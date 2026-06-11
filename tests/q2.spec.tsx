@@ -254,7 +254,7 @@ describe("Q2 section UI", () => {
     await user.click(screen.getByRole("tab", { name: "Q2 組合查詢" }));
 
     expect(screen.getByText("a = 火球鼠 ×4, b = 超夢風暴 ×3")).toBeInTheDocument();
-    const table = screen.getByRole("table");
+    const table = screen.getByRole("table", { name: "聯合分布表" });
     expect(within(table).getByText("(1, 1)")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "按字典序" }));

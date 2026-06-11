@@ -7,6 +7,8 @@ const WORKSPACES: Array<{ id: WorkspaceView; labelKey: string }> = [
   { id: "ask", labelKey: "nav.ask" },
   { id: "prizes", labelKey: "nav.prizes" },
   { id: "compare", labelKey: "nav.compare" },
+  { id: "trainer", labelKey: "nav.trainer" },
+  { id: "tracker", labelKey: "nav.tracker" },
 ];
 
 export function TopNav() {

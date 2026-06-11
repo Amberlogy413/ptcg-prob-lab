@@ -51,6 +51,7 @@ interface DeckPersisted {
 interface DeckState extends DeckPersisted {
   createDeck: (name?: string) => string;
   renameDeck: (deckId: string, name: string) => void;
+  duplicateDeck: (deckId: string, name?: string) => string | null;
   deleteDeck: (deckId: string) => void;
   setActiveDeck: (deckId: string) => void;
   importDeck: (name: string, cards: NewCardInput[]) => string;
@@ -116,6 +117,22 @@ export const useDeckStore = create<DeckState>()(
         set((s) => ({
           decks: s.decks.map((d) => (d.id === deckId ? touch({ ...d, name }) : d)),
         }));
+      },
+
+      duplicateDeck: (deckId, name) => {
+        const source = get().decks.find((d) => d.id === deckId);
+        if (!source) return null;
+        const id = uid();
+        const now = Date.now();
+        const copy: Deck = {
+          id,
+          name: name ?? `${source.name || "deck"} B`,
+          cards: source.cards.map((c) => ({ ...c, id: uid() })),
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((s) => ({ decks: [...s.decks, copy] }));
+        return id;
       },
 
       deleteDeck: (deckId) => {

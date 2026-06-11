@@ -68,9 +68,9 @@ export function useComboResult(
     const w = getWorker();
     const onMessage = (e: MessageEvent<ProbWorkerResponse>) => {
       if (e.data.id !== id) return; // stale response — ignore
-      if (e.data.ok) {
+      if (e.data.ok && "result" in e.data) {
         setAsyncResult({ status: "ready", data: computeQ2Display(e.data.result, build as Q2BuildOk) });
-      } else {
+      } else if (!e.data.ok) {
         setAsyncResult({ status: "error", message: e.data.error });
       }
     };
