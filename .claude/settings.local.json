@@ -12,7 +12,9 @@
       "Bash(npm run *)",
       "Bash(npx tsc *)",
       "Bash(echo \"exit=$?\")",
-      "Bash(echo \"exit2=$?\")"
+      "Bash(echo \"exit2=$?\")",
+      "Bash(npx vitest *)",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: deck editor green *)"
     ]
   }
 }
