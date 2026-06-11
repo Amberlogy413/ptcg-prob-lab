@@ -5,7 +5,14 @@
       "Bash(git --version)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git -c user.name=user -c user.email=user@local commit -m 'seed: verified baseline *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -m 'seed: verified baseline *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\({deps:p.dependencies, dev:Object.fromEntries\\(Object.entries\\(p.devDependencies\\).map\\(\\([k,v]\\)=>[k,v]\\)\\)},null,1\\)\\)\")",
+      "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); console.log\\(JSON.stringify\\(g.meta,null,1\\)\\); console.log\\('cases:', g.cases.length\\); console.log\\('kinds:', [...new Set\\(g.cases.map\\(c=>c.kind\\)\\)].join\\(','\\)\\)\")",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(echo \"exit2=$?\")"
     ]
   }
 }

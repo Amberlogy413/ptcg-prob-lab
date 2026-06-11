@@ -1,0 +1,8 @@
+# Protected seed paths — never reformat.
+src/lib/prob/
+tests/golden/
+scripts/
+docs/
+*.md
+dist/
+node_modules/

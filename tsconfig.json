@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    /* Required by docs/03 §4 — explicit .ts-extension imports + Node strip-types compat. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "target": "ES2022",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "types": ["vite/client", "node", "@testing-library/jest-dom"]
+  },
+  // scripts/ is protected seed code executed via Node strip-types (its proof
+  // is `npm run verify:seed`); like src/lib/prob it predates
+  // noUncheckedIndexedAccess and is excluded from this program — see
+  // docs/DECISIONS.md.
+  "references": [{ "path": "./tsconfig.prob.json" }],
+  "include": ["src", "tests", "vite.config.ts", "eslint.config.js"],
+  "exclude": ["src/lib/prob"]
+}

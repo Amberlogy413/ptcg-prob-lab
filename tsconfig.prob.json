@@ -1,0 +1,22 @@
+{
+  // Dedicated project for the PROTECTED seed core (src/lib/prob — never
+  // edited). It predates docs/03 §4's `noUncheckedIndexedAccess` flag and
+  // does not compile under it; the core is guarded by golden tests instead.
+  // All other code is checked with the full flag set in tsconfig.json.
+  // See docs/DECISIONS.md (2026-06-12).
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": ".tsout/prob",
+    "rootDir": "src/lib/prob",
+    "skipLibCheck": true
+  },
+  "include": ["src/lib/prob"]
+}

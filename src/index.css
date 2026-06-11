@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply bg-paper text-ink font-sans text-base antialiased;
+  }
+
+  /* All numerals in the product are tabular — alignment is the product's
+     personality (docs/04 §2). The mono class carries it everywhere. */
+  .font-mono,
+  code,
+  kbd {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 2px blue focus ring, keyboard-visible everywhere (docs/04 §8). */
+  :focus-visible {
+    outline: 2px solid theme("colors.blue");
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .hairline {
+    @apply border-line;
+  }
+}
