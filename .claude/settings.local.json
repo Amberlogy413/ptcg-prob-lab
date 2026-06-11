@@ -20,7 +20,11 @@
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'docs: owner language preference \\(Cantonese\\) + feature ideas backlog *)",
       "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); console.log\\(g.cases.filter\\(c=>c.kind==='opening_basics'\\).map\\(c=>c.id+' B='+c.params.basics\\).join\\('\\\\n'\\)\\)\")",
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'docs: schedule ideas backlog into roadmap \\(Phase 5/6/7 + never-do list\\) *)",
-      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase2: q1 view green *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase2: q1 view green *)",
+      "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); for \\(const c of g.cases.filter\\(c=>c.kind.startsWith\\('combo'\\)\\)\\) console.log\\(c.id, JSON.stringify\\(c.params\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(rm tests/__debug.spec.tsx)",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase3: query builder green *)"
     ]
   }
 }
