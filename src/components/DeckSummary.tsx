@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import { computeDeckSummary } from "../state/selectors.ts";
+import { PrecisionRuler } from "./PrecisionRuler.tsx";
 import { DECK_SIZE } from "../constants.ts";
 
 /**
@@ -58,7 +59,7 @@ export function DeckSummary() {
                 <p className="font-mono text-xs text-ink2">
                   {summary.mulligan.fraction} · {summary.mulligan.oneIn}
                 </p>
-                <MulliganGauge
+                <PrecisionRuler
                   value={summary.mulligan.chart}
                   ariaLabel={t("summary.gauge.aria", {
                     percent: summary.mulligan.percent,
@@ -84,36 +85,3 @@ export function DeckSummary() {
   );
 }
 
-/** Small 0–100% ruler with 10% major / 5% minor ticks and a blue cursor. */
-function MulliganGauge({ value, ariaLabel }: { value: number; ariaLabel: string }) {
-  const w = 240;
-  const h = 18;
-  const x = Math.max(0, Math.min(1, value)) * w;
-  const ticks = [];
-  for (let i = 0; i <= 20; i++) {
-    const major = i % 2 === 0;
-    ticks.push(
-      <line
-        key={i}
-        x1={(i / 20) * w}
-        y1={h}
-        x2={(i / 20) * w}
-        y2={h - (major ? 7 : 4)}
-        stroke="#E3DFD6"
-        strokeWidth="1"
-      />,
-    );
-  }
-  return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="mt-2 w-full"
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <line x1="0" y1={h - 0.5} x2={w} y2={h - 0.5} stroke="#E3DFD6" strokeWidth="1" />
-      {ticks}
-      <line x1={x} y1={h} x2={x} y2={2} stroke="#2B59C3" strokeWidth="2" />
-    </svg>
-  );
-}

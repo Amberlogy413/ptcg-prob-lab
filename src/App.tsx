@@ -3,6 +3,7 @@ import { TopNav } from "./components/TopNav.tsx";
 import { Footer } from "./components/Footer.tsx";
 import { DeckSummary } from "./components/DeckSummary.tsx";
 import { DeckView } from "./views/DeckView.tsx";
+import { AskView } from "./views/AskView.tsx";
 import { PlaceholderView } from "./views/PlaceholderView.tsx";
 import { useUiStore } from "./state/uiStore.ts";
 import { useSettingsStore } from "./state/settingsStore.ts";
@@ -22,9 +23,7 @@ export default function App() {
         <DeckSummary />
         <div className="min-w-0">
           {activeView === "deck" && <DeckView />}
-          {activeView === "ask" && (
-            <PlaceholderView titleKey="view.ask.title" descKey="view.ask.desc" />
-          )}
+          {activeView === "ask" && <AskView />}
           {activeView === "prizes" && (
             <PlaceholderView titleKey="view.prizes.title" descKey="view.prizes.desc" />
           )}

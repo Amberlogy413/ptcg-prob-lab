@@ -16,7 +16,11 @@
       "Bash(npx vitest *)",
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: deck editor green *)",
       "Bash(echo \"TYPECHECK_EXIT=$?\")",
-      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: restrict semantic color use per docs/04 §2 \\(ship-check follow-up\\) *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: restrict semantic color use per docs/04 §2 \\(ship-check follow-up\\) *)",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'docs: owner language preference \\(Cantonese\\) + feature ideas backlog *)",
+      "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); console.log\\(g.cases.filter\\(c=>c.kind==='opening_basics'\\).map\\(c=>c.id+' B='+c.params.basics\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'docs: schedule ideas backlog into roadmap \\(Phase 5/6/7 + never-do list\\) *)",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase2: q1 view green *)"
     ]
   }
 }
