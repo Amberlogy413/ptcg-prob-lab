@@ -139,7 +139,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
                 </div>
               )}
               {rememberedCount > 0 && (
-                <p className="text-good" role="status">
+                <p className="text-ink2" role="status">
                   {t("import.step2.remembered", { n: rememberedCount })}
                 </p>
               )}

@@ -14,7 +14,9 @@
       "Bash(echo \"exit=$?\")",
       "Bash(echo \"exit2=$?\")",
       "Bash(npx vitest *)",
-      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: deck editor green *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: deck editor green *)",
+      "Bash(echo \"TYPECHECK_EXIT=$?\")",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase1: restrict semantic color use per docs/04 §2 \\(ship-check follow-up\\) *)"
     ]
   }
 }
