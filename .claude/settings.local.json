@@ -24,7 +24,9 @@
       "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); for \\(const c of g.cases.filter\\(c=>c.kind.startsWith\\('combo'\\)\\)\\) console.log\\(c.id, JSON.stringify\\(c.params\\)\\)\")",
       "Bash(python -c ' *)",
       "Bash(rm tests/__debug.spec.tsx)",
-      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase3: query builder green *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase3: query builder green *)",
+      "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); for \\(const c of g.cases.filter\\(c=>c.kind.startsWith\\('prize'\\)\\)\\) console.log\\(c.kind, '|', c.id, '|', JSON.stringify\\(c.params\\)\\)\")",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase4: prizes green — MVP complete *)"
     ]
   }
 }

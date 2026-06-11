@@ -141,6 +141,7 @@ export function Q1Section() {
           <DistTable
             rows={distRows}
             caption={distMode === "conditional" ? t("q1.conditional.title") : t("q1.dist.raw")}
+            csvName="q1_distribution"
           />
         </div>
         <p className="mt-3 font-mono text-xs text-ink2">
