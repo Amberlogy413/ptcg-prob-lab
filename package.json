@@ -1,0 +1,11 @@
+{
+  "name": "ptcg-prob-lab",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Seed repository for the PTCG Probability Lab — exact-math deck probability web app. See CLAUDE.md.",
+  "scripts": {
+    "golden": "python3 scripts/generate_golden.py",
+    "verify:seed": "node --experimental-strip-types scripts/verify_seed.ts"
+  }
+}
