@@ -24,6 +24,13 @@ The human-facing docs are written in Traditional Chinese (zh-Hant) because the
 product owner and launch audience are zh-Hant users. Keep them in zh-Hant.
 Code identifiers and comments stay in English.
 
+**Communication with the product owner (standing instruction, 2026-06-12):**
+the owner's English is limited — ALL chat replies, reports, and explanations
+to them must be in Traditional Chinese with Cantonese phrasing (廣東話口語,
+e.g. 嘅/係/喺/唔/啲). Docs stay in written zh-Hant (書面語); code identifiers
+and comments stay in English; the terminology lock below applies everywhere
+(概率, never 機率).
+
 ## Non-negotiables
 
 1. **Exact math only.** Inside `src/lib/prob/`, probabilities exist solely as
