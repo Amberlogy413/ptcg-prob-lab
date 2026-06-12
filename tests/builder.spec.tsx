@@ -129,6 +129,20 @@ describe("layered deck builder", () => {
     expect(within(dialog).getByText(/^2[0-9]\.[0-9]{6}%$/)).toBeInTheDocument();
   });
 
+  it("功能 layer filters by what the card actually does", async () => {
+    useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    const user = await openBuilder();
+
+    // Whole std pool: two cards carry the draw tag (水水獺 + 調換票).
+    await user.click(await screen.findByRole("button", { name: /^抽卡 2$/ }));
+    expect(screen.getByText("2 張符合")).toBeInTheDocument();
+
+    // Narrowing to Pokémon recomputes the tag pool — only 水水獺 remains.
+    await user.click(screen.getByRole("button", { name: /^寶可夢 3$/ }));
+    expect(await screen.findByText("1 張符合")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^加入 水水獺\(SV9-050\)/ })).toBeInTheDocument();
+  });
+
   it("ⓘ in the grid opens the full card visual", async () => {
     useDeckStore.getState().importDeck("錨點", anchorDeckRows());
     const user = await openBuilder();

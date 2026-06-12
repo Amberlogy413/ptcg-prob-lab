@@ -12,6 +12,8 @@ import {
   energyTypeKey,
   typeKey,
   kindOf,
+  fnKey,
+  FN_ORDER,
   type Catalog,
   type CatalogCard,
 } from "../data/catalog.ts";
@@ -73,6 +75,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   const [category, setCategory] = useState<Category | null>(null);
   const [sub, setSub] = useState<string | null>(null);
   const [type, setType] = useState<string | null>(null);
+  const [fnTag, setFnTag] = useState<string | null>(null);
   const [stdOnly, setStdOnly] = useState(true);
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<CatalogCard | null>(null);
@@ -111,12 +114,24 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     () => (type === null ? pool2 : pool2.filter((c) => (c.types ?? []).includes(type))),
     [pool2, type],
   );
+  // Self-healing selection: when upper layers change and the chosen tag has
+  // zero cards in the new pool, it simply stops filtering (no hidden state).
+  const fnCountsEarly = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of pool3) for (const k of c.fn ?? []) m.set(k, (m.get(k) ?? 0) + 1);
+    return m;
+  }, [pool3]);
+  const activeFn = fnTag !== null && fnCountsEarly.has(fnTag) ? fnTag : null;
+  const pool4 = useMemo(
+    () => (activeFn === null ? pool3 : pool3.filter((c) => (c.fn ?? []).includes(activeFn))),
+    [pool3, activeFn],
+  );
   const results = useMemo(() => {
     if (catalog === null) return [];
     const q = search.trim().toLowerCase();
-    const hits = q === "" ? pool3 : pool3.filter((c) => c.name.toLowerCase().includes(q));
+    const hits = q === "" ? pool4 : pool4.filter((c) => c.name.toLowerCase().includes(q));
     return sortPrints(catalog, hits);
-  }, [catalog, pool3, search]);
+  }, [catalog, pool4, search]);
 
   const countBy = (cards: CatalogCard[], pick: (c: CatalogCard) => string | undefined) => {
     const m = new Map<string, number>();
@@ -135,6 +150,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     }
     return m;
   }, [pool2, category]);
+  const fnCounts = fnCountsEarly;
 
   const nameTotals = useMemo(() => {
     const m = new Map<string, number>();
@@ -276,6 +292,29 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                 >
                   {label(typeKey(ty), ty)}{" "}
                   <span className="font-mono text-xs">{typeCounts.get(ty)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 功能層 (P10.2): deterministic function tags from the card text. */}
+          {fnCounts.size > 0 && (
+            <div
+              className="mt-2 flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label={t("builder.layer.fn")}
+            >
+              <span className="text-xs text-ink2">{t("builder.layer.fn")}</span>
+              {FN_ORDER.filter((k) => (fnCounts.get(k) ?? 0) > 0).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  aria-pressed={activeFn === k}
+                  onClick={() => setFnTag(activeFn === k ? null : k)}
+                  className={chip(activeFn === k)}
+                >
+                  {label(fnKey(k), k)}{" "}
+                  <span className="font-mono text-xs">{fnCounts.get(k)}</span>
                 </button>
               ))}
             </div>

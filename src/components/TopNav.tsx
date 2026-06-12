@@ -1,16 +1,27 @@
+import type { ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
 import { useUiStore, type WorkspaceView } from "../state/uiStore.ts";
 import { useSettingsStore, type Locale } from "../state/settingsStore.ts";
+import {
+  IconDeck,
+  IconReport,
+  IconTrial,
+  IconAsk,
+  IconPrizes,
+  IconCompare,
+  IconTrainer,
+  IconTracker,
+} from "./icons.tsx";
 
-const WORKSPACES: Array<{ id: WorkspaceView; labelKey: string }> = [
-  { id: "deck", labelKey: "nav.deck" },
-  { id: "report", labelKey: "nav.report" },
-  { id: "trial", labelKey: "nav.trial" },
-  { id: "ask", labelKey: "nav.ask" },
-  { id: "prizes", labelKey: "nav.prizes" },
-  { id: "compare", labelKey: "nav.compare" },
-  { id: "trainer", labelKey: "nav.trainer" },
-  { id: "tracker", labelKey: "nav.tracker" },
+const WORKSPACES: Array<{ id: WorkspaceView; labelKey: string; icon: ReactNode }> = [
+  { id: "deck", labelKey: "nav.deck", icon: <IconDeck /> },
+  { id: "report", labelKey: "nav.report", icon: <IconReport /> },
+  { id: "trial", labelKey: "nav.trial", icon: <IconTrial /> },
+  { id: "ask", labelKey: "nav.ask", icon: <IconAsk /> },
+  { id: "prizes", labelKey: "nav.prizes", icon: <IconPrizes /> },
+  { id: "compare", labelKey: "nav.compare", icon: <IconCompare /> },
+  { id: "trainer", labelKey: "nav.trainer", icon: <IconTrainer /> },
+  { id: "tracker", labelKey: "nav.tracker", icon: <IconTracker /> },
 ];
 
 export function TopNav() {
@@ -27,8 +38,8 @@ export function TopNav() {
           <h1 className="text-lg font-medium leading-tight">{t("app.title")}</h1>
           <p className="text-xs text-ink2">{t("app.tagline")}</p>
         </div>
-        <nav aria-label={t("nav.aria")} className="flex items-end gap-1">
-          {WORKSPACES.map(({ id, labelKey }) => {
+        <nav aria-label={t("nav.aria")} className="flex flex-wrap items-end gap-1">
+          {WORKSPACES.map(({ id, labelKey, icon }) => {
             const active = id === activeView;
             return (
               <button
@@ -37,12 +48,13 @@ export function TopNav() {
                 onClick={() => setActiveView(id)}
                 aria-current={active ? "page" : undefined}
                 className={
-                  "rounded-ctl px-3 py-1.5 text-sm transition-colors duration-fast " +
+                  "inline-flex items-center gap-1.5 rounded-ctl px-3 py-1.5 text-sm transition-colors duration-fast " +
                   (active
                     ? "bg-blue font-medium text-white"
                     : "text-ink2 hover:bg-surface hover:text-ink")
                 }
               >
+                {icon}
                 {t(labelKey)}
               </button>
             );

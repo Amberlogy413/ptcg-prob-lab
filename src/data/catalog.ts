@@ -60,6 +60,10 @@ export interface CatalogCard {
   /** Pokédex flavor text. */
   description?: string;
   item?: { name: string; effect?: string };
+  /** 人性化功能標籤 — deterministic keyword tags over the official card text
+   *  (pipeline classify(); keys: search/draw/accel/heal/disrupt/gust/recover/
+   *  protect/boost/attacker/ability). */
+  fn?: string[];
   set: string | null;
 }
 
@@ -278,6 +282,38 @@ const ENERGY_KEYS: Record<string, string> = {
 };
 export function energyTypeKey(energyType: string): string | null {
   return ENERGY_KEYS[energyType] ?? null;
+}
+
+/** 功能 tags in display order (builder chips, CardVisual). */
+export const FN_ORDER = [
+  "attacker",
+  "ability",
+  "search",
+  "draw",
+  "accel",
+  "gust",
+  "disrupt",
+  "recover",
+  "heal",
+  "protect",
+  "boost",
+] as const;
+
+const FN_KEYS: Record<string, string> = {
+  search: "catalog.fn.search",
+  draw: "catalog.fn.draw",
+  accel: "catalog.fn.accel",
+  heal: "catalog.fn.heal",
+  disrupt: "catalog.fn.disrupt",
+  gust: "catalog.fn.gust",
+  recover: "catalog.fn.recover",
+  protect: "catalog.fn.protect",
+  boost: "catalog.fn.boost",
+  attacker: "catalog.fn.attacker",
+  ability: "catalog.fn.ability",
+};
+export function fnKey(tag: string): string | null {
+  return FN_KEYS[tag] ?? null;
 }
 
 const TYPE_KEYS: Record<string, string> = {

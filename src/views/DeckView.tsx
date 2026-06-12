@@ -10,6 +10,18 @@ import { TemplateDialog } from "../components/TemplateDialog.tsx";
 import { DeckSheetDialog } from "../components/DeckSheetDialog.tsx";
 import { DeckBuilderDialog } from "../components/DeckBuilderDialog.tsx";
 import { RotationPanel } from "../components/RotationPanel.tsx";
+import {
+  IconBuilder,
+  IconImport,
+  IconExport,
+  IconSheet,
+  IconTag,
+  IconLink,
+  IconTemplate,
+} from "../components/icons.tsx";
+
+const TOOLBTN =
+  "inline-flex items-center gap-1.5 rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
 export function DeckView() {
@@ -48,15 +60,17 @@ export function DeckView() {
           <button
             type="button"
             onClick={() => setImportOpen(true)}
-            className="rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white"
+            className="inline-flex items-center gap-1.5 rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white"
           >
+            <IconImport />
             {t("deck.import")}
           </button>
           <button
             type="button"
             onClick={startBuilder}
-            className="rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
+            className="inline-flex items-center gap-1.5 rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
           >
+            <IconBuilder />
             {t("builder.button")}
           </button>
           <button
@@ -69,8 +83,9 @@ export function DeckView() {
           <button
             type="button"
             onClick={() => setTemplatesOpen(true)}
-            className="rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
+            className="inline-flex items-center gap-1.5 rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
           >
+            <IconTemplate />
             {t("templates.button")}
           </button>
         </div>
@@ -117,58 +132,37 @@ export function DeckView() {
         >
           ＋ {t("deck.new")}
         </button>
-        <div className="ml-auto flex gap-2">
-          <button
-            type="button"
-            onClick={startBuilder}
-            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-          >
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button type="button" onClick={startBuilder} className={TOOLBTN}>
+            <IconBuilder />
             {t("builder.button")}
           </button>
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-          >
+          <button type="button" onClick={() => setImportOpen(true)} className={TOOLBTN}>
+            <IconImport />
             {t("deck.import")}
           </button>
           {activeDeck && (
-            <button
-              type="button"
-              onClick={() => setExportOpen(true)}
-              className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-            >
+            <button type="button" onClick={() => setExportOpen(true)} className={TOOLBTN}>
+              <IconExport />
               {t("deck.export")}
             </button>
           )}
           {activeDeck && (
-            <button
-              type="button"
-              onClick={() => setSheetOpen(true)}
-              className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-            >
+            <button type="button" onClick={() => setSheetOpen(true)} className={TOOLBTN}>
+              <IconSheet />
               {t("sheet.button")}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setBasicListOpen(true)}
-            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-          >
+          <button type="button" onClick={() => setBasicListOpen(true)} className={TOOLBTN}>
+            <IconTag />
             {t("basiclist.button")}
           </button>
-          <button
-            type="button"
-            onClick={() => setAliasOpen(true)}
-            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-          >
+          <button type="button" onClick={() => setAliasOpen(true)} className={TOOLBTN}>
+            <IconLink />
             {t("alias.button")}
           </button>
-          <button
-            type="button"
-            onClick={() => setTemplatesOpen(true)}
-            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
-          >
+          <button type="button" onClick={() => setTemplatesOpen(true)} className={TOOLBTN}>
+            <IconTemplate />
             {t("templates.button")}
           </button>
         </div>

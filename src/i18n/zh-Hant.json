@@ -600,5 +600,17 @@
   "builder.done": "完成",
   "builder.empty": "此層沒有符合的卡片。",
   "builder.more": "還有 {n} 張未顯示——用搜尋或更深層篩選收窄。",
-  "modal.close": "關閉對話框"
+  "modal.close": "關閉對話框",
+  "builder.layer.fn": "功能",
+  "catalog.fn.attacker": "攻擊手",
+  "catalog.fn.ability": "特性系",
+  "catalog.fn.search": "檢索",
+  "catalog.fn.draw": "抽卡",
+  "catalog.fn.accel": "能量加速",
+  "catalog.fn.gust": "拉打",
+  "catalog.fn.disrupt": "干擾",
+  "catalog.fn.recover": "回收",
+  "catalog.fn.heal": "回復",
+  "catalog.fn.protect": "保護",
+  "catalog.fn.boost": "加傷"
 }

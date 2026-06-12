@@ -12,16 +12,18 @@ export default {
       transparent: "transparent",
       current: "currentColor",
       white: "#FFFFFF",
-      paper: "#FAF8F3", // global background (warm paper)
+      paper: "#FBF5F7", // global background (sakura paper, 2026-06-12 revision)
       surface: "#FFFFFF", // cards
-      ink: "#15181C", // primary text
-      ink2: "#5A6069", // secondary text
-      line: "#E3DFD6", // hairline
-      blue: "#2B59C3", // the single accent: buttons, active chips, links
+      ink: "#32222B", // primary text (warm plum ink)
+      ink2: "#7C5F6D", // secondary text (mauve)
+      line: "#F1DCE5", // hairline (pink)
+      // The single accent. Token KEY stays "blue" for class-name stability
+      // across ~50 files; the VALUE is now sakura rose (docs/04 §2 revision).
+      blue: "#C8447C",
       good: "#0E7A4A", // emerald: favorable / rising delta / ideal hand
       warn: "#B45309", // amber: caution / playable hand
       bad: "#B3261E", // crimson: unfavorable / falling delta / dead hand
-      receipt: "#FFFEF9", // receipt paper
+      receipt: "#FFFBFC", // receipt paper (pink-white)
     },
     fontFamily: {
       sans: ['"Noto Sans TC"', '"IBM Plex Sans"', "system-ui", "sans-serif"],
@@ -38,8 +40,8 @@ export default {
     },
     borderRadius: {
       none: "0",
-      ctl: "6px", // controls
-      card: "10px", // cards
+      ctl: "8px", // controls (humanized, 2026-06-12 revision)
+      card: "14px", // cards
       full: "9999px",
     },
     extend: {

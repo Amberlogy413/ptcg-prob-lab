@@ -21,6 +21,7 @@ export function makeCatalogFixture(): Catalog {
       illustrator: "Shimaris Yukichi",
       dexId: [10],
       description: "別看牠的腳很短。",
+      fn: ["heal"],
       set: "SV9",
     },
     {
@@ -57,6 +58,7 @@ export function makeCatalogFixture(): Catalog {
       types: ["Water"],
       regulationMark: "I",
       std: true,
+      fn: ["draw"],
       set: "SV9",
     },
     {
@@ -68,6 +70,7 @@ export function makeCatalogFixture(): Catalog {
       effect: "數過自己的獎賞卡張數後,全部翻回反面並重洗,放回牌庫下方。",
       regulationMark: "I",
       std: true,
+      fn: ["draw"],
       set: "SV9",
     },
     {

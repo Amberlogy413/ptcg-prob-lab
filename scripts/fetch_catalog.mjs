@@ -200,6 +200,51 @@ function sanityPass(cards) {
   console.log(`  sanity pass: ${fixedStage} stages, ${fixedCategory} categories corrected`);
 }
 
+/**
+ * Function classifier (人性化功能分類): deterministic keyword rules over the
+ * OFFICIAL zh card text — every tag is reproducible from the card's own
+ * words, no judgment calls. Tags land in `fn: string[]` and drive the
+ * builder's 功能 layer. Keys are stable identifiers; labels live in i18n.
+ */
+const FN_RULES = [
+  ["search", /從(自己的)?牌庫(中|上方)?選擇|搜尋(自己的)?牌庫/],
+  ["draw", /抽出|抽\d+張/],
+  ["accel", /從(自己的)?(棄牌區|牌庫|手牌)[^。]{0,25}能量[^。]{0,15}附/],
+  ["heal", /恢復[^。]{0,8}HP/],
+  // Strict possessive — 「給對手看過後放回牌庫」 (showing your own cards) must
+  // NOT count as disruption.
+  ["disrupt", /對手的(手牌|牌庫)/],
+  ["gust", /對手[^。]{0,15}備戰寶可夢[^。]{0,15}互換/],
+  ["recover", /從(自己的)?棄牌區[^。]{0,30}(加入手牌|放回牌庫|加入牌庫)/],
+  ["protect", /不會受到[^。]{0,15}(傷害|效果)|防止[^。]{0,10}傷害/],
+  ["boost", /傷害[^。]{0,4}[+＋]\s*\d|[+＋]\s*\d+\s*點/],
+];
+
+function classify(card) {
+  const texts = [
+    card.effect ?? "",
+    ...(card.attacks ?? []).map((a) => a.effect ?? ""),
+    ...(card.abilities ?? []).map((a) => a.effect ?? ""),
+    card.item?.effect ?? "",
+  ].join("\n");
+  const fn = [];
+  for (const [key, re] of FN_RULES) {
+    if (re.test(texts)) fn.push(key);
+  }
+  if (card.category === "Pokemon") {
+    const maxDamage = Math.max(
+      0,
+      ...(card.attacks ?? []).map((a) => {
+        const m = String(a.damage ?? "").match(/\d+/);
+        return m ? Number(m[0]) : 0;
+      }),
+    );
+    if (maxDamage >= 120) fn.push("attacker");
+    if ((card.abilities ?? []).length > 0) fn.push("ability");
+  }
+  if (fn.length > 0) card.fn = fn;
+}
+
 async function main() {
   await mkdir(CACHE_DIR, { recursive: true });
   await mkdir(path.dirname(OUT_FILE), { recursive: true });
@@ -248,6 +293,13 @@ async function main() {
 
   console.log("[4/4] assemble…");
   sanityPass(cards);
+  for (const c of cards) classify(c);
+  const fnTally = new Map();
+  for (const c of cards) for (const k of c.fn ?? []) fnTally.set(k, (fnTally.get(k) ?? 0) + 1);
+  console.log(
+    "  fn tags:",
+    [...fnTally.entries()].map(([k, n]) => `${k}=${n}`).join(" "),
+  );
   // Deterministic order: set release date, then set id, then numeric localId.
   cards.sort((a, b) => {
     const da = sets[a.set]?.date ?? "";
