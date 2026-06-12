@@ -1,7 +1,7 @@
 {
   "name": "ptcg-prob-lab",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "PTCG Probability Lab — exact-math deck probability web app. See CLAUDE.md.",
   "scripts": {
