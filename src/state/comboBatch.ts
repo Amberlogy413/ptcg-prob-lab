@@ -5,6 +5,7 @@
  */
 
 import { comboOpening, type ComboResult, type TrackedCard, type ComboOptions } from "../lib/prob/index.ts";
+import { simulateCombo, type McComboParams, type McResult } from "./mcSim.ts";
 import type { ProbWorkerRequest, ProbWorkerResponse } from "../workers/prob.worker.ts";
 
 export interface BatchJob {
@@ -47,5 +48,22 @@ export function runComboBatch(jobs: BatchJob[]): Promise<Array<ComboResult | nul
     };
     w.addEventListener("message", onMessage);
     w.postMessage({ id, kind: "comboBatch", jobs } satisfies ProbWorkerRequest);
+  });
+}
+
+/** Monte-Carlo verification run (docs/05 §D) — Worker when available. */
+export function runMcCombo(params: McComboParams): Promise<McResult> {
+  if (typeof Worker === "undefined") return Promise.resolve(simulateCombo(params));
+  return new Promise((resolve, reject) => {
+    const id = nextId++;
+    const w = getWorker();
+    const onMessage = (e: MessageEvent<ProbWorkerResponse>) => {
+      if (e.data.id !== id) return;
+      w.removeEventListener("message", onMessage);
+      if (e.data.ok && "mc" in e.data) resolve(e.data.mc);
+      else if (!e.data.ok) reject(new Error(e.data.error));
+    };
+    w.addEventListener("message", onMessage);
+    w.postMessage({ id, kind: "mcCombo", params } satisfies ProbWorkerRequest);
   });
 }

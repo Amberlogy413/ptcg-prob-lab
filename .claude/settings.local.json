@@ -27,7 +27,11 @@
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase3: query builder green *)",
       "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors.json'\\); for \\(const c of g.cases.filter\\(c=>c.kind.startsWith\\('prize'\\)\\)\\) console.log\\(c.kind, '|', c.id, '|', JSON.stringify\\(c.params\\)\\)\")",
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase4: prizes green — MVP complete *)",
-      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase5: v1 green *)"
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase5: v1 green *)",
+      "Bash(python scripts/generate_golden_v2.py)",
+      "Bash(python -)",
+      "Bash(node -e \"const g=require\\('./tests/golden/golden_vectors_v2.json'\\); const c=g.cases.find\\(c=>c.id==='energy_valid_E10_B10_w1'\\); console.log\\('n=8:', c.expect.by_n['8']\\); console.log\\('n=9:', c.expect.by_n['9']\\); console.log\\('p_valid:', c.expect.p_valid\\)\")",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase6: v2 green *)"
     ]
   }
 }

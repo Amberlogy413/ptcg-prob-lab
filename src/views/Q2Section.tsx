@@ -10,8 +10,8 @@ import { Q2ResultCard } from "../components/Q2ResultCard.tsx";
 import { encodeShare } from "../utils/share.ts";
 import { downloadResultCardPng } from "../utils/resultCard.ts";
 import { buildSensitivityPlan, finishSensitivity, type SensitivityRow } from "../state/q5.ts";
-import { runComboBatch } from "../state/comboBatch.ts";
-import type { Q2Data } from "../state/selectors.ts";
+import { runComboBatch, runMcCombo } from "../state/comboBatch.ts";
+import { buildComboParams, type Q2Data } from "../state/selectors.ts";
 import { HAND_SIZE } from "../constants.ts";
 
 /** Q2 section: sentence builder on desktop, step wizard under 768px. */
@@ -49,7 +49,16 @@ export function Q2Section() {
           </>
         )}
         {ready && state.status === "ready" && (
-          <ResultActions deck={deck} tracked={tracked} aware={mulliganAware} data={state.data} />
+          <>
+            <ResultActions deck={deck} tracked={tracked} aware={mulliganAware} data={state.data} />
+            <McVerifyBlock
+              deck={deck}
+              tracked={tracked}
+              aware={mulliganAware}
+              exactPercent={state.data.headline.percent}
+              exactChart={state.data.headline.chart}
+            />
+          </>
         )}
         {ready && tracked.length > 0 && (
           <SensitivityBlock deck={deck} q={tracked[0] as TrackedQueryCard} aware={mulliganAware} />
@@ -209,6 +218,98 @@ function SensitivityBlock({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/** Monte-Carlo verification (docs/05 §D): 100,000 full-rule games in the
+ *  Worker, 95% band beside the exact value. The simulation jitters; the
+ *  exact value does not — that is the lesson. */
+function McVerifyBlock({
+  deck,
+  tracked,
+  aware,
+  exactPercent,
+  exactChart,
+}: {
+  deck: Deck;
+  tracked: TrackedQueryCard[];
+  aware: boolean;
+  exactPercent: string;
+  exactChart: number;
+}) {
+  const t = useT();
+  const [running, setRunning] = useState(false);
+  const [mc, setMc] = useState<{ phat: number; lo: number; hi: number; n: number } | null>(null);
+
+  async function run(): Promise<void> {
+    const build = buildComboParams(deck, tracked, aware);
+    if (build.status !== "ok") return;
+    setRunning(true);
+    setMc(null);
+    try {
+      const result = await runMcCombo({
+        counts: build.cards.map((c) => c.count),
+        constraints: build.cards.map((c) => [c.min, c.max]),
+        isBasic: build.cards.map((c) => c.isBasic === true),
+        otherBasics: aware ? (build.opts.mulliganAware?.otherBasics ?? 0) : -1,
+        N: build.opts.N ?? 60,
+        H: build.opts.H ?? HAND_SIZE,
+        iterations: 100000,
+        seed: (Date.now() ^ Math.floor(Math.random() * 2 ** 31)) >>> 0,
+      });
+      const phat = result.hits / result.n;
+      const se = Math.sqrt((phat * (1 - phat)) / result.n);
+      setMc({ phat, lo: Math.max(0, phat - 1.96 * se), hi: Math.min(1, phat + 1.96 * se), n: result.n });
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t hairline pt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={running}
+          onClick={() => void run()}
+          className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink disabled:opacity-40"
+        >
+          {running ? t("q2.computing") : t("mc.button")}
+        </button>
+        <span className="text-xs text-ink2">{t("mc.note")}</span>
+      </div>
+      {mc && (
+        <div className="mt-2">
+          <p className="font-mono text-sm">
+            {t("mc.result", {
+              phat: (mc.phat * 100).toFixed(3),
+              lo: (mc.lo * 100).toFixed(3),
+              hi: (mc.hi * 100).toFixed(3),
+              n: mc.n.toLocaleString("en-US"),
+            })}
+          </p>
+          <p className="mt-0.5 font-mono text-sm">
+            {t("mc.exact", { exact: exactPercent })}{" "}
+            <span className={exactChart >= mc.lo && exactChart <= mc.hi ? "text-good" : "text-warn"}>
+              {exactChart >= mc.lo && exactChart <= mc.hi ? t("mc.within") : t("mc.outside")}
+            </span>
+          </p>
+          <svg viewBox="0 0 240 14" className="mt-1 w-full max-w-md" role="img" aria-label={t("mc.band.aria")}>
+            <line x1="0" y1="7" x2="240" y2="7" stroke="#E3DFD6" strokeWidth="1" />
+            <rect
+              x={mc.lo * 240}
+              y="3"
+              width={Math.max((mc.hi - mc.lo) * 240, 1)}
+              height="8"
+              fill="#2B59C3"
+              opacity="0.25"
+            />
+            <line x1={mc.phat * 240} y1="2" x2={mc.phat * 240} y2="12" stroke="#5A6069" strokeWidth="1.5" />
+            <line x1={exactChart * 240} y1="0" x2={exactChart * 240} y2="14" stroke="#2B59C3" strokeWidth="2" />
+          </svg>
+        </div>
+      )}
     </div>
   );
 }

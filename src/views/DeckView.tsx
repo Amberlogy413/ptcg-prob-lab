@@ -4,6 +4,7 @@ import { useDeckStore } from "../state/deckStore.ts";
 import { DeckEditor } from "../components/DeckEditor.tsx";
 import { ImportWizard } from "../components/ImportWizard.tsx";
 import { ExportDialog } from "../components/ExportDialog.tsx";
+import { BasicListDialog } from "../components/BasicListDialog.tsx";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
 export function DeckView() {
@@ -15,6 +16,7 @@ export function DeckView() {
   const addCard = useDeckStore((s) => s.addCard);
   const [importOpen, setImportOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [basicListOpen, setBasicListOpen] = useState(false);
 
   const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
@@ -100,6 +102,13 @@ export function DeckView() {
               {t("deck.export")}
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setBasicListOpen(true)}
+            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
+          >
+            {t("basiclist.button")}
+          </button>
         </div>
       </div>
 
@@ -109,6 +118,7 @@ export function DeckView() {
       {exportOpen && activeDeck && (
         <ExportDialog deck={activeDeck} onClose={() => setExportOpen(false)} />
       )}
+      {basicListOpen && <BasicListDialog onClose={() => setBasicListOpen(false)} />}
     </div>
   );
 }

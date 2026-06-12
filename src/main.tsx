@@ -20,3 +20,13 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+// PWA service worker (docs/06 Phase 6) — production only, so dev hot reload
+// never fights the cache.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
+      console.warn("[pwa] service worker registration failed:", err);
+    });
+  });
+}

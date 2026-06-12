@@ -6,7 +6,7 @@ import { DeckView } from "./views/DeckView.tsx";
 import { AskView } from "./views/AskView.tsx";
 import { PrizesView } from "./views/PrizesView.tsx";
 import { CompareView } from "./views/CompareView.tsx";
-import { TrainerView } from "./views/TrainerView.tsx";
+import { TrainerView, LuckMeter, FallacyMuseum } from "./views/TrainerView.tsx";
 import { TrackerView } from "./views/TrackerView.tsx";
 import { useUiStore } from "./state/uiStore.ts";
 import { useSettingsStore } from "./state/settingsStore.ts";
@@ -79,7 +79,13 @@ export default function App() {
           {activeView === "ask" && <AskView />}
           {activeView === "prizes" && <PrizesView />}
           {activeView === "compare" && <CompareView />}
-          {activeView === "trainer" && <TrainerView />}
+          {activeView === "trainer" && (
+            <>
+              <TrainerView />
+              <LuckMeter />
+              <FallacyMuseum />
+            </>
+          )}
           {activeView === "tracker" && <TrackerView />}
         </div>
       </main>

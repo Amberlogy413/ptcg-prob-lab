@@ -2,7 +2,7 @@ import { useT } from "../i18n/index.ts";
 import { useUiStore, type AskTab } from "../state/uiStore.ts";
 import { Q1Section } from "./Q1Section.tsx";
 import { Q2Section } from "./Q2Section.tsx";
-import { CurveSection } from "./CurveSection.tsx";
+import { CurveSection, EnergyCurveBlock } from "./CurveSection.tsx";
 import { GradeSection } from "./GradeSection.tsx";
 import { PresetStrip } from "../components/PresetStrip.tsx";
 
@@ -41,7 +41,12 @@ export function AskView() {
       </div>
       {tab === "q1" && <Q1Section />}
       {tab === "q2" && <Q2Section />}
-      {tab === "curve" && <CurveSection />}
+      {tab === "curve" && (
+        <>
+          <CurveSection />
+          <EnergyCurveBlock />
+        </>
+      )}
       {tab === "grade" && <GradeSection />}
     </div>
   );

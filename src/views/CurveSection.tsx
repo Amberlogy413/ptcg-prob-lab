@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
-import { useDeckStore } from "../state/deckStore.ts";
-import { computeTurnCurve, type TurnCurveRow } from "../state/q5.ts";
+import { useDeckStore, deckBasics, deckTotal } from "../state/deckStore.ts";
+import { computeTurnCurve, computeEnergyCurve, type TurnCurveRow } from "../state/q5.ts";
 import { downloadCsv } from "../utils/csv.ts";
 import { HAND_SIZE, DECK_SIZE } from "../constants.ts";
 
@@ -170,6 +170,134 @@ export function CurveSection() {
           </tbody>
         </table>
       </div>
+    </section>
+  );
+}
+
+/** 能量斷流曲線 (docs/02 §6.4, golden pipeline v2) — mulligan-aware. */
+export function EnergyCurveBlock() {
+  const t = useT();
+  const decks = useDeckStore((s) => s.decks);
+  const activeDeckId = useDeckStore((s) => s.activeDeckId);
+  const deck = decks.find((d) => d.id === activeDeckId) ?? null;
+
+  const deckEnergy = (deck?.cards ?? [])
+    .filter((c) => c.section === "energy")
+    .reduce((s, c) => s + c.count, 0);
+  const basics = deck ? deckBasics(deck) : 0;
+  const total = deck ? deckTotal(deck) : 0;
+
+  const [energy, setEnergy] = useState<number | null>(null);
+  const [want, setWant] = useState(1);
+  const [goingFirst, setGoingFirst] = useState(false);
+  const E = energy ?? deckEnergy;
+
+  const data = useMemo(() => {
+    if (!deck || total !== DECK_SIZE || basics < 1 || E < 0 || E + basics > DECK_SIZE) return null;
+    return computeEnergyCurve(E, basics, Math.max(1, want), goingFirst, false, 8, DECK_SIZE);
+  }, [deck, total, basics, E, want, goingFirst]);
+
+  return (
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-medium">{t("energy.title")}</h2>
+        <span className="rounded-ctl bg-blue px-2 py-0.5 text-xs font-medium text-white">
+          {t("toggle.mulligan.on")}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-ink2">{t("energy.desc")}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          {t("energy.count")}
+          <input
+            type="number"
+            min={0}
+            max={DECK_SIZE}
+            value={E}
+            aria-label={t("energy.count")}
+            onChange={(e) =>
+              setEnergy(Math.max(0, Math.min(DECK_SIZE, Math.trunc(Number(e.target.value) || 0))))
+            }
+            className="h-8 w-14 rounded-ctl border hairline bg-surface text-center font-mono text-sm"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          {t("energy.want")}
+          <input
+            type="number"
+            min={1}
+            max={HAND_SIZE}
+            value={want}
+            aria-label={t("energy.want")}
+            onChange={(e) =>
+              setWant(Math.max(1, Math.min(HAND_SIZE, Math.trunc(Number(e.target.value) || 1))))
+            }
+            className="h-8 w-14 rounded-ctl border hairline bg-surface text-center font-mono text-sm"
+          />
+        </label>
+        <span className="font-mono text-xs text-ink2">{t("energy.basics", { b: basics })}</span>
+        <div role="group" aria-label={t("curve.turnOrder")} className="flex gap-1">
+          <button
+            type="button"
+            aria-pressed={goingFirst}
+            onClick={() => setGoingFirst(true)}
+            className={
+              "rounded-ctl px-3 py-1.5 text-sm " +
+              (goingFirst ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2")
+            }
+          >
+            {t("curve.first")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={!goingFirst}
+            onClick={() => setGoingFirst(false)}
+            className={
+              "rounded-ctl px-3 py-1.5 text-sm " +
+              (!goingFirst ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2")
+            }
+          >
+            {t("curve.second")}
+          </button>
+        </div>
+      </div>
+
+      {!data ? (
+        <p className="mt-3 text-sm text-warn" role="status">
+          {t("energy.guard")}
+        </p>
+      ) : (
+        <>
+          <p className="mt-2 font-mono text-xs text-ink2">
+            {t("q2.pValid", { fraction: data.pValid.fraction, percent: data.pValid.percent })}
+          </p>
+          <CurveChart rows={data.rows} ariaLabel={t("energy.chart.aria", { e: E, w: want })} />
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <caption className="sr-only">{t("energy.title")}</caption>
+              <thead>
+                <tr className="border-b hairline text-left text-xs text-ink2">
+                  <th scope="col" className="py-1.5 pr-3 font-medium">{t("curve.table.turn")}</th>
+                  <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("curve.table.nSeen")}</th>
+                  <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("energy.shortfall")}</th>
+                  <th scope="col" className="py-1.5 text-right font-medium">{t("table.fraction")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.rows.map((r) => (
+                  <tr key={r.turn} className="border-b hairline last:border-b-0">
+                    <td className="py-1.5 pr-3 font-mono">T{r.turn}</td>
+                    <td className="py-1.5 pr-3 text-right font-mono">{r.nSeen}</td>
+                    <td className="py-1.5 pr-3 text-right font-mono">{r.percent}</td>
+                    <td className="py-1.5 text-right font-mono">{r.fraction}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
 }

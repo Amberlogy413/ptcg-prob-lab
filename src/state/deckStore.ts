@@ -59,6 +59,9 @@ interface DeckState extends DeckPersisted {
   updateCard: (deckId: string, cardId: string, patch: Partial<Omit<DeckCard, "id">>) => void;
   removeCard: (deckId: string, cardId: string) => void;
   rememberBasicTags: (tags: Record<string, boolean>) => void;
+  /** D2 community basics list: merge into basicTags AND retag matching cards
+   *  in every deck. Returns how many deck rows were updated. */
+  importBasicList: (tags: Record<string, boolean>) => number;
 }
 
 /** Split one store state across the three spec keys (docs/DECISIONS.md). */
@@ -229,6 +232,27 @@ export const useDeckStore = create<DeckState>()(
 
       rememberBasicTags: (tags) => {
         set((s) => ({ basicTags: { ...s.basicTags, ...tags } }));
+      },
+
+      importBasicList: (tags) => {
+        let updated = 0;
+        set((s) => ({
+          basicTags: { ...s.basicTags, ...tags },
+          decks: s.decks.map((d) => {
+            let touched = false;
+            const cards = d.cards.map((c) => {
+              const flag = tags[c.name];
+              if (flag !== undefined && c.isBasic !== flag) {
+                touched = true;
+                updated += 1;
+                return { ...c, isBasic: flag };
+              }
+              return c;
+            });
+            return touched ? touch({ ...d, cards }) : d;
+          }),
+        }));
+        return updated;
       },
     }),
     {

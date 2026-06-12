@@ -15,6 +15,7 @@ import {
   add,
   sub,
   rat,
+  cmp,
   isZero,
   R_ONE,
   eq,
@@ -27,6 +28,8 @@ import {
   type TrackedCard,
   type TurnRuleOptions,
 } from "../lib/prob/index.ts";
+import { energyShortfallCurve } from "../lib/probx/energy.ts";
+import { luckTail } from "../lib/probx/luck.ts";
 import { deckTotal, deckBasics, type Deck } from "./deckStore.ts";
 import { HAND_SIZE, PRIZE_COUNT } from "../constants.ts";
 
@@ -575,5 +578,106 @@ export function buildTrainerQuestion(
     fraction: fractionStr(p),
     oneIn: oneInStr(p, 3),
     exactPct: toChartNumber(p) * 100,
+  };
+}
+
+
+// ---------------------------------------------------------------------------
+// Energy shortfall curve UI data (docs/02 §6.4, golden pipeline v2)
+// ---------------------------------------------------------------------------
+
+export interface EnergyCurveData {
+  pValid: { fraction: string; percent: string };
+  rows: TurnCurveRow[];
+}
+
+export function computeEnergyCurve(
+  E: number,
+  B: number,
+  want: number,
+  goingFirst: boolean,
+  firstPlayerSkipsFirstDraw: boolean,
+  maxTurn: number,
+  N = 60,
+): EnergyCurveData | null {
+  if (B < 1 || E < 0 || E + B > N) return null;
+  const physicalCap = N - PRIZE_COUNT;
+  const turns: number[] = [];
+  const nSeens: number[] = [];
+  for (let turn = 1; turn <= maxTurn; turn++) {
+    const natural = cardsSeenByTurn(turn, goingFirst, { H: HAND_SIZE, firstPlayerSkipsFirstDraw });
+    turns.push(turn);
+    nSeens.push(Math.min(natural, physicalCap));
+  }
+  try {
+    const r = energyShortfallCurve(E, B, want, nSeens, N, HAND_SIZE);
+    return {
+      pValid: { fraction: fractionStr(r.pValid), percent: percentStr(r.pValid, 6) },
+      rows: r.points.map((pt, i) => ({
+        turn: turns[i] as number,
+        nSeen: pt.nSeen,
+        capped: pt.nSeen === physicalCap,
+        percent: percentStr(pt.p, 6),
+        fraction: fractionStr(pt.p),
+        oneIn: oneInStr(pt.p, 3),
+        chart: toChartNumber(pt.p),
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Luck meter (docs/02 §10, golden pipeline v2)
+// ---------------------------------------------------------------------------
+
+export type LuckEventMode = "openingAware" | "seenT1";
+
+export interface LuckMeterData {
+  perGame: { percent: string; fraction: string };
+  tail: { percent: string; fraction: string; oneIn: string; chart: number };
+  expected: string;
+  /** True when the streak is genuinely rare (tail < 5%). */
+  rare: boolean;
+}
+
+export function computeLuckMeter(
+  deck: Deck,
+  cardName: string,
+  mode: LuckEventMode,
+  games: number,
+): LuckMeterData | null {
+  const N = deckTotal(deck);
+  if (N < HAND_SIZE || games < 1) return null;
+  const card = deck.cards.find((c) => c.name === cardName);
+  if (!card || card.count === 0) return null;
+  const basics = deckBasics(deck);
+
+  let p: Rat;
+  if (mode === "openingAware") {
+    if (basics < 1) return null;
+    const otherBasics = basics - (card.isBasic ? card.count : 0);
+    p = comboOpening(
+      [{ label: card.name, count: card.count, min: 1, max: HAND_SIZE, isBasic: card.isBasic }],
+      { N, H: HAND_SIZE, mulliganAware: { otherBasics } },
+    ).event;
+  } else {
+    p = pSeenAtLeast(card.count, Math.min(HAND_SIZE + 1, N), 1, N);
+  }
+
+  const tail = luckTail(p, games);
+  const expected = rat(p.n * BigInt(games), p.d);
+  const fivePct = rat(1n, 20n);
+  return {
+    perGame: { percent: percentStr(p, 6), fraction: fractionStr(p) },
+    tail: {
+      percent: percentStr(tail, 6),
+      fraction: fractionStr(tail),
+      oneIn: oneInStr(tail, 1),
+      chart: toChartNumber(tail),
+    },
+    expected: decimalStr(expected, 2),
+    rare: cmp(tail, fivePct) < 0,
   };
 }

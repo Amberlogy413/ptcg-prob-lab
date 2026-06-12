@@ -1,7 +1,23 @@
 import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckBasics, type Deck } from "../state/deckStore.ts";
-import { buildTrainerQuestion, type TrainerKind, type TrainerQuestion } from "../state/q5.ts";
+import {
+  buildTrainerQuestion,
+  computeLuckMeter,
+  type TrainerKind,
+  type TrainerQuestion,
+} from "../state/q5.ts";
+import {
+  comboOpening,
+  prizeDistUnconditional,
+  atLeastOnePrized,
+  mul,
+  sub,
+  rat,
+  R_ONE,
+  percentStr,
+} from "../lib/prob/index.ts";
+import { ratPow } from "../lib/probx/luck.ts";
 import { readJSON, writeJSON } from "../utils/storage.ts";
 
 /**
@@ -196,6 +212,189 @@ export function TrainerView() {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// C1 運氣儀表 (docs/02 §10) + B2 謬誤互動博物館 (docs/02 §9)
+// ---------------------------------------------------------------------------
+
+export function LuckMeter() {
+  const t = useT();
+  const decks = useDeckStore((s) => s.decks);
+  const activeDeckId = useDeckStore((s) => s.activeDeckId);
+  const deck = decks.find((d) => d.id === activeDeckId) ?? null;
+  const named = (deck?.cards ?? []).filter((c) => c.name.trim() !== "" && c.count > 0);
+
+  const [cardName, setCardName] = useState("");
+  const [mode, setMode] = useState<"openingAware" | "seenT1">("openingAware");
+  const [games, setGames] = useState(5);
+
+  const data = useMemo(() => {
+    if (!deck || cardName === "") return null;
+    return computeLuckMeter(deck, cardName, mode, games);
+  }, [deck, cardName, mode, games]);
+
+  if (!deck) return null;
+
+  return (
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+      <h2 className="text-lg font-medium">{t("luck.title")}</h2>
+      <p className="mt-1 text-xs text-ink2">{t("luck.desc")}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <select
+          value={cardName}
+          aria-label={t("compare.card.aria")}
+          onChange={(e) => setCardName(e.target.value)}
+          className="h-8 rounded-ctl border hairline bg-surface px-1 text-sm"
+        >
+          <option value="">{t("compare.pickCard")}</option>
+          {[...new Set(named.map((c) => c.name))].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <select
+          value={mode}
+          aria-label={t("luck.mode.aria")}
+          onChange={(e) => setMode(e.target.value as "openingAware" | "seenT1")}
+          className="h-8 rounded-ctl border hairline bg-surface px-1 text-sm"
+        >
+          <option value="openingAware">{t("luck.mode.opening")}</option>
+          <option value="seenT1">{t("luck.mode.t1")}</option>
+        </select>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          {t("luck.games")}
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={games}
+            aria-label={t("luck.games")}
+            onChange={(e) =>
+              setGames(Math.max(1, Math.min(50, Math.trunc(Number(e.target.value) || 1))))
+            }
+            className="h-8 w-14 rounded-ctl border hairline bg-surface text-center font-mono text-sm"
+          />
+        </label>
+      </div>
+
+      {data && (
+        <div className="mt-3">
+          <p className="font-mono text-sm">
+            {t("luck.perGame", { percent: data.perGame.percent, fraction: data.perGame.fraction })}
+          </p>
+          <p className="mt-1 font-mono text-xl">
+            {t("luck.tail", { n: games, percent: data.tail.percent })}
+          </p>
+          <p className="font-mono text-xs text-ink2">
+            {data.tail.fraction} · {data.tail.oneIn} · {t("luck.expected", { e: data.expected })}
+          </p>
+          <p className={"mt-2 text-sm " + (data.rare ? "text-good" : "text-ink2")}>
+            {data.rare ? t("luck.verdict.rare") : t("luck.verdict.normal")}
+          </p>
+          <p className="mt-1 text-xs text-ink2">{t("luck.deckNote")}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+interface FallacyDemo {
+  titleKey: string;
+  wrongKey: string;
+  rightKey: string;
+  lessonKey: string;
+  wrong: string;
+  right: string;
+}
+
+export function FallacyMuseum() {
+  const t = useT();
+
+  const demos = useMemo<FallacyDemo[]>(() => {
+    // All four demos are EXACT rationals — even the "wrong" numbers are the
+    // exact values of the wrong method (docs/02 §9).
+    const p4 = comboOpening([{ count: 4, min: 1, max: 7 }], { N: 60, H: 7 }).event;
+    const both = comboOpening(
+      [
+        { count: 4, min: 1, max: 7 },
+        { count: 4, min: 1, max: 7 },
+      ],
+      { N: 60, H: 7 },
+    ).event;
+    const product = mul(p4, p4);
+
+    const binomApprox = sub(R_ONE, ratPow(rat(56n, 60n), 7));
+
+    const killer = comboOpening(
+      [
+        { count: 4, min: 1, max: 7, isBasic: true },
+        { count: 3, min: 1, max: 7, isBasic: false },
+      ],
+      { N: 60, H: 7, mulliganAware: { otherBasics: 6 } },
+    );
+
+    const prized4 = atLeastOnePrized(prizeDistUnconditional(4, 60, 6));
+    const naive40 = rat(4n, 10n);
+
+    return [
+      {
+        titleKey: "museum.d1.title",
+        wrongKey: "museum.wrong",
+        rightKey: "museum.right",
+        lessonKey: "museum.d1.lesson",
+        wrong: percentStr(product, 6),
+        right: percentStr(both, 6),
+      },
+      {
+        titleKey: "museum.d2.title",
+        wrongKey: "museum.wrong",
+        rightKey: "museum.right",
+        lessonKey: "museum.d2.lesson",
+        wrong: percentStr(binomApprox, 6),
+        right: percentStr(p4, 6),
+      },
+      {
+        titleKey: "museum.d3.title",
+        wrongKey: "museum.wrong",
+        rightKey: "museum.right",
+        lessonKey: "museum.d3.lesson",
+        wrong: percentStr(killer.eventUnconditioned ?? killer.event, 6),
+        right: percentStr(killer.event, 6),
+      },
+      {
+        titleKey: "museum.d4.title",
+        wrongKey: "museum.wrong",
+        rightKey: "museum.right",
+        lessonKey: "museum.d4.lesson",
+        wrong: percentStr(naive40, 6),
+        right: percentStr(prized4, 6),
+      },
+    ];
+  }, []);
+
+  return (
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+      <h2 className="text-lg font-medium">{t("museum.title")}</h2>
+      <p className="mt-1 text-xs text-ink2">{t("museum.desc")}</p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        {demos.map((d) => (
+          <div key={d.titleKey} className="rounded-card border hairline p-3">
+            <h3 className="text-sm font-medium">{t(d.titleKey)}</h3>
+            <p className="mt-2 font-mono text-sm">
+              <span className="text-bad">{t(d.wrongKey)} {d.wrong}</span>
+            </p>
+            <p className="font-mono text-sm">
+              <span className="text-good">{t(d.rightKey)} {d.right}</span>
+            </p>
+            <p className="mt-2 text-xs text-ink2">{t(d.lessonKey)}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
