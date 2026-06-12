@@ -33,5 +33,12 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+  {
+    // The service worker runs in a worker scope, not the DOM.
+    files: ["public/sw.js"],
+    languageOptions: {
+      globals: { ...globals.serviceworker },
+    },
+  },
   prettier,
 );

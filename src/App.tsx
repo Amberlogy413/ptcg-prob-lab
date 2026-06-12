@@ -35,6 +35,9 @@ const TrainerBundle = lazy(() =>
 const TrackerView = lazy(() =>
   import("./views/TrackerView.tsx").then((m) => ({ default: m.TrackerView })),
 );
+const TrialView = lazy(() =>
+  import("./views/TrialView.tsx").then((m) => ({ default: m.TrialView })),
+);
 
 export default function App() {
   const t = useT();
@@ -104,6 +107,7 @@ export default function App() {
             }
           >
             {activeView === "deck" && <DeckView />}
+            {activeView === "trial" && <TrialView />}
             {activeView === "ask" && <AskView />}
             {activeView === "prizes" && <PrizesView />}
             {activeView === "compare" && <CompareView />}
