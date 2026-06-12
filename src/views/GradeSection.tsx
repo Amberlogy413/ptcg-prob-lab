@@ -10,6 +10,7 @@ import {
   type AttributionRow,
 } from "../state/q5.ts";
 import { runComboBatch } from "../state/comboBatch.ts";
+import { useGradeStore } from "../state/gradeStore.ts";
 import { HAND_SIZE } from "../constants.ts";
 
 /** 起手品質分級 (roadmap V1-12) + A1 死手歸因排行榜 — both mulligan-aware. */
@@ -19,8 +20,11 @@ export function GradeSection() {
   const activeDeckId = useDeckStore((s) => s.activeDeckId);
   const deck = decks.find((d) => d.id === activeDeckId) ?? null;
 
-  const [ideal, setIdeal] = useState<GradeCardDef[]>([]);
-  const [playable, setPlayable] = useState<GradeCardDef[]>([]);
+  // Definitions live in a shared store so the health report (P9.1) sees them.
+  const ideal = useGradeStore((s) => s.ideal);
+  const playable = useGradeStore((s) => s.playable);
+  const setIdeal = useGradeStore((s) => s.setIdeal);
+  const setPlayable = useGradeStore((s) => s.setPlayable);
   const [attribution, setAttribution] = useState<AttributionRow[] | null>(null);
   const [attributing, setAttributing] = useState(false);
 

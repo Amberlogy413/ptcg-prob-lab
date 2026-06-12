@@ -4,6 +4,7 @@ import { useSettingsStore, type Locale } from "../state/settingsStore.ts";
 
 const WORKSPACES: Array<{ id: WorkspaceView; labelKey: string }> = [
   { id: "deck", labelKey: "nav.deck" },
+  { id: "report", labelKey: "nav.report" },
   { id: "trial", labelKey: "nav.trial" },
   { id: "ask", labelKey: "nav.ask" },
   { id: "prizes", labelKey: "nav.prizes" },
