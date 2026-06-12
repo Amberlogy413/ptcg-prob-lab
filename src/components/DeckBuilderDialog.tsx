@@ -412,6 +412,14 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
             </p>
           )}
           <p className="mt-3 text-xs text-ink2">
+            {catalog.format !== undefined &&
+              t("catalog.formatLine", {
+                marks: catalog.format.standard.join("/"),
+                date: catalog.format.effective,
+              }) + " · "}
+            {catalog.newest !== undefined &&
+              t("catalog.freshness", { date: catalog.fetchedAt, newest: catalog.newest.name }) +
+                " · "}
             {t("catalog.source")} {t("catalog.popSource")}
           </p>
         </>

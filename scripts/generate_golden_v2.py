@@ -421,6 +421,58 @@ for spec in MIDGAME_CASES:
         }
     )
 
+# ---------------------------------------------------------------------------
+# Tracker v2 (docs/09 #52, math audit 2026-06-12) — prizes-left posterior.
+# After k prizes are taken, the remaining p = 6 − k facedown prizes are a
+# uniform p-subset of the unseen pool U (|U| = u):
+#   P(exactly j of the u_x unseen copies prized) = C(u_x,j)C(u−u_x,p−j)/C(u,p)
+#   E[prized] = p·u_x/u ;  still-in-deck≥1 = 1 − P(all u_x prized)
+#   next library draw hits the card with probability u_x/u.
+# ---------------------------------------------------------------------------
+
+PRIZE_P_CASES = [
+    {"u": 20, "ux": 2, "p": 4},  # audit example (2 prizes taken)
+    {"u": 37, "ux": 4, "p": 6},  # early game — must match legacy P=6 outputs
+    {"u": 9, "ux": 2, "p": 2},  # late game (legacy code wrongly nulled: u < 6)
+    {"u": 10, "ux": 0, "p": 3},  # none of the card unseen
+    {"u": 8, "ux": 3, "p": 1},  # one prize left
+    {"u": 6, "ux": 6, "p": 6},  # everything unseen is prized
+    {"u": 8, "ux": 2, "p": 0},  # all prizes taken — everything is in deck
+]
+
+for spec in PRIZE_P_CASES:
+    u, ux, p = spec["u"], spec["ux"], spec["p"]
+    total = comb(u, p)
+    pmf = [Fraction(comb(ux, j) * comb(u - ux, p - j), total) for j in range(0, min(ux, p) + 1)]
+    assert sum(pmf) == 1, "posterior must sum to 1"
+    e = Fraction(p * ux, u)
+    assert e == sum(j * f for j, f in enumerate(pmf)), "expectation identity failed"
+    all_prized = pmf[ux] if ux <= p else Fraction(0)
+    still = 1 - all_prized
+    nxt = Fraction(ux, u)
+    al1 = 1 - pmf[0]
+    if ux == 0:
+        assert al1 == 0 and still == 0
+    if p == 0:
+        assert al1 == 0 and (still == 1) == (ux > 0)
+
+    cases.append(
+        {
+            "id": "prizep_u{u}_x{ux}_p{p}".format(**spec),
+            "kind": "prize_posterior_p",
+            "params": dict(spec),
+            "expect": {
+                "dist": {str(j): frac_str(f) for j, f in enumerate(pmf)},
+                "e": frac_str(e),
+                "e_dec": dec15(e),
+                "still": frac_str(still),
+                "next": frac_str(nxt),
+                "al1": frac_str(al1),
+                "al1_dec": dec15(al1),
+            },
+        }
+    )
+
 
 out = {
     "meta": {

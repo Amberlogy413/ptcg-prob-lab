@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
-import { useDeckStore } from "../state/deckStore.ts";
+import { useDeckStore, deckTotal } from "../state/deckStore.ts";
 import { computeTrackerRows } from "../state/q5.ts";
 import { DECK_SIZE, PRIZE_COUNT } from "../constants.ts";
 
 /**
- * C2 對局獎賞卡追蹤器 (docs/02 §5.5, pulled forward from V2): tick off the
- * cards you have SEEN; the posterior over the 6 prizes updates exactly. The
- * tournament-compliance reminder is permanently visible (PRD §4-16).
+ * C2 對局獎賞卡追蹤器 v2 (docs/02 §5.5, math audit 2026-06-12): tick off the
+ * cards you have SEEN and the prizes already TAKEN; the posterior over the
+ * REMAINING facedown prizes updates exactly (p = 6 − taken — the legacy
+ * hardcoded 6 was wrong from the first prize). N follows the actual deck.
+ * The tournament-compliance reminder is permanently visible (PRD §4-16).
  */
 export function TrackerView() {
   const t = useT();
@@ -16,6 +18,7 @@ export function TrackerView() {
   const deck = decks.find((d) => d.id === activeDeckId) ?? null;
 
   const [seen, setSeen] = useState<Record<string, number>>({});
+  const [prizesTaken, setPrizesTaken] = useState(0);
 
   const cards = useMemo(
     () =>
@@ -25,7 +28,11 @@ export function TrackerView() {
     [deck, seen],
   );
 
-  const result = useMemo(() => (cards.length > 0 ? computeTrackerRows(cards, DECK_SIZE) : null), [cards]);
+  const total = deck ? deckTotal(deck) : 0;
+  const result = useMemo(
+    () => (cards.length > 0 && total > 0 ? computeTrackerRows(cards, total, prizesTaken) : null),
+    [cards, total, prizesTaken],
+  );
 
   if (!deck) {
     return (
@@ -44,11 +51,43 @@ export function TrackerView() {
         {t("tracker.legal")}
       </p>
       <p className="mt-2 text-xs text-ink2">{t("tracker.desc")}</p>
+      <p className="mt-1 text-xs text-ink2">{t("tracker.seenHint")}</p>
+      {total !== DECK_SIZE && (
+        <p className="mt-1 text-xs text-warn" role="status">
+          {t("tracker.notSixty", { n: total })}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">
+          <span className="text-ink2">{t("tracker.prizesTaken")}</span>
+          <span className="inline-flex items-center gap-1">
+            <button
+              type="button"
+              aria-label={t("tracker.prizesTakenDec")}
+              disabled={prizesTaken <= 0}
+              onClick={() => setPrizesTaken((n) => Math.max(0, n - 1))}
+              className="h-7 w-7 rounded-ctl border hairline font-mono text-sm text-ink2 disabled:opacity-40"
+            >
+              −
+            </button>
+            <span className="w-12 text-center font-mono">
+              {prizesTaken}/{PRIZE_COUNT}
+            </span>
+            <button
+              type="button"
+              aria-label={t("tracker.prizesTakenInc")}
+              disabled={prizesTaken >= PRIZE_COUNT}
+              onClick={() => setPrizesTaken((n) => Math.min(PRIZE_COUNT, n + 1))}
+              className="h-7 w-7 rounded-ctl border hairline font-mono text-sm text-ink2 disabled:opacity-40"
+            >
+              ＋
+            </button>
+          </span>
+        </label>
         {result ? (
           <p className="font-mono text-sm">
-            {t("tracker.unseen", { u: result.u, p: PRIZE_COUNT })}
+            {t("tracker.unseen", { u: result.u, p: result.p, d: result.deckLeft })}
           </p>
         ) : (
           <p className="text-sm text-warn" role="status">
@@ -57,7 +96,10 @@ export function TrackerView() {
         )}
         <button
           type="button"
-          onClick={() => setSeen({})}
+          onClick={() => {
+            setSeen({});
+            setPrizesTaken(0);
+          }}
           className="rounded-ctl border hairline px-2.5 py-1 text-xs text-ink2 hover:text-ink"
         >
           {t("tracker.reset")}
@@ -73,6 +115,8 @@ export function TrackerView() {
               <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("tracker.seen")}</th>
               <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("tracker.unseenCol")}</th>
               <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("tracker.atLeastOne")}</th>
+              <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("tracker.still")}</th>
+              <th scope="col" className="py-1.5 pr-3 text-right font-medium">{t("tracker.next")}</th>
               <th scope="col" className="py-1.5 text-right font-medium">{t("tracker.expected")}</th>
             </tr>
           </thead>
@@ -108,8 +152,23 @@ export function TrackerView() {
                     </span>
                   </td>
                   <td className="py-1.5 pr-3 text-right font-mono">{row?.unseen ?? "—"}</td>
-                  <td className="py-1.5 pr-3 text-right font-mono">
-                    {row ? `${row.atLeastOnePercent}` : "—"}
+                  <td
+                    className="py-1.5 pr-3 text-right font-mono"
+                    title={row ? row.atLeastOneFraction : undefined}
+                  >
+                    {row ? row.atLeastOnePercent : "—"}
+                  </td>
+                  <td
+                    className="py-1.5 pr-3 text-right font-mono"
+                    title={row ? row.stillFraction : undefined}
+                  >
+                    {row ? row.stillPercent : "—"}
+                  </td>
+                  <td
+                    className="py-1.5 pr-3 text-right font-mono"
+                    title={row ? row.nextFraction : undefined}
+                  >
+                    {row ? row.nextPercent : "—"}
                   </td>
                   <td className="py-1.5 text-right font-mono">{row?.expected ?? "—"}</td>
                 </tr>
@@ -118,7 +177,7 @@ export function TrackerView() {
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-xs text-ink2">{t("tracker.formula")}</p>
+      <p className="mt-2 text-xs text-ink2">{t("tracker.formula", { p: result?.p ?? PRIZE_COUNT })}</p>
     </section>
   );
 }

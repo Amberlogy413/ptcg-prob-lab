@@ -83,6 +83,10 @@ export interface Catalog {
   source: string;
   fetchedAt: string;
   count: number;
+  /** Real rotation rule the pipeline derived `std` from (official source). */
+  format?: { standard: string[]; effective: string; source?: string };
+  /** Newest set in the snapshot — honesty line for data freshness. */
+  newest?: { id: string; name: string; date: string | null };
   sets: Record<string, CatalogSet>;
   cards: CatalogCard[];
 }

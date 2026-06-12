@@ -30,6 +30,7 @@ import {
 } from "../lib/prob/index.ts";
 import { energyShortfallCurve } from "../lib/probx/energy.ts";
 import { luckTail } from "../lib/probx/luck.ts";
+import { prizePosterior } from "../lib/probx/prizesLeft.ts";
 import { deckTotal, deckBasics, type Deck } from "./deckStore.ts";
 import { HAND_SIZE, PRIZE_COUNT } from "../constants.ts";
 
@@ -469,35 +470,52 @@ export interface TrackerRow {
   atLeastOnePercent: string;
   atLeastOneFraction: string;
   expected: string;
+  /** P(at least one copy still in the DECK) — closes docs/09 #48. */
+  stillPercent: string;
+  stillFraction: string;
+  /** P(next library draw is this card) = ux/u — closes docs/09 #36. */
+  nextPercent: string;
+  nextFraction: string;
   chart: number;
 }
 
+/**
+ * Tracker v2 (math audit 2026-06-12): the posterior is parameterized by the
+ * prizes still facedown, p = 6 − prizesTaken — the legacy hardcoded P=6 was
+ * wrong from the first prize taken (+15.3pp class). Revealed prizes count as
+ * SEEN, so u stays consistent. Math pinned by golden v2 `prize_posterior_p`.
+ */
 export function computeTrackerRows(
   cards: Array<{ name: string; count: number; seen: number }>,
   N = 60,
-): { u: number; rows: TrackerRow[] } | null {
+  prizesTaken = 0,
+): { u: number; p: number; deckLeft: number; rows: TrackerRow[] } | null {
+  const taken = Math.max(0, Math.min(PRIZE_COUNT, Math.trunc(prizesTaken)));
+  const p = PRIZE_COUNT - taken;
   const totalSeen = cards.reduce((s, c) => s + Math.min(c.seen, c.count), 0);
   const u = N - totalSeen;
-  if (u < PRIZE_COUNT) return null; // cannot see more than N − 6 cards
+  if (u < 1 || u < p) return null; // cannot have fewer unseen than facedown prizes
   const rows = cards
     .filter((c) => c.name.trim() !== "" && c.count > 0)
     .map((c) => {
       const ux = c.count - Math.min(c.seen, c.count);
-      const dist = prizeDistUnconditional(ux, u, PRIZE_COUNT);
-      const al1 = atLeastOnePrized(dist);
-      const expected = rat(BigInt(ux * PRIZE_COUNT), BigInt(u));
+      const post = prizePosterior(u, ux, p);
       return {
         name: c.name,
         count: c.count,
         seen: Math.min(c.seen, c.count),
         unseen: ux,
-        atLeastOnePercent: percentStr(al1, 6),
-        atLeastOneFraction: fractionStr(al1),
-        expected: decimalStr(expected, 6),
-        chart: toChartNumber(al1),
+        atLeastOnePercent: percentStr(post.atLeastOne, 6),
+        atLeastOneFraction: fractionStr(post.atLeastOne),
+        expected: decimalStr(post.e, 6),
+        stillPercent: percentStr(post.still, 6),
+        stillFraction: fractionStr(post.still),
+        nextPercent: percentStr(post.next, 6),
+        nextFraction: fractionStr(post.next),
+        chart: toChartNumber(post.atLeastOne),
       };
     });
-  return { u, rows };
+  return { u, p, deckLeft: u - p, rows };
 }
 
 // ---------------------------------------------------------------------------

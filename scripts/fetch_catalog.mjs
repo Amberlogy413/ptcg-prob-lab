@@ -17,9 +17,44 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const API = "https://api.tcgdex.net/v2/zh-tw";
+const API_JA = "https://api.tcgdex.net/v2/ja";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const CACHE_DIR = path.join(ROOT, "scripts", ".catalog-cache");
 const OUT_FILE = path.join(ROOT, "public", "catalog", "cards-zh-Hant.json");
+
+/**
+ * CURRENT standard format by the OFFICIAL Asia rotation announcement
+ * (asia.pokemon-card.com/tw/archives/11684): from 2026-02-06 the standard is
+ * regulation marks H · I · J (G dropped; J entered 2026-01-09). We derive
+ * `std` from the mark OURSELVES — the upstream `legal.standard` flag lags
+ * the real rotation. Update this list (and `effective`) at each rotation.
+ */
+const STANDARD_MARKS = new Set(["H", "I", "J"]);
+const FORMAT_META = {
+  standard: ["H", "I", "J"],
+  effective: "2026-02-06",
+  source: "asia.pokemon-card.com 標準賽制異動公告",
+};
+
+/** Basic energies carry no useful mark and are always standard-legal. */
+function isBasicEnergy(card) {
+  if (card.category !== "Energy") return false;
+  if (card.energyType === "Normal" || card.energyType === "Basic") return true;
+  return typeof card.name === "string" && card.name.includes("基本") && card.name.includes("能量");
+}
+
+/** Recompute std/exp from the real rotation rule. */
+function applyFormat(cards) {
+  let std = 0;
+  for (const c of cards) {
+    delete c.std;
+    if (isBasicEnergy(c) || (c.regulationMark !== undefined && STANDARD_MARKS.has(c.regulationMark))) {
+      c.std = true;
+      std += 1;
+    }
+  }
+  console.log(`  format: standard = ${FORMAT_META.standard.join("/")} → ${std} std-legal cards`);
+}
 
 const args = process.argv.slice(2);
 function argNum(flag, fallback) {
@@ -82,10 +117,10 @@ async function fetchJson(url, attempt = 1) {
   }
 }
 
-async function cachedCard(id) {
-  const file = path.join(CACHE_DIR, `${id.replaceAll("/", "_")}.json`);
+async function cachedCard(id, apiBase = API, prefix = "") {
+  const file = path.join(CACHE_DIR, `${prefix}${id.replaceAll("/", "_")}.json`);
   if (existsSync(file)) return JSON.parse(await readFile(file, "utf8"));
-  const card = await fetchJson(`${API}/cards/${encodeURIComponent(id)}`);
+  const card = await fetchJson(`${apiBase}/cards/${encodeURIComponent(id)}`);
   if (card !== null) await writeFile(file, JSON.stringify(card));
   return card;
 }
@@ -291,8 +326,49 @@ async function main() {
     if (fetched % 500 === 0) console.log(`  cards ${fetched}/${ids.length}`);
   });
 
+  // 真正補完 including the newest era: the zh-tw upstream lags (max SV10,
+  // 2025-05); the missing sets (M-era, regulation J) exist upstream in
+  // JAPANESE. Supplement them with honest「(日)」labels — when zh-tw data
+  // lands upstream, the set id collides and the zh version wins this loop.
+  console.log("[3b] ja supplement for sets missing from zh-tw…");
+  const zhSetIds = new Set(setBriefs.map((b) => b.id));
+  const jaBriefsRaw = await fetchJson(`${API_JA}/sets`);
+  const jaBriefs = [...new Map(jaBriefsRaw.map((b) => [b.id, b])).values()].filter(
+    (b) => !zhSetIds.has(b.id),
+  );
+  const jaMissing = [];
+  await pool(jaBriefs, CONCURRENCY, async (brief) => {
+    const full = await fetchJson(`${API_JA}/sets/${encodeURIComponent(brief.id)}`);
+    if (full === null || (full.releaseDate ?? "") < "2025-05-02") return;
+    jaMissing.push(full);
+  });
+  jaMissing.sort((a, b) => ((a.releaseDate ?? "") < (b.releaseDate ?? "") ? -1 : 1));
+  console.log(
+    `  ${jaMissing.length} ja-only sets:`,
+    jaMissing.map((s) => `${s.id}:${s.name}`).join(" | "),
+  );
+  for (const s of jaMissing) {
+    sets[s.id] = {
+      name: `${s.name}(日)`,
+      serie: s.serie?.name ?? null,
+      date: s.releaseDate ?? null,
+      official: s.cardCount?.official ?? null,
+    };
+  }
+  const jaIds = jaMissing.flatMap((s) => (s.cards ?? []).map((c) => c.id));
+  let jaFetched = 0;
+  await pool(jaIds, CONCURRENCY, async (id) => {
+    const card = await cachedCard(id, API_JA, "ja_");
+    if (card === null) return;
+    cards.push(transform(card));
+    jaFetched += 1;
+    if (jaFetched % 200 === 0) console.log(`  ja cards ${jaFetched}/${jaIds.length}`);
+  });
+  console.log(`  ja supplement: ${jaFetched} cards`);
+
   console.log("[4/4] assemble…");
   sanityPass(cards);
+  applyFormat(cards);
   for (const c of cards) classify(c);
   await applyPopularity(cards);
   const fnTally = new Map();
@@ -313,12 +389,17 @@ async function main() {
     return String(a.localId) < String(b.localId) ? -1 : 1;
   });
 
+  const newestEntry = Object.entries(sets).sort((a, b) =>
+    (a[1].date ?? "") < (b[1].date ?? "") ? 1 : -1,
+  )[0];
   const payload = {
     v: 1,
     lang: "zh-tw",
     source: "TCGdex (https://tcgdex.dev)",
     fetchedAt: new Date().toISOString().slice(0, 10),
     count: cards.length,
+    format: FORMAT_META,
+    newest: { id: newestEntry[0], name: newestEntry[1].name, date: newestEntry[1].date },
     sets,
     cards,
   };

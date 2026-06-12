@@ -18,6 +18,7 @@ import { relayEvent } from "../src/lib/probx/relay.ts";
 import { searchFoldValid } from "../src/lib/probx/fold.ts";
 import { optimizeAllocations, type OptimizerCandidate } from "../src/lib/probx/optimizer.ts";
 import { midgameAtLeast } from "../src/lib/probx/midgame.ts";
+import { prizePosterior } from "../src/lib/probx/prizesLeft.ts";
 
 interface V2Case {
   id: string;
@@ -134,6 +135,28 @@ describe("golden v2 vectors (independent Python reference)", () => {
         const r = midgameAtLeast(p);
         expect.soft(fractionStr(r), `${c.id} :: p`).toBe(exp.p);
         expect.soft(decimalStr(r, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
+      } else if (c.kind === "prize_posterior_p") {
+        const p = c.params as { u: number; ux: number; p: number };
+        const exp = c.expect as {
+          dist: Record<string, string>;
+          e: string;
+          e_dec: string;
+          still: string;
+          next: string;
+          al1: string;
+          al1_dec: string;
+        };
+        const r = prizePosterior(p.u, p.ux, p.p);
+        expect.soft(r.dist.length, `${c.id} :: dist length`).toBe(Object.keys(exp.dist).length);
+        r.dist.forEach((f, j) => {
+          expect.soft(fractionStr(f), `${c.id} :: dist[${j}]`).toBe(exp.dist[String(j)]);
+        });
+        expect.soft(fractionStr(r.e), `${c.id} :: e`).toBe(exp.e);
+        expect.soft(decimalStr(r.e, 15), `${c.id} :: e_dec`).toBe(exp.e_dec);
+        expect.soft(fractionStr(r.still), `${c.id} :: still`).toBe(exp.still);
+        expect.soft(fractionStr(r.next), `${c.id} :: next`).toBe(exp.next);
+        expect.soft(fractionStr(r.atLeastOne), `${c.id} :: al1`).toBe(exp.al1);
+        expect.soft(decimalStr(r.atLeastOne, 15), `${c.id} :: al1_dec`).toBe(exp.al1_dec);
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }
