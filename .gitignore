@@ -5,3 +5,4 @@ dist/
 .tsout/
 *.tsbuildinfo
 coverage/
+scripts/.catalog-cache/

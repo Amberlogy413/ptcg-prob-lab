@@ -70,3 +70,28 @@
 
 - **缺口**:`docs/03 §7` 規定四個獨立鍵(`ppl.v1.decks` / `ppl.v1.activeDeckId` / `ppl.v1.basicTags` / `ppl.v1.settings`),但 Zustand `persist` 中介層一個 store 預設僅寫一個鍵。
 - **裁決**:deck store 使用自訂 `PersistStorage`,把單一 store 狀態拆寫/拆讀至前三個鍵;settings store 直接以 `ppl.v1.settings` 為 persist 鍵。鍵名與規格逐字一致,皆帶 `v1` 前綴與 version 欄位以利未來遷移。
+
+## 2026-06-12 — 真實卡牌目錄(card catalog)的鐵律邊界
+
+- **指示**:產品擁有者要求「極致詳細地真實記錄所有卡片的所有真實資訊,以直觀
+  簡單的方式讓用戶加卡」。種子 CLAUDE.md 寫「卡片身份為用戶輸入文字」,且競品
+  分析曾把「卡圖資料庫」列入唔做清單(理由:IP 鐵律)。
+- **裁決**:鐵律 #6 禁止的是**卡圖、官方標誌、掃描檔、系列符號**——不禁止事實性
+  文字資料(卡名、HP、招式、法規標記皆屬遊戲事實)。卡牌目錄以**純文字**形式
+  引入,佈局如下:
+  - 資料管道 `scripts/fetch_catalog.mjs`(外部工具,如同 gh/wrangler,不進
+    runtime 依賴)從 TCGdex 社群開源資料庫抓取 zh-tw(亞洲版編號)全卡池,
+    **於源頭剝除** `image` / `pricing` / `variants` 欄位,並內建洩漏斷言
+    (輸出含 `assets.tcgdex.net` 或 `"pricing"` 即失敗)。
+  - 卡價同樣排除(競品唔做清單:價格爬蟲屬其商業領域,與概率無關)。
+  - 輸出 `public/catalog/cards-zh-Hant.json` 靜態資產:**不進主 bundle**,
+    首次使用 picker 才 lazy fetch(BASE_URL-aware),首載預算不受影響;
+    SW cache-first 自動把它離線化。
+  - 目錄是**輔助加卡層**:用戶輸入文字身份照舊是第一公民(目錄缺卡、改名、
+    自創卡皆走原路);由目錄加卡時自動填 `isBasic`(category=Pokemon 且
+    stage=Basic)、`section`、`set`、`number`、`mark`,並寫入 basicTags
+    全域記憶(與手動切換同一行為)。
+  - 語言只收 zh-tw(發佈受眾);en locale 用戶見到的卡名仍是繁中——卡名屬
+    牌組資料,非 UI 字串,與範本牌組同一裁決。
+  - 出處標註:picker 底部注明 TCGdex 來源;README 加 attribution。卡牌文字
+    資料之權利屬原權利人,蓋於現有同人工具聲明(PRD §7)之下。

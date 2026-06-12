@@ -59,3 +59,5 @@ python3 scripts/generate_golden_v2.py  # 重生成 v2 向量(種子後新數學)
 ## 聲明 / Disclaimer
 
 非官方粉絲工具,與 The Pokémon Company / Nintendo / Creatures / GAME FREAK 無關;不使用任何官方圖像或標誌。對局追蹤器僅供練習與覆盤——正式比賽使用外部工具可能違反賽事規定。Unofficial fan tool; not affiliated with The Pokémon Company, Nintendo, Creatures, or GAME FREAK; no official artwork or logos are used. The in-game tracker is for practice and review only — using external tools in sanctioned play may violate tournament rules.
+
+卡牌目錄之文字資料(卡名、HP、招式等遊戲事實)取自社群開源資料庫 [TCGdex](https://tcgdex.dev)(zh-tw),由 `scripts/fetch_catalog.mjs` 一次性抓取並**於源頭剝除所有卡圖與價格欄位**;卡牌文字之權利屬原權利人。Card catalog text data (names, HP, attacks — game facts) comes from the community-run [TCGdex](https://tcgdex.dev) database (zh-tw), fetched once by `scripts/fetch_catalog.mjs` with **all image and pricing fields stripped at the source**; card text rights belong to their respective owners.

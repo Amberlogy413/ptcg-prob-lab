@@ -2,6 +2,7 @@ import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckTotal, type Deck, type DeckSection } from "../state/deckStore.ts";
 import { useUiStore } from "../state/uiStore.ts";
 import { CardRow } from "./CardRow.tsx";
+import { CardPicker } from "./CardPicker.tsx";
 import { CountRing } from "./CountRing.tsx";
 import { DECK_SIZE } from "../constants.ts";
 
@@ -59,6 +60,8 @@ export function DeckEditor({ deck }: { deck: Deck }) {
           {t("error.deckCount", { n: total })}
         </p>
       )}
+
+      <CardPicker deckId={deck.id} />
 
       <div className="mt-4">
         {deck.cards.length === 0 ? (

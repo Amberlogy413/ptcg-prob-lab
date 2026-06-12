@@ -42,6 +42,7 @@ export interface NewCardInput {
   section?: DeckSection;
   set?: string;
   number?: string;
+  mark?: string;
 }
 
 interface DeckPersisted {
@@ -62,6 +63,9 @@ interface DeckState extends DeckPersisted {
   setActiveDeck: (deckId: string) => void;
   importDeck: (name: string, cards: NewCardInput[]) => string;
   addCard: (deckId: string) => void;
+  /** Catalog picker: add a fully-described card; same print already in the
+   *  deck (name+set+number) bumps its count instead of duplicating the row. */
+  addCardFrom: (deckId: string, input: NewCardInput) => void;
   updateCard: (deckId: string, cardId: string, patch: Partial<Omit<DeckCard, "id">>) => void;
   removeCard: (deckId: string, cardId: string) => void;
   rememberBasicTags: (tags: Record<string, boolean>) => void;
@@ -197,6 +201,7 @@ export const useDeckStore = create<DeckState>()(
             section: c.section ?? "unknown",
             ...(c.set !== undefined ? { set: c.set } : {}),
             ...(c.number !== undefined ? { number: c.number } : {}),
+            ...(c.mark !== undefined ? { mark: c.mark } : {}),
           })),
           createdAt: now,
           updatedAt: now,
@@ -219,6 +224,43 @@ export const useDeckStore = create<DeckState>()(
               : d,
           ),
         }));
+      },
+
+      addCardFrom: (deckId, input) => {
+        set((s) => {
+          let basicTags = s.basicTags;
+          // An explicit isBasic from the catalog is remembered globally by
+          // name — same contract as a manual toggle in updateCard.
+          if (input.isBasic !== undefined && input.name.trim() !== "") {
+            basicTags = { ...basicTags, [input.name]: input.isBasic };
+          }
+          const decks = s.decks.map((d) => {
+            if (d.id !== deckId) return d;
+            const existing = d.cards.find(
+              (c) => c.name === input.name && c.set === input.set && c.number === input.number,
+            );
+            if (existing) {
+              return touch({
+                ...d,
+                cards: d.cards.map((c) =>
+                  c.id === existing.id ? { ...c, count: clampCount(c.count + input.count) } : c,
+                ),
+              });
+            }
+            const card: DeckCard = {
+              id: uid(),
+              name: input.name,
+              count: clampCount(input.count),
+              isBasic: input.isBasic ?? resolveBasicTag(s.basicTags, s.aliases, input.name) ?? false,
+              section: input.section ?? "unknown",
+              ...(input.set !== undefined ? { set: input.set } : {}),
+              ...(input.number !== undefined ? { number: input.number } : {}),
+              ...(input.mark !== undefined ? { mark: input.mark } : {}),
+            };
+            return touch({ ...d, cards: [...d.cards, card] });
+          });
+          return { decks, basicTags };
+        });
       },
 
       updateCard: (deckId, cardId, patch) => {
