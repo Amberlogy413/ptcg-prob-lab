@@ -24,7 +24,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 // never fights the cache.
 if (import.meta.env.PROD && "serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((err) => {
+    // BASE_URL-aware so subpath hosting (e.g. GitHub Pages) keeps the PWA.
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch((err) => {
       console.warn("[pwa] service worker registration failed:", err);
     });
   });
