@@ -153,7 +153,7 @@ export function sectionOf(card: CatalogCard): "pokemon" | "trainer" | "energy" {
 }
 
 /** A deck-row input carrying everything the catalog knows that the row stores. */
-export function toNewCardInput(card: CatalogCard): NewCardInput & { mark?: string } {
+export function toNewCardInput(card: CatalogCard): NewCardInput {
   const mark =
     card.regulationMark !== undefined && /^[A-Z]$/.test(card.regulationMark)
       ? card.regulationMark
@@ -166,7 +166,82 @@ export function toNewCardInput(card: CatalogCard): NewCardInput & { mark?: strin
     ...(card.set !== null ? { set: card.set } : {}),
     number: card.localId,
     ...(mark !== undefined ? { mark } : {}),
+    catalogId: card.id,
   };
+}
+
+/** std-legal prints first, then newest set, then id — the "which print do I
+ *  actually play" order used by search, the builder grid and name matching. */
+export function sortPrints(catalog: Catalog, cards: CatalogCard[]): CatalogCard[] {
+  return [...cards].sort((a, b) => {
+    const aStd = a.std === true ? 0 : 1;
+    const bStd = b.std === true ? 0 : 1;
+    if (aStd !== bStd) return aStd - bStd;
+    const da = catalog.sets[a.set ?? ""]?.date ?? "";
+    const db = catalog.sets[b.set ?? ""]?.date ?? "";
+    if (da !== db) return da < db ? 1 : -1;
+    return a.id < b.id ? -1 : 1;
+  });
+}
+
+/** Per-catalog id → card index, built once per catalog object. */
+const idIndexCache = new WeakMap<Catalog, Map<string, CatalogCard>>();
+export function cardById(catalog: Catalog, id: string): CatalogCard | null {
+  let index = idIndexCache.get(catalog);
+  if (index === undefined) {
+    index = new Map(catalog.cards.map((c) => [c.id, c]));
+    idIndexCache.set(catalog, index);
+  }
+  return index.get(id) ?? null;
+}
+
+/**
+ * Resolve a deck row to its catalog card: exact print (set+number) wins;
+ * otherwise the best print of the exact (trimmed) name.
+ */
+export function matchRow(
+  catalog: Catalog,
+  row: { name: string; set?: string; number?: string },
+): CatalogCard | null {
+  if (row.set !== undefined && row.number !== undefined) {
+    const exact = catalog.cards.find((c) => c.set === row.set && c.localId === row.number);
+    if (exact) return exact;
+  }
+  const name = row.name.trim();
+  if (name === "") return null;
+  const prints = catalog.cards.filter((c) => c.name === name);
+  if (prints.length === 0) return null;
+  return sortPrints(catalog, prints)[0] ?? null;
+}
+
+/** The full tag patch a matched catalog card stamps onto a deck row. */
+export function enrichPatch(card: CatalogCard): Omit<NewCardInput, "name" | "count"> {
+  const input = toNewCardInput(card);
+  return {
+    isBasic: input.isBasic,
+    section: input.section,
+    ...(input.set !== undefined ? { set: input.set } : {}),
+    ...(input.number !== undefined ? { number: input.number } : {}),
+    ...(input.mark !== undefined ? { mark: input.mark } : {}),
+    catalogId: input.catalogId,
+  };
+}
+
+/** Kind descriptor: stage for Pokémon, trainer type, or energy type. */
+export function kindOf(card: CatalogCard): { key: string | null; raw: string } {
+  if (card.category === "Pokemon") {
+    return card.stage !== undefined
+      ? { key: stageKey(card.stage), raw: card.stage }
+      : { key: "catalog.cat.pokemon", raw: "Pokemon" };
+  }
+  if (card.category === "Trainer") {
+    return card.trainerType !== undefined
+      ? { key: trainerTypeKey(card.trainerType), raw: card.trainerType }
+      : { key: "catalog.cat.trainer", raw: "Trainer" };
+  }
+  return card.energyType !== undefined
+    ? { key: energyTypeKey(card.energyType), raw: card.energyType }
+    : { key: "catalog.cat.energy", raw: "Energy" };
 }
 
 // ---------------------------------------------------------------------------

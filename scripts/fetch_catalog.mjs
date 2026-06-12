@@ -109,7 +109,95 @@ function transform(card) {
     out[key] = value;
   }
   out.set = card.set?.id ?? null;
+  // Upstream data ships empty {} attack/ability slots (stripped VSTAR powers
+  // etc.) — drop entries with no name so the UI never renders blank blocks.
+  for (const k of ["attacks", "abilities"]) {
+    if (Array.isArray(out[k])) {
+      out[k] = out[k].filter((e) => e && typeof e.name === "string" && e.name !== "");
+      if (out[k].length === 0) delete out[k];
+    }
+  }
   return out;
+}
+
+/**
+ * Cross-print sanity pass. The upstream zh-tw data contains corrupt prints
+ * (an Item recorded as a Basic Pokémon, VSTARs recorded as stage VMAX,
+ * Trainers filed under Energy) — and a wrong stage/category poisons the
+ * EXACT mulligan math downstream (isBasic = Pokemon+Basic). Rules:
+ *  1. Pokémon named …VMAX/…VSTAR get that stage (name is authoritative).
+ *  2. A print whose category disagrees with the strict majority of its
+ *     same-name siblings adopts the majority, taking the functional text
+ *     (trainerType/effect) from the best sibling — same-name cards share
+ *     rules text by the game's own rules.
+ *  3. An "Energy" print whose name has no 能量 while a Trainer sibling
+ *     exists is a miscategorized Trainer (covers Nest Ball/Vitality Band…).
+ */
+function sanityPass(cards) {
+  let fixedStage = 0;
+  let fixedCategory = 0;
+  const byName = new Map();
+  for (const c of cards) {
+    if (!byName.has(c.name)) byName.set(c.name, []);
+    byName.get(c.name).push(c);
+  }
+  for (const [name, prints] of byName) {
+    const tally = new Map();
+    for (const p of prints) tally.set(p.category, (tally.get(p.category) ?? 0) + 1);
+    const ranked = [...tally.entries()].sort((a, b) => b[1] - a[1]);
+    const hasStrictMajority = ranked.length > 1 && ranked[0][1] > ranked[1][1];
+    for (const p of prints) {
+      if (p.category === "Pokemon") {
+        if (/VMAX$/i.test(name) && p.stage !== "VMAX") {
+          p.stage = "VMAX";
+          fixedStage += 1;
+        }
+        if (/VSTAR$/i.test(name) && p.stage !== "VSTAR") {
+          p.stage = "VSTAR";
+          fixedStage += 1;
+        }
+      }
+      let target = null;
+      if (hasStrictMajority && p.category !== ranked[0][0] && ranked[0][1] >= 2) {
+        target = ranked[0][0];
+      }
+      if (
+        p.category === "Energy" &&
+        !name.includes("能量") &&
+        prints.some((q) => q.category === "Trainer")
+      ) {
+        target = "Trainer";
+      }
+      if (target === null || target === p.category) continue;
+      const donor = prints
+        .filter((q) => q.category === target)
+        .sort((a, b) => (b.std === true ? 1 : 0) - (a.std === true ? 1 : 0))[0];
+      if (donor === undefined) continue;
+      p.category = target;
+      for (const k of [
+        "hp",
+        "stage",
+        "types",
+        "attacks",
+        "abilities",
+        "weaknesses",
+        "resistances",
+        "retreat",
+        "dexId",
+        "evolveFrom",
+        "energyType",
+        "trainerType",
+        "effect",
+      ]) {
+        delete p[k];
+      }
+      if (donor.trainerType !== undefined) p.trainerType = donor.trainerType;
+      if (donor.energyType !== undefined) p.energyType = donor.energyType;
+      if (donor.effect !== undefined) p.effect = donor.effect;
+      fixedCategory += 1;
+    }
+  }
+  console.log(`  sanity pass: ${fixedStage} stages, ${fixedCategory} categories corrected`);
 }
 
 async function main() {
@@ -159,6 +247,7 @@ async function main() {
   });
 
   console.log("[4/4] assemble…");
+  sanityPass(cards);
   // Deterministic order: set release date, then set id, then numeric localId.
   cards.sort((a, b) => {
     const da = sets[a.set]?.date ?? "";

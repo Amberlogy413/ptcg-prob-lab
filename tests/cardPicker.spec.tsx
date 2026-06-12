@@ -119,7 +119,7 @@ describe("CardPicker", () => {
     const sv9 = await screen.findByRole("button", { name: "加入 綠毛蟲(SV9-001)" });
     await user.click(sv9);
     await user.click(sv9);
-    await user.click(screen.getByRole("button", { name: "加入 綠毛蟲(S11-001)" }));
+    await user.click(screen.getByRole("button", { name: "加入 綠毛蟲(S11-001),非標準" }));
 
     const deck = useDeckStore.getState().decks.find((d) => d.id === deckId)!;
     const prints = deck.cards.filter((c) => c.name === "綠毛蟲");

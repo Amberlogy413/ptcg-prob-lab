@@ -5,13 +5,11 @@ import {
   loadCatalog,
   searchCatalog,
   toNewCardInput,
-  stageKey,
-  trainerTypeKey,
-  energyTypeKey,
-  typeKey,
+  kindOf,
   type Catalog,
   type CatalogCard,
 } from "../data/catalog.ts";
+import { CardVisual } from "./CardVisual.tsx";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -46,27 +44,10 @@ export function CardPicker({ deckId }: { deckId: string }) {
     [catalog, query],
   );
 
-  /** i18n label when the raw enum is known, the raw data value otherwise. */
-  const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
-
   const kindBadge = (card: CatalogCard): string => {
-    if (card.category === "Pokemon") {
-      return card.stage !== undefined
-        ? label(stageKey(card.stage), card.stage)
-        : t("catalog.cat.pokemon");
-    }
-    if (card.category === "Trainer") {
-      return card.trainerType !== undefined
-        ? label(trainerTypeKey(card.trainerType), card.trainerType)
-        : t("catalog.cat.trainer");
-    }
-    return card.energyType !== undefined
-      ? label(energyTypeKey(card.energyType), card.energyType)
-      : t("catalog.cat.energy");
+    const kind = kindOf(card);
+    return kind.key !== null ? t(kind.key) : kind.raw;
   };
-
-  const costText = (cost: string[] | undefined): string =>
-    (cost ?? []).map((c) => label(typeKey(c), c)).join("·");
 
   function add(card: CatalogCard) {
     addCardFrom(deckId, toNewCardInput(card));
@@ -74,7 +55,7 @@ export function CardPicker({ deckId }: { deckId: string }) {
   }
 
   return (
-    <div className="mt-4 rounded-ctl border hairline bg-bg p-3">
+    <div className="mt-4 rounded-ctl border hairline bg-paper p-3">
       <input
         type="search"
         value={query}
@@ -118,7 +99,11 @@ export function CardPicker({ deckId }: { deckId: string }) {
                     <div className="flex items-center gap-2 py-1.5">
                       <button
                         type="button"
-                        aria-label={t("catalog.addAria", { name: card.name, id: card.id })}
+                        aria-label={
+                          t("catalog.addAria", { name: card.name, id: card.id }) +
+                          (card.std !== true ? `,${t("catalog.legal.not")}` : "") +
+                          (addedId === card.id ? `,${t("catalog.added")}` : "")
+                        }
                         onClick={() => add(card)}
                         className="flex min-w-0 flex-1 items-center gap-2 rounded-ctl px-1 py-1 text-left hover:bg-surface"
                       >
@@ -161,86 +146,15 @@ export function CardPicker({ deckId }: { deckId: string }) {
                         aria-label={t("catalog.detailAria", { name: card.name })}
                         aria-expanded={open}
                         onClick={() => setDetailId(open ? null : card.id)}
-                        className="h-8 w-8 shrink-0 rounded-ctl border hairline bg-surface text-sm text-ink2 hover:text-ink"
+                        className="h-9 w-9 shrink-0 rounded-ctl border hairline bg-surface text-sm text-ink2 hover:text-ink"
                       >
                         ⓘ
                       </button>
                     </div>
 
                     {open && (
-                      <div className="mb-2 rounded-ctl border hairline bg-surface p-3 text-sm">
-                        <p className="text-xs text-ink2">
-                          {t("catalog.set")}:{setInfo?.name ?? "?"}({card.set ?? "?"}{" "}
-                          {card.localId}
-                          {setInfo?.official != null && ` / ${setInfo.official}`})
-                          {setInfo?.date != null && ` · ${t("catalog.date")} ${setInfo.date}`}
-                          {card.rarity !== undefined && card.rarity !== "None" && ` · ${card.rarity}`}
-                          {card.regulationMark !== undefined &&
-                            ` · ${t("catalog.mark")} ${card.regulationMark}`}
-                        </p>
-                        {card.category === "Pokemon" && (
-                          <p className="mt-1 text-xs text-ink2">
-                            {(card.types ?? []).map((ty) => label(typeKey(ty), ty)).join("·")}
-                            {card.hp !== undefined && ` · HP ${card.hp}`}
-                            {card.evolveFrom !== undefined &&
-                              ` · ${t("catalog.evolveFrom")} ${card.evolveFrom}`}
-                            {card.dexId !== undefined &&
-                              ` · ${t("catalog.dex")} #${card.dexId.join("/#")}`}
-                          </p>
-                        )}
-                        {(card.abilities ?? []).map((ab) => (
-                          <p key={ab.name} className="mt-2">
-                            <span className="font-medium">
-                              {t("catalog.ability")}:{ab.name}
-                            </span>
-                            {ab.effect !== undefined && (
-                              <span className="block text-ink2">{ab.effect}</span>
-                            )}
-                          </p>
-                        ))}
-                        {(card.attacks ?? []).map((atk) => (
-                          <p key={atk.name} className="mt-2">
-                            <span className="font-medium">
-                              {costText(atk.cost) !== "" && (
-                                <span className="mr-1 font-mono text-xs text-ink2">
-                                  [{costText(atk.cost)}]
-                                </span>
-                              )}
-                              {atk.name}
-                              {atk.damage !== undefined && (
-                                <span className="ml-1 font-mono">{atk.damage}</span>
-                              )}
-                            </span>
-                            {atk.effect !== undefined && (
-                              <span className="block text-ink2">{atk.effect}</span>
-                            )}
-                          </p>
-                        ))}
-                        {card.effect !== undefined && <p className="mt-2 text-ink2">{card.effect}</p>}
-                        {(card.weaknesses !== undefined ||
-                          card.resistances !== undefined ||
-                          card.retreat !== undefined) && (
-                          <p className="mt-2 text-xs text-ink2">
-                            {card.weaknesses !== undefined &&
-                              `${t("catalog.weakness")} ${card.weaknesses
-                                .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
-                                .join("、")}`}
-                            {card.resistances !== undefined &&
-                              ` · ${t("catalog.resistance")} ${card.resistances
-                                .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
-                                .join("、")}`}
-                            {card.retreat !== undefined &&
-                              ` · ${t("catalog.retreat")} ${card.retreat}`}
-                          </p>
-                        )}
-                        {card.description !== undefined && (
-                          <p className="mt-2 text-xs italic text-ink2">{card.description}</p>
-                        )}
-                        {card.illustrator !== undefined && (
-                          <p className="mt-1 text-xs text-ink2">
-                            {t("catalog.illustrator")}:{card.illustrator}
-                          </p>
-                        )}
+                      <div className="mb-2">
+                        <CardVisual card={card} setInfo={setInfo ?? null} />
                       </div>
                     )}
                   </li>

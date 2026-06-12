@@ -133,6 +133,7 @@ describe("Basic-Pokémon rule and deck mapping", () => {
       set: "SV9",
       number: "001",
       mark: "I",
+      catalogId: "SV9-001",
     });
     // Trainer: not Basic, trainer section.
     const trainer = toNewCardInput(FIXTURE.cards[4]!);

@@ -25,6 +25,9 @@ export interface DeckCard {
   number?: string;
   /** Regulation mark (single letter); drives the rotation preview only (P8.4). */
   mark?: string;
+  /** Catalog card id (e.g. "SV9-001") when this row maps to a real print —
+   *  unlocks the full-info card visual and tag chips; math never reads it. */
+  catalogId?: string;
 }
 
 export interface Deck {
@@ -43,6 +46,7 @@ export interface NewCardInput {
   set?: string;
   number?: string;
   mark?: string;
+  catalogId?: string;
 }
 
 interface DeckPersisted {
@@ -202,6 +206,7 @@ export const useDeckStore = create<DeckState>()(
             ...(c.set !== undefined ? { set: c.set } : {}),
             ...(c.number !== undefined ? { number: c.number } : {}),
             ...(c.mark !== undefined ? { mark: c.mark } : {}),
+            ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}),
           })),
           createdAt: now,
           updatedAt: now,
@@ -237,13 +242,43 @@ export const useDeckStore = create<DeckState>()(
           const decks = s.decks.map((d) => {
             if (d.id !== deckId) return d;
             const existing = d.cards.find(
-              (c) => c.name === input.name && c.set === input.set && c.number === input.number,
+              (c) =>
+                (input.catalogId !== undefined && c.catalogId === input.catalogId) ||
+                (c.name === input.name && c.set === input.set && c.number === input.number),
             );
             if (existing) {
               return touch({
                 ...d,
                 cards: d.cards.map((c) =>
                   c.id === existing.id ? { ...c, count: clampCount(c.count + input.count) } : c,
+                ),
+              });
+            }
+            // A manually-typed row of the same name (no print identity yet)
+            // folds in rather than duplicating: bump it AND stamp the tags.
+            const manual = d.cards.find(
+              (c) =>
+                c.name === input.name &&
+                c.catalogId === undefined &&
+                c.set === undefined &&
+                c.number === undefined,
+            );
+            if (manual) {
+              return touch({
+                ...d,
+                cards: d.cards.map((c) =>
+                  c.id === manual.id
+                    ? {
+                        ...c,
+                        count: clampCount(c.count + input.count),
+                        isBasic: input.isBasic ?? c.isBasic,
+                        section: input.section ?? c.section,
+                        ...(input.set !== undefined ? { set: input.set } : {}),
+                        ...(input.number !== undefined ? { number: input.number } : {}),
+                        ...(input.mark !== undefined ? { mark: input.mark } : {}),
+                        ...(input.catalogId !== undefined ? { catalogId: input.catalogId } : {}),
+                      }
+                    : c,
                 ),
               });
             }
@@ -256,6 +291,7 @@ export const useDeckStore = create<DeckState>()(
               ...(input.set !== undefined ? { set: input.set } : {}),
               ...(input.number !== undefined ? { number: input.number } : {}),
               ...(input.mark !== undefined ? { mark: input.mark } : {}),
+              ...(input.catalogId !== undefined ? { catalogId: input.catalogId } : {}),
             };
             return touch({ ...d, cards: [...d.cards, card] });
           });

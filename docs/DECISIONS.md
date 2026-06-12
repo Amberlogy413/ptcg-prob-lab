@@ -95,3 +95,37 @@
     牌組資料,非 UI 字串,與範本牌組同一裁決。
   - 出處標註:picker 底部注明 TCGdex 來源;README 加 attribution。卡牌文字
     資料之權利屬原權利人,蓋於現有同人工具聲明(PRD §7)之下。
+
+## 2026-06-12 — 視覺化卡片、全標籤列、逐層組牌
+
+- **指示**:卡片視覺化(顯示全部資訊)、每行牌補完全部標籤(不只「基礎」)、
+  系統化逐層揀卡組牌。
+- **卡片視覺(CardVisual)**:原創純文字卡框,呈現目錄記錄的**每一項**事實
+  (特性/招式/弱點/抗性/撤退/稀有度/繪師/圖鑑/風味文/系列/法規/賽制)。
+  `docs/04 §2` 鎖死「全產品一隻 accent 色」——屬性身份以文字 chip(草/火/水…)
+  表達,不引入屬性彩色;同時遠離官方版面,IP 風險為零。
+- **全標籤列**:`DeckCard.catalogId` 連結真實卡;數學永不讀它(僅 isBasic 進
+  數學)。「補完標籤」掃描:print 身份(set+number)優先於卡名;卡名取
+  標準合法、最新系列之 print;明確 isBasic 寫入 basicTags 全域記憶(與手動
+  切換同一契約);目錄外卡名保持原狀——用戶輸入身份仍是第一公民。
+- **逐層組牌(DeckBuilderDialog)**:三層 chip(大類→細分→屬性,皆附在池
+  計數)+ 結果格 + std-only 預設開。牌組即時讀數列顯示**精確**重抽概率
+  (`openingBasics`,6 位小數),building-by-the-numbers 是本品差異化。
+  層間互斥邏輯:轉大類清空下兩層;再點同一 chip 取消該層。
+- **嵌套 Modal Esc**:只關最上層(以 DOM 末位 dialog 判定)。
+- **42-agent 審查後補裁(同日)**:
+  - **上游資料消毒(sanityPass)**:TCGdex zh-tw 有壞 print(物品卡標成基礎
+    寶可夢、56 張 VSTAR 標成 VMAX、訓練家卡歸入能量)——壞 stage/category 會
+    **毒害精確重抽數學**(isBasic = Pokemon+Basic)。管道新增三規則:
+    名稱後綴 VMAX/VSTAR 決定 stage;同名 print 嚴格多數決 category(功能文字
+    由最佳同名 print 提供——同名卡按遊戲規則共享規則文字);名稱無「能量」
+    且有訓練家同名 print 的「能量」卡改歸訓練家。空白招式/特性槽於源頭剝除。
+    本次修正 57 stage + 6 category。
+  - **Modal 合約**:focus trap(aria-modal 承諾)、開啟者 focus 還原、
+    mount-only focus(否則父層每次重繪搶 focus——組牌器每加一張卡都會搶)、
+    常設 ✕ 關閉鈕(觸屏唯一可發現的出口)。
+  - **行摺疊不變量**:「同一 print 永不分裂成兩行」——addCardFrom 將同名
+    無身份(手動)行升級合併;補完標籤掃描遇到已存在同 print 行時合併計數。
+  - **AT 可讀性**:加卡按鈕 aria-label 附帶同名合計與「非標準」;牌組讀數列
+    role=status;ⓘ 一律 aria-haspopup=dialog、h-9 觸標。
+  - `bg-bg` 並非 token(palette 是替換制)——一律 `bg-paper`。

@@ -10,10 +10,12 @@ interface CardRowProps {
   onRemove: () => void;
   /** P8.4: true while the rotation preview marks this row as leaving. */
   rotatingOut?: boolean;
+  /** Set when the row resolves to a catalog print — shows the ⓘ visual. */
+  onShowVisual?: () => void;
 }
 
 /** One editor row: count stepper + name + Basic toggle + mark + delete (docs/04 §6). */
-export function CardRow({ card, onUpdate, onRemove, rotatingOut }: CardRowProps) {
+export function CardRow({ card, onUpdate, onRemove, rotatingOut, onShowVisual }: CardRowProps) {
   const t = useT();
   const stepBtn =
     "h-9 w-9 rounded-ctl border hairline bg-surface font-mono text-base leading-none " +
@@ -93,6 +95,17 @@ export function CardRow({ card, onUpdate, onRemove, rotatingOut }: CardRowProps)
           </option>
         ))}
       </select>
+      {onShowVisual !== undefined && (
+        <button
+          type="button"
+          aria-label={t("deck.card.info", { name: card.name || t("deck.card.name") })}
+          aria-haspopup="dialog"
+          onClick={onShowVisual}
+          className="h-9 w-9 shrink-0 rounded-ctl border hairline bg-surface text-sm text-ink2 hover:text-ink"
+        >
+          ⓘ
+        </button>
+      )}
       <button
         type="button"
         aria-label={t("deck.card.delete")}

@@ -8,6 +8,7 @@ import { BasicListDialog } from "../components/BasicListDialog.tsx";
 import { AliasDialog } from "../components/AliasDialog.tsx";
 import { TemplateDialog } from "../components/TemplateDialog.tsx";
 import { DeckSheetDialog } from "../components/DeckSheetDialog.tsx";
+import { DeckBuilderDialog } from "../components/DeckBuilderDialog.tsx";
 import { RotationPanel } from "../components/RotationPanel.tsx";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
@@ -24,12 +25,18 @@ export function DeckView() {
   const [aliasOpen, setAliasOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(false);
 
   const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
   function startBlank() {
     const id = createDeck();
     addCard(id);
+  }
+
+  function startBuilder() {
+    if (activeDeck === null) createDeck();
+    setBuilderOpen(true);
   }
 
   if (decks.length === 0) {
@@ -44,6 +51,13 @@ export function DeckView() {
             className="rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white"
           >
             {t("deck.import")}
+          </button>
+          <button
+            type="button"
+            onClick={startBuilder}
+            className="rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
+          >
+            {t("builder.button")}
           </button>
           <button
             type="button"
@@ -62,6 +76,9 @@ export function DeckView() {
         </div>
         {importOpen && <ImportWizard onClose={() => setImportOpen(false)} />}
         {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
+        {builderOpen && activeDeck !== null && (
+          <DeckBuilderDialog deck={activeDeck} onClose={() => setBuilderOpen(false)} />
+        )}
       </section>
     );
   }
@@ -101,6 +118,13 @@ export function DeckView() {
           ＋ {t("deck.new")}
         </button>
         <div className="ml-auto flex gap-2">
+          <button
+            type="button"
+            onClick={startBuilder}
+            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
+          >
+            {t("builder.button")}
+          </button>
           <button
             type="button"
             onClick={() => setImportOpen(true)}
@@ -162,6 +186,9 @@ export function DeckView() {
       {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
       {sheetOpen && activeDeck && (
         <DeckSheetDialog deck={activeDeck} onClose={() => setSheetOpen(false)} />
+      )}
+      {builderOpen && activeDeck && (
+        <DeckBuilderDialog deck={activeDeck} onClose={() => setBuilderOpen(false)} />
       )}
     </div>
   );
