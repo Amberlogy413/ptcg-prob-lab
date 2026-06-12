@@ -97,6 +97,18 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
               {t("import.step1.empty")}
             </p>
           )}
+          {/* P8.2 bridge guide (docs/08 §5A): build elsewhere, audit here. */}
+          <details className="mt-3 rounded-ctl border hairline px-3 py-2">
+            <summary className="cursor-pointer text-sm text-ink2">
+              {t("import.bridge.summary")}
+            </summary>
+            <ol className="ml-4 mt-2 list-decimal space-y-1 text-sm text-ink2">
+              <li>{t("import.bridge.step1")}</li>
+              <li>{t("import.bridge.step2")}</li>
+              <li>{t("import.bridge.step3")}</li>
+            </ol>
+            <p className="mt-2 text-xs text-ink2">{t("import.bridge.formats")}</p>
+          </details>
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"

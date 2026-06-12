@@ -6,6 +6,7 @@ import { ImportWizard } from "../components/ImportWizard.tsx";
 import { ExportDialog } from "../components/ExportDialog.tsx";
 import { BasicListDialog } from "../components/BasicListDialog.tsx";
 import { AliasDialog } from "../components/AliasDialog.tsx";
+import { TemplateDialog } from "../components/TemplateDialog.tsx";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
 export function DeckView() {
@@ -19,6 +20,7 @@ export function DeckView() {
   const [exportOpen, setExportOpen] = useState(false);
   const [basicListOpen, setBasicListOpen] = useState(false);
   const [aliasOpen, setAliasOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
@@ -47,8 +49,16 @@ export function DeckView() {
           >
             {t("deck.startBlank")}
           </button>
+          <button
+            type="button"
+            onClick={() => setTemplatesOpen(true)}
+            className="rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
+          >
+            {t("templates.button")}
+          </button>
         </div>
         {importOpen && <ImportWizard onClose={() => setImportOpen(false)} />}
+        {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
       </section>
     );
   }
@@ -118,6 +128,13 @@ export function DeckView() {
           >
             {t("alias.button")}
           </button>
+          <button
+            type="button"
+            onClick={() => setTemplatesOpen(true)}
+            className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
+          >
+            {t("templates.button")}
+          </button>
         </div>
       </div>
 
@@ -129,6 +146,7 @@ export function DeckView() {
       )}
       {basicListOpen && <BasicListDialog onClose={() => setBasicListOpen(false)} />}
       {aliasOpen && <AliasDialog onClose={() => setAliasOpen(false)} />}
+      {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
     </div>
   );
 }

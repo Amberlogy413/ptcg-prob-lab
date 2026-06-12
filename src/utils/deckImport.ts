@@ -31,7 +31,13 @@ export interface ParseResult {
 /** docs/03 §8 line format: count, name, optional set code + collector number. */
 const CARD_LINE = /^(\d+)\s+(.+?)(?:\s+([A-Z0-9-]{2,6})\s+(\w+))?$/;
 
+/** P8.2 bridge format (docs/08 §5A): name-first lines — 「卡名 x4」/「卡名×4」. */
+const SUFFIX_LINE = /^(.+?)\s*[x×]\s*(\d+)$/i;
+
 const SECTION_HEADER = /^(pok[ée]mon|trainer|trainers|energy|energies)\s*:?\s*(\d+)?\s*$/i;
+/** zh-Hant headers seen in pasted zh deck lists; sub-categories fold into
+ *  the three sections the math cares about. */
+const SECTION_HEADER_ZH = /^(寶可夢|訓練家|物品|裝備|支援者|競技場|能量|基本能量|特殊能量)\s*[::]?\s*(\d+)?\s*$/;
 const TOTAL_LINE = /^total\s+cards\s*:?\s*(\d+)?\s*$/i;
 
 function sectionFromHeader(word: string): DeckSection {
@@ -39,6 +45,12 @@ function sectionFromHeader(word: string): DeckSection {
   if (w.startsWith("pok")) return "pokemon";
   if (w.startsWith("trainer")) return "trainer";
   return "energy";
+}
+
+function sectionFromZhHeader(word: string): DeckSection {
+  if (word === "寶可夢") return "pokemon";
+  if (word.endsWith("能量")) return "energy";
+  return "trainer";
 }
 
 export function parseDeckList(text: string): ParseResult {
@@ -59,6 +71,13 @@ export function parseDeckList(text: string): ParseResult {
       continue;
     }
 
+    const zhHeader = SECTION_HEADER_ZH.exec(line);
+    if (zhHeader) {
+      section = sectionFromZhHeader(zhHeader[1] as string);
+      hasSections = true;
+      continue;
+    }
+
     const totalLine = TOTAL_LINE.exec(line);
     if (totalLine) {
       if (totalLine[1] !== undefined) declaredTotal = Number(totalLine[1]);
@@ -75,6 +94,13 @@ export function parseDeckList(text: string): ParseResult {
       if (m[3] !== undefined) card.set = m[3];
       if (m[4] !== undefined) card.number = m[4];
       cards.push(card);
+      continue;
+    }
+
+    // Count-first failed: try the name-first bridge form 「卡名 x4」.
+    const s = SUFFIX_LINE.exec(line);
+    if (s) {
+      cards.push({ count: Number(s[2]), name: (s[1] as string).trim(), section });
       continue;
     }
 

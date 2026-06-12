@@ -129,6 +129,65 @@ energies
   });
 });
 
+describe("P8.2 bridge formats (docs/08 §5A)", () => {
+  it("parses zh headers, count-first zh lines and x-suffix lines together", () => {
+    const r = parseDeckList(`寶可夢:13
+4 火球鼠
+系統夥伴(基礎) x6
+進化夥伴 ×3
+物品
+檢索球x4
+能量:12
+基本能量 X 12
+`);
+    expect(r.unparsedLines).toEqual([]);
+    expect(r.hasSections).toBe(true);
+    expect(r.total).toBe(29);
+    expect(r.cards.find((c) => c.name === "火球鼠")).toMatchObject({
+      count: 4,
+      section: "pokemon",
+    });
+    expect(r.cards.find((c) => c.name === "系統夥伴(基礎)")).toMatchObject({
+      count: 6,
+      section: "pokemon",
+    });
+    expect(r.cards.find((c) => c.name === "進化夥伴")).toMatchObject({
+      count: 3,
+      section: "pokemon",
+    });
+    expect(r.cards.find((c) => c.name === "檢索球")).toMatchObject({
+      count: 4,
+      section: "trainer",
+    });
+    expect(r.cards.find((c) => c.name === "基本能量")).toMatchObject({
+      count: 12,
+      section: "energy",
+    });
+  });
+
+  it("folds zh sub-category headers into the trainer section", () => {
+    const r = parseDeckList(`支援者
+博士系支援 x4
+競技場:2
+場地卡 ×2
+裝備
+強化裝備 x2
+`);
+    expect(r.cards.map((c) => c.section)).toEqual(["trainer", "trainer", "trainer"]);
+    expect(r.total).toBe(8);
+  });
+
+  it("does not let the suffix form swallow Live lines or digit-tail names", () => {
+    const r = parseDeckList(`4 Charmander OBF 26
+Pokégear 3.0
+`);
+    // Count-first Live line keeps set/number parsing.
+    expect(r.cards[0]).toMatchObject({ count: 4, name: "Charmander", set: "OBF", number: "26" });
+    // A bare name with a digit tail but no x-marker stays unparsed (no guess).
+    expect(r.unparsedLines).toEqual(["Pokégear 3.0"]);
+  });
+});
+
 describe("cardsNeedingBasicTag", () => {
   it("returns only the Pokémon section when sections exist", () => {
     const r = parseDeckList(NORMAL_LIST);
