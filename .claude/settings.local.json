@@ -35,7 +35,9 @@
       "Bash(python scripts/_patch_v2.py)",
       "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'phase7: v3 green — roadmap complete *)",
       "Bash(node -e \"const h=require\\('fs'\\).readFileSync\\('dist/index.html','utf8'\\); console.log\\('manifest link:', h.includes\\('manifest.webmanifest'\\), '| theme-color:', h.includes\\('theme-color'\\)\\)\")",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node -e \"const zh=require\\('./src/i18n/zh-Hant.json'\\),en=require\\('./src/i18n/en.json'\\);console.log\\('i18n',Object.keys\\(zh\\).length,'=',Object.keys\\(en\\).length\\)\")",
+      "Bash(git -c user.name=user -c user.email=user@local commit -q -m 'perf: first-load diet — view code-splitting + font weight trim *)"
     ]
   }
 }

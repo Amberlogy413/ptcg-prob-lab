@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import {
   binom,
   rat,
@@ -63,7 +64,7 @@ beforeEach(() => {
 });
 
 describe("turn curve (anchors from docs/02 §6.2, x=4 ≥1)", () => {
-  it("going second, turns 1..6 hit n=8..13 exactly", () => {
+  it("going second, turns 1..6 hit n=8..13 exactly", async () => {
     const rows = computeTurnCurve({
       x: 4,
       want: 1,
@@ -78,7 +79,7 @@ describe("turn curve (anchors from docs/02 §6.2, x=4 ≥1)", () => {
     }
   });
 
-  it("legacy rule going first reaches n=7 on turn 1 (the opening itself)", () => {
+  it("legacy rule going first reaches n=7 on turn 1 (the opening itself)", async () => {
     const rows = computeTurnCurve({
       x: 4,
       want: 1,
@@ -91,7 +92,7 @@ describe("turn curve (anchors from docs/02 §6.2, x=4 ≥1)", () => {
     expect(rows[0]?.percent).toBe(CURVE_ANCHORS[7]);
   });
 
-  it("caps cards seen at the physical 54 (60 − 6 prizes)", () => {
+  it("caps cards seen at the physical 54 (60 − 6 prizes)", async () => {
     const rows = computeTurnCurve({
       x: 4,
       want: 1,
@@ -128,7 +129,7 @@ describe("share URL (docs/03 §7)", () => {
     },
   };
 
-  it("round-trips encode → decode deep-equal", () => {
+  it("round-trips encode → decode deep-equal", async () => {
     const { fragment, tooLong } = encodeShare(payload);
     expect(fragment.startsWith("#/q=")).toBe(true);
     expect(tooLong).toBe(false);
@@ -137,7 +138,7 @@ describe("share URL (docs/03 §7)", () => {
     if (decoded.ok) expect(decoded.payload).toEqual(payload);
   });
 
-  it("rejects corrupted and foreign hashes without throwing", () => {
+  it("rejects corrupted and foreign hashes without throwing", async () => {
     expect(decodeShare("#/q=%%%not-base64%%%").ok).toBe(false);
     expect(decodeShare("#/q=" + btoa('{"schema":2}')).ok).toBe(false);
     expect(decodeShare("#/other").ok).toBe(false);
@@ -147,6 +148,7 @@ describe("share URL (docs/03 §7)", () => {
     const { fragment } = encodeShare(payload);
     window.history.replaceState(null, "", "/" + fragment);
     render(<App />);
+    await viewReady();
 
     expect(useDeckStore.getState().decks).toHaveLength(1);
     expect(useUiStore.getState().activeView).toBe("ask");
@@ -155,15 +157,16 @@ describe("share URL (docs/03 §7)", () => {
     expect(window.location.hash).toBe(""); // fragment cleared
   });
 
-  it("App intake: a bad link shows the friendly error banner", () => {
+  it("App intake: a bad link shows the friendly error banner", async () => {
     window.history.replaceState(null, "", "/#/q=broken!!!");
     render(<App />);
+    await viewReady();
     expect(screen.getByRole("alert")).toHaveTextContent("分享連結無法解析");
   });
 });
 
 describe("result-card SVG (docs/03 §7)", () => {
-  it("carries the three formats, badge and product name", () => {
+  it("carries the three formats, badge and product name", async () => {
     const svg = buildResultCardSvg({
       title: "a = 火球鼠 ×4",
       percent: "15.383618%",
@@ -204,7 +207,7 @@ describe("compare (DoD: 3投 vs 4投)", () => {
     return { a, b };
   }
 
-  it("4-of beats 3-of with a positive green delta; uncond anchor matches", () => {
+  it("4-of beats 3-of with a positive green delta; uncond anchor matches", async () => {
     const { a, b } = seedAB();
     const deckA = useDeckStore.getState().decks.find((d) => d.id === a)!;
     const deckB = useDeckStore.getState().decks.find((d) => d.id === b)!;
@@ -225,6 +228,7 @@ describe("compare (DoD: 3投 vs 4投)", () => {
     useUiStore.setState({ activeView: "compare" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     const main = screen.getByRole("main");
     await user.selectOptions(within(main).getByRole("combobox", { name: "牌組 A" }), ["A 三投"]);
@@ -240,7 +244,7 @@ describe("compare (DoD: 3投 vs 4投)", () => {
 });
 
 describe("hand grading + dead-hand attribution (A1)", () => {
-  it("buckets match independent single-card conditioned events and sum to 1", () => {
+  it("buckets match independent single-card conditioned events and sum to 1", async () => {
     seedKillerDeck();
     const deck = useDeckStore.getState().decks[0]!;
     const grades = computeGrades(deck, {
@@ -277,7 +281,7 @@ describe("hand grading + dead-hand attribution (A1)", () => {
 });
 
 describe("prize tracker posterior (docs/02 §5.5)", () => {
-  it("matches the hand calculation 1 − C(u−u_x,6)/C(u,6) and E = 6·u_x/u", () => {
+  it("matches the hand calculation 1 − C(u−u_x,6)/C(u,6) and E = 6·u_x/u", async () => {
     const result = computeTrackerRows(
       [
         { name: "A", count: 4, seen: 2 },
@@ -299,13 +303,13 @@ describe("prize tracker posterior (docs/02 §5.5)", () => {
     expect(rowB.unseen).toBe(3);
   });
 
-  it("refuses impossible states (more than 54 seen)", () => {
+  it("refuses impossible states (more than 54 seen)", async () => {
     expect(computeTrackerRows([{ name: "A", count: 60, seen: 55 }], 60)).toBeNull();
   });
 });
 
 describe("trainer (B1)", () => {
-  it("builds exact questions from the deck (mulligan anchor)", () => {
+  it("builds exact questions from the deck (mulligan anchor)", async () => {
     seedKillerDeck();
     const deck = useDeckStore.getState().decks[0]!;
     const q = buildTrainerQuestion(deck, "mulligan", "", 3)!;
@@ -319,6 +323,7 @@ describe("trainer (B1)", () => {
     useUiStore.setState({ activeView: "trainer" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.click(screen.getByRole("button", { name: "出題" }));
     await user.type(screen.getByRole("spinbutton", { name: "你的估計(百分比)" }), "50");
@@ -338,6 +343,7 @@ describe("tracker view UI", () => {
     useUiStore.setState({ activeView: "tracker" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     expect(screen.getByText(/正式比賽使用外部工具可能違反賽事規定/)).toBeInTheDocument();
     const inc = screen.getByRole("button", { name: "「火球鼠」已見 +1" });

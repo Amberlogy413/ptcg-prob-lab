@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import { useDeckStore, resolveBasicTag } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
 import { useQ3Store } from "../src/state/q3Store.ts";
@@ -54,20 +55,20 @@ beforeEach(() => {
 });
 
 describe("relay (A5, docs/02 §6.5)", () => {
-  it("UI selector matches the v2 golden value (A4 by T1, B3 by T3, going second)", () => {
+  it("UI selector matches the v2 golden value (A4 by T1, B3 by T3, going second)", async () => {
     const r = computeRelay({ cA: 4, wA: 1, turnA: 1, cB: 3, wB: 1, turnB: 3, goingFirst: false })!;
     expect(r.n1).toBe(8);
     expect(r.n2).toBe(10);
     expect(r.joint.fraction).toBe(v2expect("relay_A4w1n8_B3w1n10").p);
   });
 
-  it("rejects reversed turns", () => {
+  it("rejects reversed turns", async () => {
     expect(computeRelay({ cA: 4, wA: 1, turnA: 5, cB: 3, wB: 1, turnB: 2, goingFirst: false })).toBeNull();
   });
 });
 
 describe("search-chain fold (A4, docs/02 §4.3)", () => {
-  it("UI selector matches the v2 golden case (x4 basic, s4, ob6, w1)", () => {
+  it("UI selector matches the v2 golden case (x4 basic, s4, ob6, w1)", async () => {
     seedKillerDeck();
     const deck = useDeckStore.getState().decks[0]!;
     // 火球鼠 ×4 basic; ob = 10 − 4 = 6 → exactly the golden fold case.
@@ -84,6 +85,7 @@ describe("search-chain fold (A4, docs/02 §4.3)", () => {
     useUiStore.setState({ activeView: "ask", askTab: "tools" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.selectOptions(screen.getByRole("combobox", { name: "目標卡" }), ["火球鼠"]);
     for (const frag of [/假設一/, /假設二/, /假設三/, /假設四/]) {
       expect(screen.getByText(frag)).toBeInTheDocument();
@@ -121,7 +123,7 @@ describe("optimizer (A2, docs/02 §11)", () => {
 });
 
 describe("D1 aliases", () => {
-  it("resolveBasicTag falls through the alias map and persists to ppl.v1.aliases", () => {
+  it("resolveBasicTag falls through the alias map and persists to ppl.v1.aliases", async () => {
     const st = () => useDeckStore.getState();
     st().rememberBasicTags({ 火球鼠: true });
     st().setAlias("Cyndaquil", "火球鼠");
@@ -144,6 +146,7 @@ describe("D3 question bank + custom presets", () => {
     useUiStore.setState({ activeView: "prizes" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.type(
       screen.getByRole("textbox", { name: "快捷名稱(儲存目前 Q3 查詢)" }),
@@ -170,6 +173,7 @@ describe("tools section smoke", () => {
     useUiStore.setState({ activeView: "ask", askTab: "tools" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.selectOptions(screen.getByRole("combobox", { name: "加入候選卡" }), ["火球鼠"]);
     await user.click(screen.getByRole("button", { name: "枚舉所有分配" }));

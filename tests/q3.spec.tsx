@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
 import { useQ3Store } from "../src/state/q3Store.ts";
@@ -32,7 +33,7 @@ beforeEach(() => {
 });
 
 describe("computeQ3Single (anchors from docs/02 §5)", () => {
-  it("mode (a) uncond: x=4 → 35.145960%, E = 2/5; x=1 → exactly 10%", () => {
+  it("mode (a) uncond: x=4 → 35.145960%, E = 2/5; x=1 → exactly 10%", async () => {
     const r4 = computeQ3Single("uncond", BASE_QUERY);
     expect(r4.headline.percent).toBe("35.145960%");
     expect(r4.headline.fraction).toBe("57128/162545");
@@ -49,7 +50,7 @@ describe("computeQ3Single (anchors from docs/02 §5)", () => {
     expect(r1.receipt.goldenId).toBe("prize_uncond_x1");
   });
 
-  it("mode (b) known hand: x=4 h=1 → 30.782037%; h=0 → 39.088193%", () => {
+  it("mode (b) known hand: x=4 h=1 → 30.782037%; h=0 → 39.088193%", async () => {
     const h1 = computeQ3Single("givenHand", { ...BASE_QUERY, h: 1 });
     expect(h1.headline.percent).toBe("30.782037%");
     expect(h1.headline.fraction).toBe("7211/23426");
@@ -61,7 +62,7 @@ describe("computeQ3Single (anchors from docs/02 §5)", () => {
     expect(h0.receipt.goldenId).toBe("prize_given_hand_x4_h0");
   });
 
-  it("mode (c) pre-game mulligan-aware: directions flip with Basic-ness", () => {
+  it("mode (c) pre-game mulligan-aware: directions flip with Basic-ness", async () => {
     const basic = computeQ3Single("preGame", { x: 4, h: 0, isBasic: true, otherBasics: 6 });
     expect(basic.expected.fraction).toBe("21933186/57481415");
     expect(basic.expected.decimal).toBe("0.381570");
@@ -80,7 +81,7 @@ describe("computeQ3Single (anchors from docs/02 §5)", () => {
 });
 
 describe("computeQ3Joint (anchor from docs/02 §5.4)", () => {
-  it("A4 h1 + B3 h0, each ≥1 prized → 8.335640%", () => {
+  it("A4 h1 + B3 h0, each ≥1 prized → 8.335640%", async () => {
     const data = computeQ3Joint([
       { id: "a", label: "A", count: 4, inHand: 1, min: 1, max: 6 },
       { id: "b", label: "B", count: 3, inHand: 0, min: 1, max: 6 },
@@ -96,7 +97,7 @@ describe("computeQ3Joint (anchor from docs/02 §5.4)", () => {
 });
 
 describe("GOLDEN_PRIZE_REFS stays in lockstep with the golden JSON", () => {
-  it("every prize case id+signature matches", () => {
+  it("every prize case id+signature matches", async () => {
     const goldenPath = join(
       dirname(fileURLToPath(import.meta.url)),
       "golden",
@@ -137,7 +138,7 @@ describe("GOLDEN_PRIZE_REFS stays in lockstep with the golden JSON", () => {
 });
 
 describe("buildCsv", () => {
-  it("joins with CRLF and escapes quotes/commas", () => {
+  it("joins with CRLF and escapes quotes/commas", async () => {
     const csv = buildCsv(
       ["k", "value"],
       [
@@ -156,9 +157,11 @@ describe("Prizes view UI + 預設十問", () => {
     useUiStore.setState({ activeView: "ask" });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.click(screen.getByRole("button", { name: "唯一 ACE SPEC 被獎賞?(10% 整)" }));
     expect(useUiStore.getState().activeView).toBe("prizes");
+    await viewReady();
     // Headline + the k=1 row of the distribution table both read exactly 10%.
     expect(screen.getAllByText("10.000000%").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("1/10 · 1 in 10.000")).toBeInTheDocument();
@@ -170,6 +173,7 @@ describe("Prizes view UI + 預設十問", () => {
   it("mode (c) UI states the direction intuition and pValid", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "4 投基礎(ob6)· 含重抽 E?" }));
 
     expect(screen.getByText("33.770701%")).toBeInTheDocument();
@@ -184,6 +188,7 @@ describe("Prizes view UI + 預設十問", () => {
   it("mode (b) preset fills the known-hand anchor", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "4 投、手上 1 張 → 被獎賞?" }));
     expect(screen.getByText("30.782037%")).toBeInTheDocument();
     expect(screen.getByText("7211/23426 · 1 in 3.249")).toBeInTheDocument();
@@ -192,6 +197,7 @@ describe("Prizes view UI + 預設十問", () => {
   it("joint preset reproduces 8.335640% with the satisfied table", async () => {
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "A4 手1 + B3 手0,各至少 1 被獎賞?" }));
     expect(screen.getByText("8.335640%")).toBeInTheDocument();
     expect(screen.getByText("a = A ×4 (h=1), b = B ×3 (h=0)")).toBeInTheDocument();
@@ -205,9 +211,11 @@ describe("Prizes view UI + 預設十問", () => {
     ]);
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "你牌組的重抽概率?" }));
     expect(useUiStore.getState().activeView).toBe("ask");
     expect(useUiStore.getState().askTab).toBe("q1");
+    await viewReady();
     expect(screen.getAllByText("25.862923%").length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -11,6 +11,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import { comboOpening } from "../src/lib/prob/index.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
@@ -55,14 +56,14 @@ beforeEach(() => {
 
 describe("constraintBounds (builder→params mapping, docs/05 §E)", () => {
   const base = { cardId: "x", n: 1, a: 1, b: 2 };
-  it("maps every constraint kind to [min, max] per docs/02 §4.1", () => {
+  it("maps every constraint kind to [min, max] per docs/02 §4.1", async () => {
     expect(constraintBounds({ ...base, kind: "atLeast", n: 1 }, 4)).toEqual([1, 7]);
     expect(constraintBounds({ ...base, kind: "exactly", n: 2 }, 4)).toEqual([2, 2]);
     expect(constraintBounds({ ...base, kind: "atMost", n: 1 }, 4)).toEqual([0, 1]);
     expect(constraintBounds({ ...base, kind: "between", a: 1, b: 2 }, 4)).toEqual([1, 2]);
     expect(constraintBounds({ ...base, kind: "avoid" }, 4)).toEqual([0, 0]);
   });
-  it("clamps to [0, min(count, 7)] and normalizes reversed ranges", () => {
+  it("clamps to [0, min(count, 7)] and normalizes reversed ranges", async () => {
     expect(constraintBounds({ ...base, kind: "atLeast", n: 9 }, 4)).toEqual([4, 7]);
     expect(constraintBounds({ ...base, kind: "exactly", n: 5 }, 3)).toEqual([3, 3]);
     expect(constraintBounds({ ...base, kind: "between", a: 3, b: 1 }, 4)).toEqual([1, 3]);
@@ -71,7 +72,7 @@ describe("constraintBounds (builder→params mapping, docs/05 §E)", () => {
 });
 
 describe("buildComboParams", () => {
-  it("killer demo, mulligan-aware: counts/flags/otherBasics/cells", () => {
+  it("killer demo, mulligan-aware: counts/flags/otherBasics/cells", async () => {
     seedKillerDeck();
     const r = buildComboParams(killerDeck(), trackedFor(["火球鼠", "超夢風暴"]), true);
     expect(r.status).toBe("ok");
@@ -86,7 +87,7 @@ describe("buildComboParams", () => {
     expect(r.opts.N).toBe(60);
     expect(r.estimatedCells).toBe(5 * 4 * 7); // incl. other-Basics category
   });
-  it("toggle off: no conditioning, smaller estimate", () => {
+  it("toggle off: no conditioning, smaller estimate", async () => {
     seedKillerDeck();
     const r = buildComboParams(killerDeck(), trackedFor(["火球鼠", "超夢風暴"]), false);
     expect(r.status).toBe("ok");
@@ -94,7 +95,7 @@ describe("buildComboParams", () => {
     expect(r.opts.mulliganAware).toBeUndefined();
     expect(r.estimatedCells).toBe(5 * 4);
   });
-  it("guards: empty / tooFewCards / noBasicsForAware", () => {
+  it("guards: empty / tooFewCards / noBasicsForAware", async () => {
     seedKillerDeck();
     expect(buildComboParams(killerDeck(), [], true).status).toBe("empty");
     useDeckStore.getState().importDeck("小", [{ name: "A", count: 3, isBasic: true }]);
@@ -113,7 +114,7 @@ describe("buildComboParams", () => {
 });
 
 describe("computeQ2Display (killer anchors, docs/02 §4.2)", () => {
-  it("mulligan-aware: 15.383618%, naive line −3.98pp, five-line receipt", () => {
+  it("mulligan-aware: 15.383618%, naive line −3.98pp, five-line receipt", async () => {
     seedKillerDeck();
     const build = buildComboParams(killerDeck(), trackedFor(["火球鼠", "超夢風暴"]), true);
     if (build.status !== "ok") throw new Error("build failed");
@@ -141,7 +142,7 @@ describe("computeQ2Display (killer anchors, docs/02 §4.2)", () => {
     expect(data.legend).toContain("a = 火球鼠 ×4");
   });
 
-  it("toggle off: 11.404965%, no naive line, no golden ref for this combo", () => {
+  it("toggle off: 11.404965%, no naive line, no golden ref for this combo", async () => {
     seedKillerDeck();
     const build = buildComboParams(killerDeck(), trackedFor(["火球鼠", "超夢風暴"]), false);
     if (build.status !== "ok") throw new Error("build failed");
@@ -153,7 +154,7 @@ describe("computeQ2Display (killer anchors, docs/02 §4.2)", () => {
     expect(data.receipt.goldenId).toBeUndefined();
   });
 
-  it("A4+B4 each ≥1 (uncond) hits its golden anchor and ref", () => {
+  it("A4+B4 each ≥1 (uncond) hits its golden anchor and ref", async () => {
     useDeckStore.getState().importDeck("AB", [
       { name: "A", count: 4, isBasic: true },
       { name: "B", count: 4 },
@@ -176,7 +177,7 @@ describe("computeQ2Display (killer anchors, docs/02 §4.2)", () => {
 });
 
 describe("GOLDEN_COMBO_REFS stays in lockstep with the golden JSON", () => {
-  it("every combo case id+signature matches", () => {
+  it("every combo case id+signature matches", async () => {
     const goldenPath = join(
       dirname(fileURLToPath(import.meta.url)),
       "golden",
@@ -212,6 +213,7 @@ describe("Q2 section UI", () => {
     seedKillerDeck();
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.click(screen.getByRole("tab", { name: "Q2 組合查詢" }));
     const addSelect = screen.getByRole("combobox", { name: "加入追蹤卡" });
@@ -251,6 +253,7 @@ describe("Q2 section UI", () => {
     });
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("tab", { name: "Q2 組合查詢" }));
 
     expect(screen.getByText("a = 火球鼠 ×4, b = 超夢風暴 ×3")).toBeInTheDocument();
@@ -280,6 +283,7 @@ describe("Q2 section UI", () => {
     try {
       const user = userEvent.setup();
       render(<App />);
+    await viewReady();
       await user.click(screen.getByRole("tab", { name: "Q2 組合查詢" }));
 
       expect(screen.getByText(/步驟 1 \/ 4/)).toBeInTheDocument();

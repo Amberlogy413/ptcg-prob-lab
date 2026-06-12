@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
 import { computeQ1, groupDigits } from "../src/state/selectors.ts";
@@ -26,7 +27,7 @@ beforeEach(() => {
 });
 
 describe("computeQ1 (anchors from docs/02 §3 / §8)", () => {
-  it("B=10, N=60: headline, receipt and conditional k=0", () => {
+  it("B=10, N=60: headline, receipt and conditional k=0", async () => {
     seedAnchorDeck();
     const deck = useDeckStore.getState().decks[0]!;
     const r = computeQ1(deck);
@@ -62,7 +63,7 @@ describe("computeQ1 (anchors from docs/02 §3 / §8)", () => {
     expect(r.data.receipt.goldenId).toBe("opening_basics_B10");
   });
 
-  it("guards: no deck / under 7 cards / no Basics", () => {
+  it("guards: no deck / under 7 cards / no Basics", async () => {
     expect(computeQ1(null).status).toBe("noDeck");
     useDeckStore.getState().importDeck("Tiny", [{ name: "A", count: 3, isBasic: true }]);
     expect(computeQ1(useDeckStore.getState().decks[0]!).status).toBe("tooFewCards");
@@ -70,16 +71,17 @@ describe("computeQ1 (anchors from docs/02 §3 / §8)", () => {
     expect(computeQ1(useDeckStore.getState().decks[1]!).status).toBe("noBasics");
   });
 
-  it("groupDigits formats BigInt integers", () => {
+  it("groupDigits formats BigInt integers", async () => {
     expect(groupDigits(99884400n)).toBe("99,884,400");
     expect(groupDigits(7n)).toBe("7");
   });
 });
 
 describe("AskView (Q1)", () => {
-  it("shows the three-format headline, ruler aria-label and conditional default", () => {
+  it("shows the three-format headline, ruler aria-label and conditional default", async () => {
     seedAnchorDeck();
     render(<App />);
+    await viewReady();
 
     // Headline (also appears in the dashboard card).
     expect(screen.getAllByText("25.862923%").length).toBeGreaterThanOrEqual(1);
@@ -101,6 +103,7 @@ describe("AskView (Q1)", () => {
     seedAnchorDeck();
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "原始分布(未含重抽)" }));
     expect(screen.getByRole("button", { name: "原始分布(未含重抽)" })).toHaveAttribute(
       "aria-pressed",
@@ -114,6 +117,7 @@ describe("AskView (Q1)", () => {
     seedAnchorDeck();
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
 
     await user.click(screen.getByRole("button", { name: "展開數學收據 ▾" }));
     expect(screen.getByText("P(重抽) = C(50, 7) / C(60, 7)")).toBeInTheDocument();
@@ -128,8 +132,9 @@ describe("AskView (Q1)", () => {
     expect(copied).toContain("全程 BigInt 精確分數;小數為 round-half-up 顯示。");
   });
 
-  it("guards render guidance instead of crashing", () => {
+  it("guards render guidance instead of crashing", async () => {
     render(<App />);
+    await viewReady();
     const main = screen.getByRole("main");
     expect(within(main).getAllByText("尚未選擇牌組。").length).toBeGreaterThanOrEqual(1);
   });

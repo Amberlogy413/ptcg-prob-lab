@@ -395,5 +395,6 @@
   "export.copied": "Copied",
   "export.close": "Close",
   "common.cancel": "Cancel",
-  "common.confirm": "Confirm"
+  "common.confirm": "Confirm",
+  "common.loading": "Loading…"
 }

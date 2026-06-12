@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
+import { viewReady } from "./helpers.ts";
 import { simulateCombo, mulberry32 } from "../src/state/mcSim.ts";
 import { computeLuckMeter, computeEnergyCurve } from "../src/state/q5.ts";
 import { luckTail, ratPow } from "../src/lib/probx/luck.ts";
@@ -49,28 +50,28 @@ describe("Monte-Carlo simulator (docs/05 §D)", () => {
     seed: 42,
   };
 
-  it("is deterministic for a fixed seed", () => {
+  it("is deterministic for a fixed seed", async () => {
     const a = simulateCombo(KILLER);
     const b = simulateCombo(KILLER);
     expect(a.hits).toBe(b.hits);
     expect(a.n).toBe(20000);
   });
 
-  it("converges on the exact killer value within 5σ", () => {
+  it("converges on the exact killer value within 5σ", async () => {
     const { hits, n } = simulateCombo(KILLER);
     const p = 0.15383618; // exact 11011691/71580630, float for the tolerance only
     const sigma = Math.sqrt((p * (1 - p)) / n);
     expect(Math.abs(hits / n - p)).toBeLessThan(5 * sigma);
   });
 
-  it("without conditioning it matches the naive value within 5σ", () => {
+  it("without conditioning it matches the naive value within 5σ", async () => {
     const { hits, n } = simulateCombo({ ...KILLER, otherBasics: -1, seed: 7 });
     const p = 0.11404965;
     const sigma = Math.sqrt((p * (1 - p)) / n);
     expect(Math.abs(hits / n - p)).toBeLessThan(5 * sigma);
   });
 
-  it("mulberry32 streams are reproducible", () => {
+  it("mulberry32 streams are reproducible", async () => {
     const r1 = mulberry32(123);
     const r2 = mulberry32(123);
     for (let i = 0; i < 5; i++) expect(r1()).toBe(r2());
@@ -78,7 +79,7 @@ describe("Monte-Carlo simulator (docs/05 §D)", () => {
 });
 
 describe("energy shortfall curve UI data (docs/02 §6.4)", () => {
-  it("matches the v2-golden-backed module and is monotone in n", () => {
+  it("matches the v2-golden-backed module and is monotone in n", async () => {
     const data = computeEnergyCurve(10, 10, 1, false, false, 6, 60)!;
     expect(data.pValid.fraction).toBe("216911/292581");
     const charts = data.rows.map((r) => r.chart);
@@ -88,13 +89,13 @@ describe("energy shortfall curve UI data (docs/02 §6.4)", () => {
     expect(data.rows[0]?.nSeen).toBe(8);
   });
 
-  it("guards impossible setups", () => {
+  it("guards impossible setups", async () => {
     expect(computeEnergyCurve(10, 0, 1, false, false, 6, 60)).toBeNull();
   });
 });
 
 describe("luck meter (docs/02 §10)", () => {
-  it("n straight T1 misses of the 4-of equals (1−p)^n exactly", () => {
+  it("n straight T1 misses of the 4-of equals (1−p)^n exactly", async () => {
     seedKillerDeck();
     const deck = useDeckStore.getState().decks[0]!;
     const data = computeLuckMeter(deck, "火球鼠", "seenT1", 5)!;
@@ -108,7 +109,7 @@ describe("luck meter (docs/02 §10)", () => {
     expect(six.rare).toBe(true);
   });
 
-  it("ratPow exact power identities", () => {
+  it("ratPow exact power identities", async () => {
     expect(fractionStr(ratPow(rat(1n, 2n), 3))).toBe("1/8");
     expect(fractionStr(ratPow(rat(3n, 4n), 0))).toBe("1/1");
     expect(fractionStr(luckTail(rat(1n, 10n), 2))).toBe("81/100");
@@ -116,10 +117,11 @@ describe("luck meter (docs/02 §10)", () => {
 });
 
 describe("fallacy museum (docs/02 §9, ≥4 exact demos)", () => {
-  it("renders four demos with the spec's wrong-vs-right anchors", () => {
+  it("renders four demos with the spec's wrong-vs-right anchors", async () => {
     seedKillerDeck();
     useUiStore.setState({ activeView: "trainer" });
     render(<App />);
+    await viewReady();
 
     expect(screen.getByText("謬誤互動博物館(02 §9)")).toBeInTheDocument();
     // §9-1 independence: 15.959995% vs 14.540568%
@@ -143,6 +145,7 @@ describe("D2 basics list import", () => {
     // 超夢風暴 starts non-Basic; the list flips it and adds an EN alias name.
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "匯入基礎名單" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("textbox"));
@@ -160,6 +163,7 @@ describe("D2 basics list import", () => {
     seedKillerDeck();
     const user = userEvent.setup();
     render(<App />);
+    await viewReady();
     await user.click(screen.getByRole("button", { name: "匯入基礎名單" }));
     const dialog = screen.getByRole("dialog");
     await user.click(within(dialog).getByRole("textbox"));

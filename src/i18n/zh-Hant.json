@@ -395,5 +395,6 @@
   "export.copied": "已複製",
   "export.close": "關閉",
   "common.cancel": "取消",
-  "common.confirm": "確定"
+  "common.confirm": "確定",
+  "common.loading": "載入中…"
 }

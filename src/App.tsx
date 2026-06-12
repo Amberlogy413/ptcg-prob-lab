@@ -1,19 +1,40 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { TopNav } from "./components/TopNav.tsx";
 import { Footer } from "./components/Footer.tsx";
 import { DeckSummary } from "./components/DeckSummary.tsx";
 import { DeckView } from "./views/DeckView.tsx";
-import { AskView } from "./views/AskView.tsx";
-import { PrizesView } from "./views/PrizesView.tsx";
-import { CompareView } from "./views/CompareView.tsx";
-import { TrainerView, LuckMeter, FallacyMuseum } from "./views/TrainerView.tsx";
-import { TrackerView } from "./views/TrackerView.tsx";
 import { useUiStore } from "./state/uiStore.ts";
 import { useSettingsStore } from "./state/settingsStore.ts";
 import { useDeckStore } from "./state/deckStore.ts";
 import { useQueryStore } from "./state/queryStore.ts";
 import { useT } from "./i18n/index.ts";
 import { decodeShare, SHARE_PREFIX } from "./utils/share.ts";
+
+// Code splitting (docs/03 §6: chart/view code may split): the deck workspace
+// is the landing view and stays eager; every other workspace loads on demand.
+const AskView = lazy(() => import("./views/AskView.tsx").then((m) => ({ default: m.AskView })));
+const PrizesView = lazy(() =>
+  import("./views/PrizesView.tsx").then((m) => ({ default: m.PrizesView })),
+);
+const CompareView = lazy(() =>
+  import("./views/CompareView.tsx").then((m) => ({ default: m.CompareView })),
+);
+const TrainerBundle = lazy(() =>
+  import("./views/TrainerView.tsx").then((m) => ({
+    default: function TrainerBundle() {
+      return (
+        <>
+          <m.TrainerView />
+          <m.LuckMeter />
+          <m.FallacyMuseum />
+        </>
+      );
+    },
+  })),
+);
+const TrackerView = lazy(() =>
+  import("./views/TrackerView.tsx").then((m) => ({ default: m.TrackerView })),
+);
 
 export default function App() {
   const t = useT();
@@ -75,18 +96,20 @@ export default function App() {
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-start gap-6 px-4 py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <DeckSummary />
         <div className="min-w-0">
-          {activeView === "deck" && <DeckView />}
-          {activeView === "ask" && <AskView />}
-          {activeView === "prizes" && <PrizesView />}
-          {activeView === "compare" && <CompareView />}
-          {activeView === "trainer" && (
-            <>
-              <TrainerView />
-              <LuckMeter />
-              <FallacyMuseum />
-            </>
-          )}
-          {activeView === "tracker" && <TrackerView />}
+          <Suspense
+            fallback={
+              <p className="p-6 font-mono text-sm text-ink2" role="status">
+                {t("common.loading")}
+              </p>
+            }
+          >
+            {activeView === "deck" && <DeckView />}
+            {activeView === "ask" && <AskView />}
+            {activeView === "prizes" && <PrizesView />}
+            {activeView === "compare" && <CompareView />}
+            {activeView === "trainer" && <TrainerBundle />}
+            {activeView === "tracker" && <TrackerView />}
+          </Suspense>
         </div>
       </main>
       <Footer />
