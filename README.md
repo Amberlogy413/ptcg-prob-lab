@@ -1,35 +1,46 @@
-# PTCG 概率實驗室 · PTCG Probability Lab(seed)
+# PTCG 概率實驗室 · PTCG Probability Lab
 
-**zh-Hant** — 這是一個「種子倉庫」:用來讓 Claude Code 建造一個全 client-side 的網頁應用,對 60 張 PTCG 牌組做**精確**(BigInt 既約分數、零浮點誤差)的抽卡與獎賞卡概率計算——起手 7 張的基礎寶可夢分布與 Mulligan(重抽)、指定卡組合的完整聯合分布(含重抽修正)、指定卡被放入 6 張獎賞卡的三種模式,以及回合曲線、A/B 比較、對局獎賞卡追蹤器等。數學核心**已完成並通過驗證**;其餘由 Claude Code 依 `docs/` 規格實作。
+**zh-Hant** — 全 client-side 的「牌組概率計量儀器」:對 60 張 PTCG 牌組做**精確**(BigInt 既約分數、零浮點誤差)的抽卡與獎賞卡概率計算。每個概率都以三格式呈現(百分比/精確分數/「1 in N」),附可展開、可複製的**數學收據**;所有涉及起手的問題預設**含 Mulligan(重抽)修正**——這正是市面上計算器集體算錯的地方。零後端、零遙測、可離線(PWA)。
 
-**en** — A seed repository for Claude Code to build a fully client-side web app computing **exact** (BigInt reduced fractions, zero float error) draw & prize probabilities for 60-card Pokémon TCG decks: opening-hand Basic distribution with mulligan conditioning, full joint distributions for tracked-card combos, three prize-card modes, turn curves, A/B comparison, and an in-game prize tracker. The math core is **finished and verified**; the app is built from the specs in `docs/`.
+**en** — A fully client-side "measuring instrument" for 60-card Pokémon TCG deck probability: **exact** BigInt reduced fractions, zero float error. Every probability ships in three formats (percent / exact fraction / "1 in N") with an expandable, copyable **math receipt**; every opening-hand question is **mulligan-aware by default** — the correction most calculators get wrong. No backend, no telemetry, offline-capable (PWA).
 
-## 現狀 / Status
+## 功能 / Features
 
-- `src/lib/prob/` — 完成的精確數學核心(零依賴、零框架)。
-- `tests/golden/golden_vectors.json` — 由獨立 Python `fractions` 產生器生成的黃金向量:**27 案例 / 507 斷言,TypeScript 核心全數通過,含 15 位小數逐字元比對。**
-- `docs/01–06` — PRD、數學規格、架構、UI/UX、測試計畫、路線圖(zh-Hant)。
-- `CLAUDE.md` — Claude Code 的最高指導文件(en)。
+| 工作區 | 內容 |
+|---|---|
+| 牌組 | 行編輯器、60 計數環、多牌組管理、PTCG Live 匯入精靈(強制基礎寶可夢標記)/匯出、社群基礎名單 JSON、卡名別名對照 |
+| 提問 | **Q1** 基礎與重抽儀表板 · **Q2** 句子式查詢建構器(殺手示範:含重抽 15.383618% vs 天真 11.404965%)+ 蒙地卡羅驗證掣 + 敏感度掃描 + 分享連結 + PNG 圖卡 · **回合曲線**(含能量斷流、多回合接力)· **品質分級**(理想/可用/死手 + 死手歸因排行榜)· **構築工具**(檢索鏈摺疊、局部優化器) |
+| 獎賞卡 | Q3 三模式(賽前無條件/已知手牌/賽前·含重抽)+ 多卡聯合 + 預設十問/題庫/自訂快捷 + CSV 匯出 |
+| 比較 | A/B 牌組同題對照,±pp delta 徽章,一鍵分叉 |
+| 訓練 | 概率直覺訓練(用你牌組的真實數字出題)+ 運氣儀表 + 謬誤互動博物館 |
+| 追蹤器 | 對局獎賞卡後驗追蹤(含常駐賽事合規提醒) |
 
-## 自行驗證 / Verify yourself
+## 信任從何而來 / Why trust it
 
-需求:Node 22+(Python 3 僅在重新生成向量時需要)。
+1. **雙獨立實作交叉驗證**:獨立 Python `fractions` 產生器 vs TypeScript BigInt 核心,逐字元比對(含 15 位 round-half-up 小數)。種子管線 27 案例/507 斷言;v2 管線(能量斷流、運氣尾概率、接力事件、檢索鏈摺疊、優化器枚舉)16 案例,**全數通過**。
+2. **數學收據**:每個結果可展開公式代入過程,任何人可手工覆核;收據引用對應黃金向量 id。
+3. **謬誤免疫**:獨立相乘、二項近似、忽略重抽、期望當概率——`docs/02 §9` 全列,訓練工作區有互動演示。
+
+## 開發 / Development
+
+需求:Node 22+(Python 3 僅在重新生成黃金向量時需要)。
 
 ```bash
-node --experimental-strip-types scripts/verify_seed.ts
-# → ALL GOLDEN VECTORS PASS — TypeScript core matches the independent Python reference exactly.
-
-python3 scripts/generate_golden.py   # optional: regenerate vectors (asserts its own identities)
+npm install
+npm run dev          # http://localhost:5173
+npm run typecheck && npm test && npm run verify:seed   # 全綠才算數
+npm run build        # 產出 dist/(全靜態,任何靜態主機可部署)
 ```
 
-## 用 Claude Code 開始 / Start with Claude Code
+黃金管線:
 
-在此資料夾開啟 Claude Code,第一句建議照用:
+```bash
+npm run verify:seed                    # 種子核心 vs 獨立 Python 參考(27 案例/507 斷言)
+python3 scripts/generate_golden.py     # 重生成種子向量(內建恆等式自檢;受保護,勿手改)
+python3 scripts/generate_golden_v2.py  # 重生成 v2 向量(種子後新數學)
+```
 
-> Read CLAUDE.md first, then docs/01 through docs/06 in order. Run `node --experimental-strip-types scripts/verify_seed.ts` and confirm ALL GOLDEN VECTORS PASS before touching anything. Then execute Phase 0 and Phase 1 of docs/06_ROADMAP.md, keeping `src/lib/prob/` byte-identical and golden tests green at every commit. Stop and show me the running app after Phase 1's DoD is met.
-
-之後每階段:`Execute Phase N of docs/06_ROADMAP.md; run /ship-check before declaring done.`
-內建指令:`/verify-math`、`/ship-check`、`/new-question`。
+規格在 `docs/01–07`(zh-Hant);裁決紀錄在 `docs/DECISIONS.md`;Claude Code 指導文件為 `CLAUDE.md`。內建指令:`/verify-math`、`/ship-check`、`/new-question`(新題型必走雙實作管線)。
 
 ## 一眼看出它在算什麼 / A taste of the math
 
@@ -43,4 +54,4 @@ python3 scripts/generate_golden.py   # optional: regenerate vectors (asserts its
 
 ## 聲明 / Disclaimer
 
-非官方粉絲工具,與 The Pokémon Company / Nintendo / Creatures / GAME FREAK 無關;不使用任何官方圖像或標誌。Unofficial fan tool; not affiliated with The Pokémon Company, Nintendo, Creatures, or GAME FREAK; no official artwork or logos are used.
+非官方粉絲工具,與 The Pokémon Company / Nintendo / Creatures / GAME FREAK 無關;不使用任何官方圖像或標誌。對局追蹤器僅供練習與覆盤——正式比賽使用外部工具可能違反賽事規定。Unofficial fan tool; not affiliated with The Pokémon Company, Nintendo, Creatures, or GAME FREAK; no official artwork or logos are used. The in-game tracker is for practice and review only — using external tools in sanctioned play may violate tournament rules.
