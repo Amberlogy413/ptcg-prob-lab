@@ -12,6 +12,7 @@ import {
   type TrialStats,
 } from "../state/trial.ts";
 import { DECK_SIZE, HAND_SIZE } from "../constants.ts";
+import { GoldfishBlock } from "./GoldfishBlock.tsx";
 
 /**
  * 試抽桌 (docs/08 §5A, Phase 8): an honest seeded dealer — 7-card hand, real
@@ -90,7 +91,8 @@ export function TrialView() {
       : "0.00";
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <>
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
       <h2 className="text-xl font-medium">{t("trial.title")}</h2>
       <p className="mt-2 text-xs text-ink2">{t("trial.desc")}</p>
 
@@ -240,6 +242,8 @@ export function TrialView() {
           <p className="mt-2 text-xs text-ink2">{t("trial.teach")}</p>
         </div>
       )}
-    </section>
+      </section>
+      <GoldfishBlock deck={deck} copies={copies} />
+    </>
   );
 }

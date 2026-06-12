@@ -118,6 +118,91 @@ export function dealGame(
   };
 }
 
+export interface GoldfishDeal {
+  hand: TrialCard[];
+  prizes: TrialCard[];
+  mulligans: number;
+  /** turnDraws[i] = cards drawn on turn i+1; sizes mirror the nSeen schedule. */
+  turnDraws: TrialCard[][];
+}
+
+/**
+ * P9.2 goldfish: one full solo game following an nSeen schedule (cumulative
+ * cards seen per turn, from the exact curve's cardsSeenByTurn) so the sample
+ * and the exact column count the very same draws.
+ */
+export function goldfishGame(
+  copies: readonly TrialCard[],
+  mulliganAware: boolean,
+  rng: () => number,
+  nSeens: readonly number[],
+): GoldfishDeal {
+  const n = copies.length;
+  const last = nSeens[nSeens.length - 1] ?? HAND_SIZE;
+  if (last < HAND_SIZE) throw new RangeError("nSeen schedule must start at the opening hand");
+  if (n < PRIZE_COUNT + last) {
+    throw new RangeError(`goldfish needs at least ${PRIZE_COUNT + last} cards`);
+  }
+  const idx: number[] = [];
+  for (let i = 0; i < n; i++) idx.push(i);
+
+  let mulligans = 0;
+  for (;;) {
+    for (let i = 0; i < HAND_SIZE; i++) {
+      const j = i + Math.floor(rng() * (n - i));
+      const tmp = idx[i] as number;
+      idx[i] = idx[j] as number;
+      idx[j] = tmp;
+    }
+    let basics = 0;
+    for (let i = 0; i < HAND_SIZE; i++) {
+      if ((copies[idx[i] as number] as TrialCard).isBasic) basics++;
+    }
+    if (!mulliganAware || basics >= 1) break;
+    mulligans++;
+  }
+
+  // Prizes, then every scheduled draw, dealt off the same shuffle.
+  const drawTotal = last - HAND_SIZE;
+  for (let i = HAND_SIZE; i < HAND_SIZE + PRIZE_COUNT + drawTotal; i++) {
+    const j = i + Math.floor(rng() * (n - i));
+    const tmp = idx[i] as number;
+    idx[i] = idx[j] as number;
+    idx[j] = tmp;
+  }
+
+  const at = (i: number): TrialCard => copies[idx[i] as number] as TrialCard;
+  const turnDraws: TrialCard[][] = [];
+  let cursor = HAND_SIZE + PRIZE_COUNT;
+  let prevSeen = HAND_SIZE;
+  for (const seen of nSeens) {
+    const draws: TrialCard[] = [];
+    for (let d = prevSeen; d < seen; d++) draws.push(at(cursor++));
+    turnDraws.push(draws);
+    prevSeen = seen;
+  }
+  return {
+    hand: Array.from({ length: HAND_SIZE }, (_, i) => at(i)),
+    prizes: Array.from({ length: PRIZE_COUNT }, (_, i) => at(HAND_SIZE + i)),
+    mulligans,
+    turnDraws,
+  };
+}
+
+/** True when ≥`want` copies of `name` appear in the first `byTurn` turns. */
+export function goldfishSeenBy(
+  deal: GoldfishDeal,
+  name: string,
+  byTurn: number,
+  want = 1,
+): boolean {
+  let seen = deal.hand.reduce((s, c) => s + (c.name === name ? 1 : 0), 0);
+  for (let t = 0; t < byTurn && t < deal.turnDraws.length; t++) {
+    for (const c of deal.turnDraws[t] as TrialCard[]) if (c.name === name) seen++;
+  }
+  return seen >= want;
+}
+
 export function runTrials(
   copies: readonly TrialCard[],
   mulliganAware: boolean,
