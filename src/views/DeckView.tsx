@@ -7,6 +7,7 @@ import { ExportDialog } from "../components/ExportDialog.tsx";
 import { BasicListDialog } from "../components/BasicListDialog.tsx";
 import { AliasDialog } from "../components/AliasDialog.tsx";
 import { TemplateDialog } from "../components/TemplateDialog.tsx";
+import { DeckSheetDialog } from "../components/DeckSheetDialog.tsx";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
 export function DeckView() {
@@ -21,6 +22,7 @@ export function DeckView() {
   const [basicListOpen, setBasicListOpen] = useState(false);
   const [aliasOpen, setAliasOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
@@ -114,6 +116,15 @@ export function DeckView() {
               {t("deck.export")}
             </button>
           )}
+          {activeDeck && (
+            <button
+              type="button"
+              onClick={() => setSheetOpen(true)}
+              className="rounded-ctl border hairline px-3 py-1.5 text-sm text-ink2 hover:text-ink"
+            >
+              {t("sheet.button")}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setBasicListOpen(true)}
@@ -147,6 +158,9 @@ export function DeckView() {
       {basicListOpen && <BasicListDialog onClose={() => setBasicListOpen(false)} />}
       {aliasOpen && <AliasDialog onClose={() => setAliasOpen(false)} />}
       {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
+      {sheetOpen && activeDeck && (
+        <DeckSheetDialog deck={activeDeck} onClose={() => setSheetOpen(false)} />
+      )}
     </div>
   );
 }

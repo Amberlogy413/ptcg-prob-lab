@@ -56,4 +56,13 @@
   input[type="number"] {
     display: none !important;
   }
+
+  /* P8.3 registration sheet: while its dialog is open, printing swaps the
+     whole app for the print-only portal (DeckSheetDialog). */
+  body.print-deck-sheet #root {
+    display: none !important;
+  }
+  body.print-deck-sheet .deck-sheet-print {
+    display: block !important;
+  }
 }

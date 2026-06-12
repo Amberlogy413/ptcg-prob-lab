@@ -4,6 +4,8 @@
  * product name and the 「精確計算 · 非模擬」 badge.
  */
 
+import { downloadSvgPng } from "./svgPng.ts";
+
 export interface ResultCardSpec {
   title: string;
   percent: string;
@@ -41,34 +43,5 @@ export function buildResultCardSvg(spec: ResultCardSpec): string {
 }
 
 export async function downloadResultCardPng(spec: ResultCardSpec, filename: string): Promise<void> {
-  const svg = buildResultCardSvg(spec);
-  const blob = new Blob([svg], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  try {
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("svg rasterize failed"));
-      img.src = url;
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = W * 2;
-    canvas.height = H * 2;
-    const cx = canvas.getContext("2d");
-    if (!cx) throw new Error("no 2d context");
-    cx.scale(2, 2);
-    cx.drawImage(img, 0, 0);
-    const pngBlob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (!pngBlob) throw new Error("png encode failed");
-    const dl = URL.createObjectURL(pngBlob);
-    const a = document.createElement("a");
-    a.href = dl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(dl);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  await downloadSvgPng(buildResultCardSvg(spec), W, H, filename);
 }
