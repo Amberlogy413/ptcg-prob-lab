@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { Modal } from "./Modal.tsx";
-import { useDeckStore } from "../state/deckStore.ts";
+import { useDeckStore, resolveBasicTag } from "../state/deckStore.ts";
 import {
   parseDeckList,
   cardsNeedingBasicTag,
@@ -19,6 +19,7 @@ import { DECK_SIZE } from "../constants.ts";
 export function ImportWizard({ onClose }: { onClose: () => void }) {
   const t = useT();
   const basicTags = useDeckStore((s) => s.basicTags);
+  const aliases = useDeckStore((s) => s.aliases);
   const rememberBasicTags = useDeckStore((s) => s.rememberBasicTags);
   const importDeck = useDeckStore((s) => s.importDeck);
 
@@ -58,7 +59,7 @@ export function ImportWizard({ onClose }: { onClose: () => void }) {
     const initial: Record<string, boolean> = {};
     let remembered = 0;
     for (const name of names) {
-      const known = basicTags[name];
+      const known = resolveBasicTag(basicTags, aliases, name);
       if (known !== undefined) remembered += 1;
       initial[name] = known ?? false;
     }

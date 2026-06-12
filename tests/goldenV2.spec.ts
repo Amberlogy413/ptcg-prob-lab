@@ -14,6 +14,9 @@ import { describe, it, expect } from "vitest";
 import { fractionStr, decimalStr, rat } from "../src/lib/prob/index.ts";
 import { energyShortfallCurve } from "../src/lib/probx/energy.ts";
 import { luckTail } from "../src/lib/probx/luck.ts";
+import { relayEvent } from "../src/lib/probx/relay.ts";
+import { searchFoldValid } from "../src/lib/probx/fold.ts";
+import { optimizeAllocations, type OptimizerCandidate } from "../src/lib/probx/optimizer.ts";
 
 interface V2Case {
   id: string;
@@ -63,6 +66,67 @@ describe("golden v2 vectors (independent Python reference)", () => {
         const tail = luckTail(parseFrac(p.p), p.n);
         expect.soft(fractionStr(tail), `${c.id} :: tail`).toBe(exp.tail);
         expect.soft(decimalStr(tail, 15), `${c.id} :: tail_dec`).toBe(exp.tail_dec);
+      } else if (c.kind === "relay_event") {
+        const p = c.params as {
+          N: number;
+          cA: number;
+          cB: number;
+          wA: number;
+          wB: number;
+          n1: number;
+          n2: number;
+        };
+        const exp = c.expect as { p: string; p_dec: string };
+        const r = relayEvent(p.cA, p.cB, p.wA, p.wB, p.n1, p.n2, p.N);
+        expect.soft(fractionStr(r), `${c.id} :: p`).toBe(exp.p);
+        expect.soft(decimalStr(r, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
+      } else if (c.kind === "search_fold_valid") {
+        const p = c.params as {
+          N: number;
+          H: number;
+          x: number;
+          x_basic: boolean;
+          s: number;
+          ob: number;
+          want: number;
+        };
+        const exp = c.expect as {
+          optimistic: string;
+          optimistic_dec: string;
+          conservative: string;
+          conservative_dec: string;
+          p_valid: string;
+        };
+        const r = searchFoldValid(p.x, p.x_basic, p.s, p.ob, p.want, p.N, p.H);
+        expect.soft(fractionStr(r.optimistic), `${c.id} :: optimistic`).toBe(exp.optimistic);
+        expect.soft(decimalStr(r.optimistic, 15), `${c.id} :: optimistic_dec`).toBe(exp.optimistic_dec);
+        expect.soft(fractionStr(r.conservative), `${c.id} :: conservative`).toBe(exp.conservative);
+        expect
+          .soft(decimalStr(r.conservative, 15), `${c.id} :: conservative_dec`)
+          .toBe(exp.conservative_dec);
+        expect.soft(fractionStr(r.pValid), `${c.id} :: p_valid`).toBe(exp.p_valid);
+      } else if (c.kind === "optimizer_enum") {
+        const p = c.params as {
+          N: number;
+          H: number;
+          free: number;
+          ob: number;
+          cands: Array<{ base: number; basic: boolean; want: number }>;
+        };
+        const exp = c.expect as { allocs: Record<string, string>; best: string; best_dec: string };
+        const cands: OptimizerCandidate[] = p.cands.map((cd) => ({
+          base: cd.base,
+          isBasic: cd.basic,
+          want: cd.want,
+        }));
+        const r = optimizeAllocations(cands, p.free, p.ob, p.N, p.H);
+        expect.soft(Object.keys(exp.allocs)).toHaveLength(r.cells.length);
+        for (const cell of r.cells) {
+          const key = cell.alloc.join("_");
+          expect.soft(fractionStr(cell.p), `${c.id} :: alloc[${key}]`).toBe(exp.allocs[key]);
+        }
+        expect.soft(r.best.alloc.join("_"), `${c.id} :: best`).toBe(exp.best);
+        expect.soft(decimalStr(r.best.p, 15), `${c.id} :: best_dec`).toBe(exp.best_dec);
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }

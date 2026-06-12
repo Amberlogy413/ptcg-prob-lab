@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 export type WorkspaceView = "deck" | "ask" | "prizes" | "compare" | "trainer" | "tracker";
-export type AskTab = "q1" | "q2" | "curve" | "grade";
+export type AskTab = "q1" | "q2" | "curve" | "grade" | "tools";
 
 interface UiState {
   activeView: WorkspaceView;

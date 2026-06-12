@@ -6,7 +6,18 @@
 
 import { create } from "zustand";
 import { uid } from "../utils/uid.ts";
+import { readJSON, writeJSON } from "../utils/storage.ts";
 import type { Q3Mode, Q3JointRowInput } from "./q3.ts";
+
+/** D3: user-saved Q3 quick questions (ppl.v1.customPresets). */
+export interface CustomPreset {
+  id: string;
+  label: string;
+  mode: Q3Mode;
+  single: Q3SingleState;
+}
+
+const CUSTOM_PRESETS_KEY = "ppl.v1.customPresets";
 
 export interface Q3SingleState {
   /** "custom" or a DeckCard id. */
@@ -21,6 +32,7 @@ interface Q3StoreState {
   mode: Q3Mode;
   single: Q3SingleState;
   joint: Q3JointRowInput[];
+  custom: CustomPreset[];
   setMode: (mode: Q3Mode) => void;
   setSingle: (patch: Partial<Q3SingleState>) => void;
   addJointRow: () => void;
@@ -29,6 +41,8 @@ interface Q3StoreState {
   /** One-click preset fill (預設十問). */
   applySinglePreset: (mode: Q3Mode, single: Partial<Q3SingleState>) => void;
   applyJointPreset: (rows: Array<Omit<Q3JointRowInput, "id">>) => void;
+  saveCustomPreset: (label: string) => void;
+  removeCustomPreset: (id: string) => void;
 }
 
 const DEFAULT_SINGLE: Q3SingleState = {
@@ -39,10 +53,11 @@ const DEFAULT_SINGLE: Q3SingleState = {
   otherBasics: 10,
 };
 
-export const useQ3Store = create<Q3StoreState>()((set) => ({
+export const useQ3Store = create<Q3StoreState>()((set, get) => ({
   mode: "uncond",
   single: DEFAULT_SINGLE,
   joint: [],
+  custom: readJSON<CustomPreset[]>(CUSTOM_PRESETS_KEY) ?? [],
   setMode: (mode) => set({ mode }),
   setSingle: (patch) => set((s) => ({ single: { ...s.single, ...patch } })),
   addJointRow: () =>
@@ -61,4 +76,17 @@ export const useQ3Store = create<Q3StoreState>()((set) => ({
     set((s) => ({ mode, single: { ...s.single, source: "custom", ...single } })),
   applyJointPreset: (rows) =>
     set({ joint: rows.map((r) => ({ ...r, id: uid() })) }),
+  saveCustomPreset: (label) => {
+    const trimmed = label.trim();
+    if (trimmed === "") return;
+    const { mode, single, custom } = get();
+    const updated = [...custom, { id: uid(), label: trimmed, mode, single: { ...single } }].slice(-50);
+    writeJSON(CUSTOM_PRESETS_KEY, updated);
+    set({ custom: updated });
+  },
+  removeCustomPreset: (id) => {
+    const updated = get().custom.filter((c) => c.id !== id);
+    writeJSON(CUSTOM_PRESETS_KEY, updated);
+    set({ custom: updated });
+  },
 }));

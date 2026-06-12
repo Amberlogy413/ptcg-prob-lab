@@ -46,6 +46,8 @@ interface DeckPersisted {
   decks: Deck[];
   activeDeckId: string | null;
   basicTags: Record<string, boolean>;
+  /** D1: alias name -> canonical name; basicTags lookups fall through it. */
+  aliases: Record<string, string>;
 }
 
 interface DeckState extends DeckPersisted {
@@ -59,6 +61,8 @@ interface DeckState extends DeckPersisted {
   updateCard: (deckId: string, cardId: string, patch: Partial<Omit<DeckCard, "id">>) => void;
   removeCard: (deckId: string, cardId: string) => void;
   rememberBasicTags: (tags: Record<string, boolean>) => void;
+  setAlias: (alias: string, canonical: string) => void;
+  removeAlias: (alias: string) => void;
   /** D2 community basics list: merge into basicTags AND retag matching cards
    *  in every deck. Returns how many deck rows were updated. */
   importBasicList: (tags: Record<string, boolean>) => number;
@@ -70,12 +74,16 @@ const splitStorage: PersistStorage<DeckPersisted> = {
     const decks = readJSON<Deck[]>(STORAGE_KEYS.decks);
     const activeDeckId = readJSON<string | null>(STORAGE_KEYS.activeDeckId);
     const basicTags = readJSON<Record<string, boolean>>(STORAGE_KEYS.basicTags);
-    if (decks === null && activeDeckId === null && basicTags === null) return null;
+    const aliases = readJSON<Record<string, string>>(STORAGE_KEYS.aliases);
+    if (decks === null && activeDeckId === null && basicTags === null && aliases === null) {
+      return null;
+    }
     return {
       state: {
         decks: decks ?? [],
         activeDeckId: activeDeckId ?? null,
         basicTags: basicTags ?? {},
+        aliases: aliases ?? {},
       },
       version: 1,
     };
@@ -84,11 +92,13 @@ const splitStorage: PersistStorage<DeckPersisted> = {
     writeJSON(STORAGE_KEYS.decks, value.state.decks);
     writeJSON(STORAGE_KEYS.activeDeckId, value.state.activeDeckId);
     writeJSON(STORAGE_KEYS.basicTags, value.state.basicTags);
+    writeJSON(STORAGE_KEYS.aliases, value.state.aliases);
   },
   removeItem: () => {
     removeKey(STORAGE_KEYS.decks);
     removeKey(STORAGE_KEYS.activeDeckId);
     removeKey(STORAGE_KEYS.basicTags);
+    removeKey(STORAGE_KEYS.aliases);
   },
 };
 
@@ -107,6 +117,7 @@ export const useDeckStore = create<DeckState>()(
       decks: [],
       activeDeckId: null,
       basicTags: {},
+      aliases: {},
 
       createDeck: (name) => {
         const id = uid();
@@ -154,7 +165,7 @@ export const useDeckStore = create<DeckState>()(
       importDeck: (name, cards) => {
         const id = uid();
         const now = Date.now();
-        const { basicTags } = get();
+        const { basicTags, aliases } = get();
         const deck: Deck = {
           id,
           name,
@@ -162,7 +173,7 @@ export const useDeckStore = create<DeckState>()(
             id: uid(),
             name: c.name,
             count: clampCount(c.count),
-            isBasic: c.isBasic ?? basicTags[c.name] ?? false,
+            isBasic: c.isBasic ?? resolveBasicTag(basicTags, aliases, c.name) ?? false,
             section: c.section ?? "unknown",
             ...(c.set !== undefined ? { set: c.set } : {}),
             ...(c.number !== undefined ? { number: c.number } : {}),
@@ -203,12 +214,9 @@ export const useDeckStore = create<DeckState>()(
                 next.count = clampCount(next.count);
                 // Renaming to a known name auto-fills the remembered tag —
                 // unless this very patch also sets isBasic explicitly.
-                if (
-                  patch.name !== undefined &&
-                  patch.isBasic === undefined &&
-                  s.basicTags[next.name] !== undefined
-                ) {
-                  next.isBasic = s.basicTags[next.name] as boolean;
+                if (patch.name !== undefined && patch.isBasic === undefined) {
+                  const known = resolveBasicTag(s.basicTags, s.aliases, next.name);
+                  if (known !== undefined) next.isBasic = known;
                 }
                 // An explicit isBasic toggle is remembered globally by name.
                 if (patch.isBasic !== undefined && next.name.trim() !== "") {
@@ -232,6 +240,21 @@ export const useDeckStore = create<DeckState>()(
 
       rememberBasicTags: (tags) => {
         set((s) => ({ basicTags: { ...s.basicTags, ...tags } }));
+      },
+
+      setAlias: (alias, canonical) => {
+        const a = alias.trim();
+        const c = canonical.trim();
+        if (a === "" || c === "" || a === c) return;
+        set((s) => ({ aliases: { ...s.aliases, [a]: c } }));
+      },
+
+      removeAlias: (alias) => {
+        set((s) => {
+          const aliases = { ...s.aliases };
+          delete aliases[alias];
+          return { aliases };
+        });
       },
 
       importBasicList: (tags) => {
@@ -263,10 +286,22 @@ export const useDeckStore = create<DeckState>()(
         decks: s.decks,
         activeDeckId: s.activeDeckId,
         basicTags: s.basicTags,
+        aliases: s.aliases,
       }),
     },
   ),
 );
+
+/** D1 lookup: direct tag, else the canonical name's tag via the alias map. */
+export function resolveBasicTag(
+  basicTags: Record<string, boolean>,
+  aliases: Record<string, string>,
+  name: string,
+): boolean | undefined {
+  if (basicTags[name] !== undefined) return basicTags[name];
+  const canonical = aliases[name];
+  return canonical !== undefined ? basicTags[canonical] : undefined;
+}
 
 export function deckTotal(deck: Deck): number {
   return deck.cards.reduce((sum, c) => sum + c.count, 0);

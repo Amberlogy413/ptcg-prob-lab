@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   decks: "ppl.v1.decks",
   activeDeckId: "ppl.v1.activeDeckId",
   basicTags: "ppl.v1.basicTags",
+  aliases: "ppl.v1.aliases",
   settings: "ppl.v1.settings",
 } as const;
 

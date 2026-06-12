@@ -2,7 +2,8 @@ import { useT } from "../i18n/index.ts";
 import { useUiStore, type AskTab } from "../state/uiStore.ts";
 import { Q1Section } from "./Q1Section.tsx";
 import { Q2Section } from "./Q2Section.tsx";
-import { CurveSection, EnergyCurveBlock } from "./CurveSection.tsx";
+import { CurveSection, EnergyCurveBlock, RelayBlock } from "./CurveSection.tsx";
+import { ToolsSection } from "./ToolsSection.tsx";
 import { GradeSection } from "./GradeSection.tsx";
 import { PresetStrip } from "../components/PresetStrip.tsx";
 
@@ -11,6 +12,7 @@ const TABS: Array<{ id: AskTab; labelKey: string }> = [
   { id: "q2", labelKey: "ask.tab.q2" },
   { id: "curve", labelKey: "ask.tab.curve" },
   { id: "grade", labelKey: "ask.tab.grade" },
+  { id: "tools", labelKey: "ask.tab.tools" },
 ];
 
 /** 提問 workspace: Q1 (Basics & mulligan) + Q2 (sentence combo query). */
@@ -45,8 +47,10 @@ export function AskView() {
         <>
           <CurveSection />
           <EnergyCurveBlock />
+          <RelayBlock />
         </>
       )}
+      {tab === "tools" && <ToolsSection />}
       {tab === "grade" && <GradeSection />}
     </div>
   );

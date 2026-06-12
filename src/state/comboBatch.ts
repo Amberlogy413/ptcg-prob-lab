@@ -6,6 +6,11 @@
 
 import { comboOpening, type ComboResult, type TrackedCard, type ComboOptions } from "../lib/prob/index.ts";
 import { simulateCombo, type McComboParams, type McResult } from "./mcSim.ts";
+import {
+  optimizeAllocations,
+  type OptimizerCandidate,
+  type OptimizerResult,
+} from "../lib/probx/optimizer.ts";
 import type { ProbWorkerRequest, ProbWorkerResponse } from "../workers/prob.worker.ts";
 
 export interface BatchJob {
@@ -48,6 +53,31 @@ export function runComboBatch(jobs: BatchJob[]): Promise<Array<ComboResult | nul
     };
     w.addEventListener("message", onMessage);
     w.postMessage({ id, kind: "comboBatch", jobs } satisfies ProbWorkerRequest);
+  });
+}
+
+/** Optimizer enumeration (docs/02 §11) — Worker when available (≤200ms). */
+export function runOptimizer(
+  cands: OptimizerCandidate[],
+  free: number,
+  ob: number,
+  N = 60,
+  H = 7,
+): Promise<OptimizerResult> {
+  if (typeof Worker === "undefined") {
+    return Promise.resolve(optimizeAllocations(cands, free, ob, N, H));
+  }
+  return new Promise((resolve, reject) => {
+    const id = nextId++;
+    const w = getWorker();
+    const onMessage = (e: MessageEvent<ProbWorkerResponse>) => {
+      if (e.data.id !== id) return;
+      w.removeEventListener("message", onMessage);
+      if (e.data.ok && "opt" in e.data) resolve(e.data.opt);
+      else if (!e.data.ok) reject(new Error(e.data.error));
+    };
+    w.addEventListener("message", onMessage);
+    w.postMessage({ id, kind: "optimizer", cands, free, ob, N, H } satisfies ProbWorkerRequest);
   });
 }
 

@@ -12,6 +12,7 @@ export type PresetDef =
   | {
       id: string;
       labelKey: string;
+      labelParams?: Record<string, string | number>;
       kind: "q3single";
       mode: Q3Mode;
       single: Partial<Q3SingleState>;
@@ -92,3 +93,32 @@ export const PRESET_TEN: PresetDef[] = [
   },
   { id: "mulliganRate", labelKey: "preset.mulliganRate", kind: "gotoQ1" },
 ];
+
+
+/** D3 question bank: generated canonical Q3 questions (beyond the ten). */
+export const GENERATED_BANK: PresetDef[] = [1, 2, 3, 4].flatMap((x) => [
+  {
+    id: `bank_uncond_x${x}`,
+    labelKey: "bank.prized",
+    labelParams: { x },
+    kind: "q3single" as const,
+    mode: "uncond" as const,
+    single: { x, h: 0 },
+  },
+  {
+    id: `bank_h0_x${x}`,
+    labelKey: "bank.prizedH0",
+    labelParams: { x },
+    kind: "q3single" as const,
+    mode: "givenHand" as const,
+    single: { x, h: 0 },
+  },
+  {
+    id: `bank_h1_x${x}`,
+    labelKey: "bank.prizedH1",
+    labelParams: { x },
+    kind: "q3single" as const,
+    mode: "givenHand" as const,
+    single: { x, h: 1 },
+  },
+]);

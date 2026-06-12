@@ -183,6 +183,202 @@ for spec in LUCK_CASES:
         }
     )
 
+
+
+# ---------------------------------------------------------------------------
+# §6.5 — multi-turn relay event (A by n1 AND B by n2, nested windows)
+# ---------------------------------------------------------------------------
+
+
+def hyper_at_least(N: int, K: int, n: int, w: int) -> Fraction:
+    if w <= 0:
+        return Fraction(1)
+    return 1 - hyper_at_most(N, K, n, w - 1)
+
+
+def multi_hg(N: int, counts, n: int, ks) -> Fraction:
+    rest = N - sum(counts)
+    krest = n - sum(ks)
+    if krest < 0 or krest > rest:
+        return Fraction(0)
+    num = 1
+    for c, k in zip(counts, ks):
+        if k < 0 or k > c:
+            return Fraction(0)
+        num *= comb(c, k)
+    return Fraction(num * comb(rest, krest), comb(N, n))
+
+
+def relay_event(N: int, cA: int, cB: int, wA: int, wB: int, n1: int, n2: int) -> Fraction:
+    assert 0 <= n1 <= n2 <= N
+    acc = Fraction(0)
+    for a1 in range(wA, min(cA, n1) + 1):
+        for b1 in range(0, min(cB, n1 - a1) + 1):
+            ph = multi_hg(N, [cA, cB], n1, [a1, b1])
+            if ph == 0:
+                continue
+            acc += ph * hyper_at_least(N - n1, cB - b1, n2 - n1, max(wB - b1, 0))
+    return acc
+
+
+RELAY_CASES = [
+    {"cA": 4, "cB": 3, "wA": 1, "wB": 1, "n1": 8, "n2": 10},
+    {"cA": 4, "cB": 4, "wA": 1, "wB": 1, "n1": 7, "n2": 9},
+    {"cA": 4, "cB": 2, "wA": 2, "wB": 1, "n1": 9, "n2": 13},
+    {"cA": 3, "cB": 3, "wA": 1, "wB": 2, "n1": 8, "n2": 12},
+]
+
+for spec in RELAY_CASES:
+    N = 60
+    p = relay_event(N, spec["cA"], spec["cB"], spec["wA"], spec["wB"], spec["n1"], spec["n2"])
+
+    degen = relay_event(N, spec["cA"], spec["cB"], spec["wA"], 0, spec["n1"], spec["n2"])
+    assert degen == hyper_at_least(N, spec["cA"], spec["n1"], spec["wA"]), "wB=0 degeneration failed"
+
+    joint = Fraction(0)
+    for a in range(spec["wA"], min(spec["cA"], spec["n1"]) + 1):
+        for b in range(spec["wB"], min(spec["cB"], spec["n1"] - a) + 1):
+            joint += multi_hg(N, [spec["cA"], spec["cB"]], spec["n1"], [a, b])
+    assert relay_event(N, spec["cA"], spec["cB"], spec["wA"], spec["wB"], spec["n1"], spec["n1"]) == joint, (
+        "single-window equivalence failed"
+    )
+
+    assert p <= hyper_at_least(N, spec["cA"], spec["n1"], spec["wA"])
+    assert p <= hyper_at_least(N, spec["cB"], spec["n2"], spec["wB"])
+
+    cases.append(
+        {
+            "id": "relay_A{cA}w{wA}n{n1}_B{cB}w{wB}n{n2}".format(**spec),
+            "kind": "relay_event",
+            "params": dict(N=N, **spec),
+            "expect": {"p": frac_str(p), "p_dec": dec15(p)},
+        }
+    )
+
+# ---------------------------------------------------------------------------
+# §4.3 — search-chain fold (optimistic / conservative), mulligan-aware
+# ---------------------------------------------------------------------------
+
+
+def search_fold_valid(N, H, x, x_basic, s, ob, want):
+    p_valid = Fraction(0)
+    p_opt = Fraction(0)
+    p_con = Fraction(0)
+    p_opt_uncond = Fraction(0)
+    for kx in range(0, min(x, H) + 1):
+        for ks_ in range(0, min(s, H - kx) + 1):
+            for j in range(0, min(ob, H - kx - ks_) + 1):
+                ph = multi_hg(N, [x, s, ob], H, [kx, ks_, j])
+                if ph == 0:
+                    continue
+                opt_hit = kx + ks_ >= want
+                if opt_hit:
+                    p_opt_uncond += ph
+                basics = (kx if x_basic else 0) + j
+                if basics < 1:
+                    continue
+                p_valid += ph
+                if opt_hit:
+                    p_opt += ph
+                if kx >= want:
+                    p_con += ph
+    assert p_valid > 0
+    assert p_opt_uncond == hyper_at_least(N, x + s, H, want), "fold identity failed"
+    return p_opt / p_valid, p_con / p_valid, p_valid
+
+
+FOLD_CASES = [
+    {"x": 4, "x_basic": True, "s": 4, "ob": 6, "want": 1},
+    {"x": 3, "x_basic": False, "s": 4, "ob": 10, "want": 1},
+    {"x": 2, "x_basic": False, "s": 3, "ob": 12, "want": 1},
+]
+
+for spec in FOLD_CASES:
+    N, H = 60, 7
+    p_opt, p_con, p_valid = search_fold_valid(
+        N, H, spec["x"], spec["x_basic"], spec["s"], spec["ob"], spec["want"]
+    )
+    assert p_con <= p_opt, "conservative must not exceed optimistic"
+    fid = "fold_x{}{}_s{}_ob{}_w{}".format(
+        spec["x"], "b" if spec["x_basic"] else "n", spec["s"], spec["ob"], spec["want"]
+    )
+    cases.append(
+        {
+            "id": fid,
+            "kind": "search_fold_valid",
+            "params": dict(N=N, H=H, **spec),
+            "expect": {
+                "optimistic": frac_str(p_opt),
+                "optimistic_dec": dec15(p_opt),
+                "conservative": frac_str(p_con),
+                "conservative_dec": dec15(p_con),
+                "p_valid": frac_str(p_valid),
+            },
+        }
+    )
+
+# ---------------------------------------------------------------------------
+# §11 — optimizer enumeration (free slots over candidates, argmax)
+# ---------------------------------------------------------------------------
+
+
+def optimizer_cell(N, H, cands, ob, alloc):
+    counts = [c["base"] + a for c, a in zip(cands, alloc)]
+    p_valid = Fraction(0)
+    p_hit = Fraction(0)
+
+    def rec(i, ks):
+        nonlocal p_valid, p_hit
+        if i == len(counts):
+            for j in range(0, min(ob, H - sum(ks)) + 1):
+                ph = multi_hg(N, counts + [ob], H, ks + [j])
+                if ph == 0:
+                    continue
+                basics = j + sum(k for k, c in zip(ks, cands) if c["basic"])
+                if basics < 1:
+                    continue
+                p_valid += ph
+                if all(k >= c["want"] for k, c in zip(ks, cands)):
+                    p_hit += ph
+            return
+        for k in range(0, min(counts[i], H - sum(ks)) + 1):
+            rec(i + 1, ks + [k])
+
+    rec(0, [])
+    assert p_valid > 0
+    return p_hit / p_valid
+
+
+OPT_CASE = {
+    "N": 60,
+    "H": 7,
+    "free": 5,
+    "ob": 6,
+    "cands": [
+        {"base": 2, "basic": True, "want": 1},
+        {"base": 1, "basic": False, "want": 1},
+    ],
+}
+
+allocs = {}
+best_id, best_p = None, Fraction(-1)
+for a in range(0, OPT_CASE["free"] + 1):
+    for b in range(0, OPT_CASE["free"] - a + 1):
+        p = optimizer_cell(OPT_CASE["N"], OPT_CASE["H"], OPT_CASE["cands"], OPT_CASE["ob"], [a, b])
+        key = "{}_{}".format(a, b)
+        allocs[key] = frac_str(p)
+        if p > best_p:
+            best_p, best_id = p, key
+cases.append(
+    {
+        "id": "optimizer_A2b_B1n_free5_ob6",
+        "kind": "optimizer_enum",
+        "params": OPT_CASE,
+        "expect": {"allocs": allocs, "best": best_id, "best_dec": dec15(best_p)},
+    }
+)
+
+
 out = {
     "meta": {
         "generator": "python3 fractions (independent reference, v2 pipeline)",
@@ -198,9 +394,6 @@ with open(path, "w", encoding="utf-8", newline="\n") as fh:
     json.dump(out, fh, ensure_ascii=False, indent=1)
     fh.write("\n")
 
-assertion_count = sum(
-    1 + 2 * len(c["expect"].get("by_n", {})) if c["kind"] == "energy_curve_valid" else 2
-    for c in cases
-)
+assertion_count = sum(len(json.dumps(c["expect"]).split(":")) for c in cases)
 print(f"golden v2: {len(cases)} cases, ~{assertion_count} assertions -> {os.path.relpath(path, os.path.join(here, '..'))}")
 print("ALL V2 SELF-CHECKS PASS")

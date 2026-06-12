@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckBasics, deckTotal } from "../state/deckStore.ts";
 import { computeTurnCurve, computeEnergyCurve, type TurnCurveRow } from "../state/q5.ts";
+import { computeRelay } from "../state/q7.ts";
 import { downloadCsv } from "../utils/csv.ts";
 import { HAND_SIZE, DECK_SIZE } from "../constants.ts";
 
@@ -344,5 +345,145 @@ function CurveChart({ rows, ariaLabel }: { rows: TurnCurveRow[]; ariaLabel: stri
         </g>
       ))}
     </svg>
+  );
+}
+
+/** A5 multi-turn relay (docs/02 §6.5, golden pipeline v2). Unconditioned on
+ *  mulligans — same honesty label as the turn curve. */
+export function RelayBlock() {
+  const t = useT();
+  const decks = useDeckStore((s) => s.decks);
+  const activeDeckId = useDeckStore((s) => s.activeDeckId);
+  const deck = decks.find((d) => d.id === activeDeckId) ?? null;
+  const named = (deck?.cards ?? []).filter((c) => c.name.trim() !== "" && c.count > 0);
+
+  const [aName, setAName] = useState("");
+  const [bName, setBName] = useState("");
+  const [wA, setWA] = useState(1);
+  const [wB, setWB] = useState(1);
+  const [turnA, setTurnA] = useState(1);
+  const [turnB, setTurnB] = useState(3);
+  const [goingFirst, setGoingFirst] = useState(false);
+
+  const cA = named.filter((c) => c.name === aName).reduce((s, c) => s + c.count, 0);
+  const cB = named.filter((c) => c.name === bName).reduce((s, c) => s + c.count, 0);
+
+  const data = useMemo(() => {
+    if (aName === "" || bName === "" || aName === bName || cA === 0 || cB === 0) return null;
+    return computeRelay(
+      { cA, wA, turnA, cB, wB, turnB: Math.max(turnA, turnB), goingFirst },
+      deck ? deckTotal(deck) : DECK_SIZE,
+    );
+  }, [aName, bName, cA, cB, wA, wB, turnA, turnB, goingFirst, deck]);
+
+  const numCtl = (value: number, aria: string, max: number, set: (v: number) => void, min = 1) => (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      value={value}
+      aria-label={aria}
+      onChange={(e) => set(Math.max(min, Math.min(max, Math.trunc(Number(e.target.value) || min))))}
+      className="h-8 w-14 rounded-ctl border hairline bg-surface text-center font-mono text-sm"
+    />
+  );
+
+  return (
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-medium">{t("relay.title")}</h2>
+        <span className="rounded-ctl border hairline px-2 py-0.5 text-xs text-ink2">
+          {t("toggle.mulligan.off")}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-ink2">{t("relay.desc")}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <select
+          value={aName}
+          aria-label={t("relay.cardA")}
+          onChange={(e) => setAName(e.target.value)}
+          className="h-8 rounded-ctl border hairline bg-surface px-1 text-sm"
+        >
+          <option value="">{t("relay.cardA")}…</option>
+          {[...new Set(named.map((c) => c.name))].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          ≥{numCtl(wA, t("curve.want"), HAND_SIZE, setWA)}
+        </label>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          {t("relay.byTurn")}
+          {numCtl(turnA, t("relay.byTurn"), 12, setTurnA)}
+        </label>
+        <span className="font-medium">{t("q2.s.and")}</span>
+        <select
+          value={bName}
+          aria-label={t("relay.cardB")}
+          onChange={(e) => setBName(e.target.value)}
+          className="h-8 rounded-ctl border hairline bg-surface px-1 text-sm"
+        >
+          <option value="">{t("relay.cardB")}…</option>
+          {[...new Set(named.map((c) => c.name))].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          ≥{numCtl(wB, t("curve.want"), HAND_SIZE, setWB)}
+        </label>
+        <label className="flex items-center gap-1 text-xs text-ink2">
+          {t("relay.byTurn")}
+          {numCtl(turnB, t("relay.byTurn"), 12, setTurnB)}
+        </label>
+        <div role="group" aria-label={t("curve.turnOrder")} className="flex gap-1">
+          <button
+            type="button"
+            aria-pressed={goingFirst}
+            onClick={() => setGoingFirst(true)}
+            className={
+              "rounded-ctl px-3 py-1.5 text-sm " +
+              (goingFirst ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2")
+            }
+          >
+            {t("curve.first")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={!goingFirst}
+            onClick={() => setGoingFirst(false)}
+            className={
+              "rounded-ctl px-3 py-1.5 text-sm " +
+              (!goingFirst ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2")
+            }
+          >
+            {t("curve.second")}
+          </button>
+        </div>
+      </div>
+
+      {aName !== "" && aName === bName && (
+        <p className="mt-3 text-sm text-warn" role="status">
+          {t("relay.sameCard")}
+        </p>
+      )}
+      {data && (
+        <div className="mt-4">
+          <p className="font-mono text-2xl">{data.joint.percent}</p>
+          <p className="font-mono text-xs text-ink2">
+            {data.joint.fraction} · {data.joint.oneIn}
+          </p>
+          <p className="mt-2 text-xs text-ink2">
+            {t("relay.windows", { n1: data.n1, n2: data.n2 })} ·{" "}
+            {t("relay.singles", { a: data.singleA, b: data.singleB })}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }

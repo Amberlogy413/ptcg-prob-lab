@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckBasics } from "../state/deckStore.ts";
 import { useQ3Store } from "../state/q3Store.ts";
@@ -79,6 +79,8 @@ function Q3SingleSection() {
   const single = useQ3Store((s) => s.single);
   const setMode = useQ3Store((s) => s.setMode);
   const setSingle = useQ3Store((s) => s.setSingle);
+  const saveCustomPreset = useQ3Store((s) => s.saveCustomPreset);
+  const [presetLabel, setPresetLabel] = useState("");
 
   const deckCards = (deck?.cards ?? []).filter((c) => c.name.trim() !== "" && c.count > 0);
   const fromDeck =
@@ -217,6 +219,28 @@ function Q3SingleSection() {
           {t("q3.preGame.impossible")}
         </p>
       )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={presetLabel}
+          placeholder={t("bank.save.placeholder")}
+          aria-label={t("bank.save.placeholder")}
+          onChange={(e) => setPresetLabel(e.target.value)}
+          className="h-8 w-56 rounded-ctl border hairline bg-surface px-2 text-sm"
+        />
+        <button
+          type="button"
+          disabled={presetLabel.trim() === ""}
+          onClick={() => {
+            saveCustomPreset(presetLabel);
+            setPresetLabel("");
+          }}
+          className="rounded-ctl border hairline px-2.5 py-1 text-xs text-ink2 hover:text-ink disabled:opacity-40"
+        >
+          {t("bank.save")}
+        </button>
+      </div>
 
       {data && <Q3SingleResult data={data} />}
     </section>

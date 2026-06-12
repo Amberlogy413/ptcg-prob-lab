@@ -86,6 +86,17 @@ P(E | 有效) = P(E ∧ 有效) / p_valid
 
 注意分子相同並非巧合:此事件要求 A ≥ 1,而 A 是基礎,故事件 ⊆ 有效,於是 P(E|有效) = P(E)/p_valid。一般情形(事件不蘊含有效)必須走完整的聯合枚舉,不可套用此捷徑——實作已正確處理一般情形,本例只是漂亮的可驗算特例。**產品啟示:忽略重抽的計算器在這類查詢上系統性低估近 4 個百分點;這正是本工具存在的理由,UI 應並排展示兩值。**
 
+### §4.3 檢索鏈等效摺疊(Phase 7 新增,07 §A4)
+
+把「能找到目標卡的檢索卡」摺疊成目標的等效投數,以兩檔呈現,假設必須逐條列明於 UI:
+
+- **樂觀檔**:抽到檢索卡視同抽到目標(假設:檢索必中、牌庫尚有目標、無干擾)。事件 = `k_目標 + k_檢索 ≥ w`。
+- **保守檔**:檢索卡完全不計。事件 = `k_目標 ≥ w`。真實值必落於兩檔之間。
+
+牌組分四類:目標 x 張(基礎與否照實)、檢索 s 張(**非基礎**——檢索卡本身不可開局擺場,故不計入有效起手)、其餘基礎 ob、其餘。對 (k_x, k_s, j) 枚舉 §2 公式,條件於有效起手(`(x為基礎 ? k_x : 0) + j ≥ 1`)後求兩檔事件。
+
+**摺疊恆等式**(產生器自檢):未條件化的樂觀檔 = `hypergeomAtLeast(N, x+s, H, w)`(單類別摺疊與聯合枚舉完全相等)。實作:黃金管線 v2,kind `search_fold_valid`;TS `src/lib/probx/fold.ts`。
+
 ## §5 Q3 — 獎賞卡
 
 ### §5.1 模式 (a):無條件(賽前)
@@ -176,6 +187,20 @@ P(已見能量 < w | 有效) = 上式 ÷ p_valid,  p_valid = Σ_{e,b: b≥1} P_h
 實作:**黃金管線 v2** —— `scripts/generate_golden_v2.py`(獨立 Python `fractions`)→ `tests/golden/golden_vectors_v2.json` → TS `src/lib/probx/energy.ts`(BigInt 有理數,呼叫既有核心原語)→ `tests/goldenV2.spec.ts` 逐字元比對。原始種子三件套(`generate_golden.py` / `golden_vectors.json` / `verify_seed.ts`)受保護,一字不動。
 
 **錨點(v2 產生器驗證)**:E=10、B=10、w=1(完全斷能,後攻):n=8 → 見 §v2 向量;方向檢查:n 增 ⇒ P(斷流) 單調下降;w 增 ⇒ P(斷流) 單調上升。
+
+### §6.5 多回合接力事件(Phase 7 新增,07 §A5)
+
+「到第 T_A 回合前見到 ≥w_A 張 A,**且**到第 T_B 回合前見到 ≥w_B 張 B」(n₁ = nSeen(T_A) ≤ n₂ = nSeen(T_B))。由可交換性,前 n₁ 張是均勻子集、其後 n₂−n₁ 張是其餘 N−n₁ 張的均勻子集(嵌套):
+
+```
+P = Σ_{a₁≥w_A, b₁} multiHG(N, [c_A, c_B], n₁, [a₁, b₁]) · hypergeomAtLeast(N−n₁, c_B−b₁, n₂−n₁, max(w_B−b₁, 0))
+```
+
+恆等式(產生器自檢):w_B = 0 ⇒ 退化為 `hypergeomAtLeast(N, c_A, n₁, w_A)`;n₁ = n₂ ⇒ 等於單窗聯合枚舉;P ≤ min(兩個單卡事件)。未含重抽修正(同 §6.3 誠實聲明)。實作:v2 kind `relay_event`;TS `src/lib/probx/relay.ts`。
+
+## §11 局部構築優化器枚舉(Phase 7 新增,07 §A2)
+
+鎖定牌組其餘部分,把 F 個自由格分配給 k 張候選卡(其餘入一般非基礎填充),枚舉所有 `Σaᵢ ≤ F` 的分配。每個分配對用戶查詢(各候選 kᵢ ≥ wᵢ,條件於有效起手)求精確值,輸出全表與 argmax。無新概率公式——每格都是 §4.2 的枚舉;黃金 kind `optimizer_enum` 鎖定「分配枚舉 + 逐格精確值 + argmax」的全管線。實作:TS `src/lib/probx/optimizer.ts`,UI 經 Worker 批次(預算 ≤200ms,`03 §6`)。
 
 ## §10 對局運氣尾概率(Phase 6 新增)
 
