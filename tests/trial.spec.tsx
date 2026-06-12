@@ -12,6 +12,7 @@ import App from "../src/App.tsx";
 import { viewReady } from "./helpers.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
+import { computeQ1 } from "../src/state/selectors.ts";
 import {
   physicalCopies,
   emptyStats,
@@ -121,6 +122,47 @@ describe("trial table UI", () => {
 
     await user.click(screen.getByRole("button", { name: "重設統計" }));
     expect(screen.getByText(/按「試抽一手」開始/)).toBeInTheDocument();
+  });
+
+  it("P9.3 loop: a dealt hand becomes a trainer question with the golden-backed answer", async () => {
+    seedDeck();
+    const user = userEvent.setup();
+    render(<App />);
+    await viewReady();
+
+    await user.click(screen.getByRole("button", { name: "試抽一手" }));
+    // Work out k for (seed 42, game 0) through the same engine the view used.
+    const copies = copiesOf(10);
+    const { lastDeal } = runTrials(copies, true, 42, 0, 1, emptyStats());
+    const k = lastDeal.hand.filter((c) => c.isBasic).length;
+
+    await user.click(screen.getByRole("button", { name: "把這手變成訓練題" }));
+    expect(useUiStore.getState().activeView).toBe("trainer");
+    await viewReady();
+
+    // The injected question is on stage with the right k.
+    expect(
+      screen.getByText(new RegExp(`留用手剛好有 ${k} 張基礎的概率是`)),
+    ).toBeInTheDocument();
+
+    // Answer and reveal: the exact value is the conditional-dist row —
+    // golden-backed (opening_basics_B10 conditional fields).
+    const expected = computeQ1(useDeckStore.getState().decks[0]!) as Extract<
+      ReturnType<typeof computeQ1>,
+      { status: "ok" }
+    >;
+    const row = expected.data.conditional[k]!;
+    await user.type(screen.getByLabelText("你的估計(百分比)"), "50");
+    await user.click(screen.getByRole("button", { name: "揭曉精確值" }));
+    expect(screen.getAllByText(row.percent).length).toBeGreaterThanOrEqual(1);
+
+    // The error record landed in the shared history with the loop's kind.
+    const records = JSON.parse(localStorage.getItem("ppl.v1.training") ?? "[]") as Array<{
+      kind: string;
+      exactPct: number;
+    }>;
+    expect(records.at(-1)?.kind).toBe("trialHand");
+    expect(records.at(-1)?.exactPct).toBeCloseTo(row.chart * 100, 10);
   });
 
   it("warns when no Basic is tagged and still deals unconditioned", async () => {

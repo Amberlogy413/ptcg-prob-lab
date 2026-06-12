@@ -524,5 +524,7 @@
   "goldfish.relayB": "Relay card B",
   "goldfish.relayTurn": "B deadline (turn)",
   "goldfish.relayLine": "P(see {a} by T1 and {b} by T{tb})",
-  "goldfish.relayNa": "This relay combination cannot be computed (check counts and turns)."
+  "goldfish.relayNa": "This relay combination cannot be computed (check counts and turns).",
+  "trial.toTrainer": "Turn this hand into a training question",
+  "trainer.q.trialHand": "The hand you just kept holds {k} Basic Pokémon. Conditioned on a valid hand (mulligan-corrected), how likely is a kept hand with exactly {k} Basics?"
 }

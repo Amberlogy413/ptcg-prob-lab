@@ -516,7 +516,13 @@ export interface TrainerQuestion {
   exactPct: number;
 }
 
-export type TrainerKind = "openingAtLeast1" | "prizedAtLeast1" | "mulligan" | "seenByTurn";
+export type TrainerKind =
+  | "openingAtLeast1"
+  | "prizedAtLeast1"
+  | "mulligan"
+  | "seenByTurn"
+  /** P9.3 loop: a question injected from the trial table's dealt hand. */
+  | "trialHand";
 
 export function buildTrainerQuestion(
   deck: Deck,

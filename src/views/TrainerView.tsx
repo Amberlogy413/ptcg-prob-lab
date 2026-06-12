@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckBasics, type Deck } from "../state/deckStore.ts";
+import { useTrainerStore } from "../state/trainerStore.ts";
 import {
   buildTrainerQuestion,
   computeLuckMeter,
@@ -73,6 +74,17 @@ export function TrainerView() {
   const [guess, setGuess] = useState("");
   const [revealed, setRevealed] = useState<TrainingRecord | null>(null);
   const [records, setRecords] = useState<TrainingRecord[]>(loadRecords);
+
+  // P9.3 loop: a question handed over from the trial table takes the stage.
+  const pending = useTrainerStore((s) => s.pending);
+  const setPending = useTrainerStore((s) => s.setPending);
+  useEffect(() => {
+    if (!pending) return;
+    setActive(pending);
+    setGuess("");
+    setRevealed(null);
+    setPending(null);
+  }, [pending, setPending]);
 
   const stats = useMemo(() => {
     if (records.length === 0) return null;

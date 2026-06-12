@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckTotal } from "../state/deckStore.ts";
+import { useUiStore } from "../state/uiStore.ts";
+import { useTrainerStore } from "../state/trainerStore.ts";
 import { computeQ1 } from "../state/selectors.ts";
 import {
   physicalCopies,
@@ -44,6 +46,8 @@ export function TrialView() {
   const [seed, setSeed] = useState(42);
   const [stats, setStats] = useState<TrialStats>(emptyStats);
   const [lastDeal, setLastDeal] = useState<TrialDeal | null>(null);
+  const setActiveView = useUiStore((s) => s.setActiveView);
+  const setPending = useTrainerStore((s) => s.setPending);
 
   const copies = useMemo(() => (deck ? physicalCopies(deck.cards) : []), [deck]);
   const hasBasic = copies.some((c) => c.isBasic);
@@ -155,11 +159,40 @@ export function TrialView() {
         <p className="mt-4 text-sm text-ink2">{t("trial.empty")}</p>
       ) : (
         <div className="mt-4 space-y-3">
-          <p className="font-mono text-xs text-ink2" role="status">
-            {lastDeal.mulligans === 0
-              ? t("trial.keptFirst")
-              : t("trial.mulligans", { n: lastDeal.mulligans })}
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="font-mono text-xs text-ink2" role="status">
+              {lastDeal.mulligans === 0
+                ? t("trial.keptFirst")
+                : t("trial.mulligans", { n: lastDeal.mulligans })}
+            </p>
+            {/* P9.3 loop: this hand becomes a trainer question; the revealed
+                value is the golden-backed conditional distribution row. */}
+            {hasBasic && q1.status === "ok" && (
+              <button
+                type="button"
+                onClick={() => {
+                  const k = lastDeal.hand.reduce((s, c) => s + (c.isBasic ? 1 : 0), 0);
+                  const row = q1.data.conditional[k];
+                  if (!row) return;
+                  setPending({
+                    kind: "trialHand",
+                    q: {
+                      promptKey: "trainer.q.trialHand",
+                      promptParams: { k },
+                      percent: row.percent,
+                      fraction: row.fraction,
+                      oneIn: row.oneIn,
+                      exactPct: row.chart * 100,
+                    },
+                  });
+                  setActiveView("trainer");
+                }}
+                className="rounded-ctl border hairline px-2.5 py-1 text-xs text-blue hover:underline"
+              >
+                {t("trial.toTrainer")}
+              </button>
+            )}
+          </div>
           <div>
             <h3 className="text-sm font-medium">{t("trial.hand")}</h3>
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
