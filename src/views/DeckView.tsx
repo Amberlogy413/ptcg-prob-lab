@@ -8,6 +8,7 @@ import { BasicListDialog } from "../components/BasicListDialog.tsx";
 import { AliasDialog } from "../components/AliasDialog.tsx";
 import { TemplateDialog } from "../components/TemplateDialog.tsx";
 import { DeckSheetDialog } from "../components/DeckSheetDialog.tsx";
+import { RotationPanel } from "../components/RotationPanel.tsx";
 
 /** Deck workspace: multi-deck management, row editor, import/export. */
 export function DeckView() {
@@ -149,6 +150,7 @@ export function DeckView() {
         </div>
       </div>
 
+      {activeDeck && <RotationPanel deck={activeDeck} />}
       {activeDeck && <DeckEditor deck={activeDeck} />}
 
       {importOpen && <ImportWizard onClose={() => setImportOpen(false)} />}

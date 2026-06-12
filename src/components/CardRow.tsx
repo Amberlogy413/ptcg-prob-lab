@@ -1,20 +1,30 @@
 import { useT } from "../i18n/index.ts";
 import type { DeckCard } from "../state/deckStore.ts";
 
+/** Regulation letters offered by the mark select (current era ± buffer). */
+export const REGULATION_MARKS = ["D", "E", "F", "G", "H", "I", "J"] as const;
+
 interface CardRowProps {
   card: DeckCard;
   onUpdate: (patch: Partial<Omit<DeckCard, "id">>) => void;
   onRemove: () => void;
+  /** P8.4: true while the rotation preview marks this row as leaving. */
+  rotatingOut?: boolean;
 }
 
-/** One editor row: count stepper + name + Basic toggle + delete (docs/04 §6). */
-export function CardRow({ card, onUpdate, onRemove }: CardRowProps) {
+/** One editor row: count stepper + name + Basic toggle + mark + delete (docs/04 §6). */
+export function CardRow({ card, onUpdate, onRemove, rotatingOut }: CardRowProps) {
   const t = useT();
   const stepBtn =
     "h-9 w-9 rounded-ctl border hairline bg-surface font-mono text-base leading-none " +
     "text-ink2 hover:text-ink disabled:opacity-40";
   return (
-    <li className="flex items-center gap-2 border-b hairline py-1.5 last:border-b-0">
+    <li
+      className={
+        "flex items-center gap-2 border-b hairline py-1.5 last:border-b-0" +
+        (rotatingOut ? " opacity-40 line-through" : "")
+      }
+    >
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -69,6 +79,20 @@ export function CardRow({ card, onUpdate, onRemove }: CardRowProps) {
       >
         {t("deck.card.basic")}
       </button>
+      <select
+        value={card.mark ?? ""}
+        aria-label={t("deck.card.mark", { name: card.name || t("deck.card.name") })}
+        title={t("deck.card.markFull")}
+        onChange={(e) => onUpdate({ mark: e.target.value || undefined })}
+        className="h-9 w-14 shrink-0 rounded-ctl border hairline bg-surface px-1 font-mono text-sm text-ink2"
+      >
+        <option value="">—</option>
+        {REGULATION_MARKS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         aria-label={t("deck.card.delete")}

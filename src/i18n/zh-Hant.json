@@ -467,5 +467,21 @@
   "sheet.total": "合計",
   "sheet.mulligan": "重抽概率",
   "sheet.declare": "本表由選手自行核對,確認與實際牌組一致。",
-  "sheet.signature": "選手簽名"
+  "sheet.signature": "選手簽名",
+  "deck.card.mark": "{name} 的賽制標記",
+  "deck.card.markFull": "賽制標記(輪替預覽用)",
+  "rotation.title": "輪替預覽",
+  "rotation.hint": "先在牌組行右側設定賽制標記(D–J),這裡就能預覽退環境後的牌組與精確概率變化。",
+  "rotation.select": "退場標記",
+  "rotation.off": "關閉預覽",
+  "rotation.lose": "將失去 {n} 張(其中基礎寶可夢 {b} 張)",
+  "rotation.now": "現在",
+  "rotation.after": "輪替後",
+  "rotation.total": "總張數",
+  "rotation.basics": "基礎",
+  "rotation.mulligan": "重抽概率",
+  "rotation.delta": "重抽概率變化",
+  "rotation.na": "輪替後不足 7 張或沒有基礎寶可夢——重抽概率無法定義,先補牌再看。",
+  "rotation.fork": "分叉出輪替後牌組",
+  "rotation.forkName": "{name}(輪替後)"
 }

@@ -467,5 +467,21 @@
   "sheet.total": "Total",
   "sheet.mulligan": "Mulligan probability",
   "sheet.declare": "Checked by the player against the actual deck.",
-  "sheet.signature": "Player signature"
+  "sheet.signature": "Player signature",
+  "deck.card.mark": "Regulation mark of {name}",
+  "deck.card.markFull": "Regulation mark (for the rotation preview)",
+  "rotation.title": "Rotation preview",
+  "rotation.hint": "Set regulation marks (D–J) on the deck rows first; then preview the post-rotation deck and the exact probability shift here.",
+  "rotation.select": "Rotating mark",
+  "rotation.off": "Preview off",
+  "rotation.lose": "Loses {n} cards ({b} of them Basic Pokémon)",
+  "rotation.now": "Now",
+  "rotation.after": "After rotation",
+  "rotation.total": "Total",
+  "rotation.basics": "Basics",
+  "rotation.mulligan": "Mulligan probability",
+  "rotation.delta": "Mulligan probability shift",
+  "rotation.na": "After rotation the deck has under 7 cards or no Basic Pokémon — the mulligan probability is undefined; refill first.",
+  "rotation.fork": "Fork post-rotation deck",
+  "rotation.forkName": "{name} (post-rotation)"
 }

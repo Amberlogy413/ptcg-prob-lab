@@ -23,6 +23,8 @@ export interface DeckCard {
   /** Set code / collector number from PTCG Live import; kept, never used in math. */
   set?: string;
   number?: string;
+  /** Regulation mark (single letter); drives the rotation preview only (P8.4). */
+  mark?: string;
 }
 
 export interface Deck {
@@ -54,6 +56,8 @@ interface DeckState extends DeckPersisted {
   createDeck: (name?: string) => string;
   renameDeck: (deckId: string, name: string) => void;
   duplicateDeck: (deckId: string, name?: string) => string | null;
+  /** P8.4 rotation fork: a copy without the rows whose mark matches. */
+  forkWithoutMark: (deckId: string, mark: string, name: string) => string | null;
   deleteDeck: (deckId: string) => void;
   setActiveDeck: (deckId: string) => void;
   importDeck: (name: string, cards: NewCardInput[]) => string;
@@ -146,6 +150,22 @@ export const useDeckStore = create<DeckState>()(
           updatedAt: now,
         };
         set((s) => ({ decks: [...s.decks, copy] }));
+        return id;
+      },
+
+      forkWithoutMark: (deckId, mark, name) => {
+        const source = get().decks.find((d) => d.id === deckId);
+        if (!source) return null;
+        const id = uid();
+        const now = Date.now();
+        const fork: Deck = {
+          id,
+          name,
+          cards: source.cards.filter((c) => c.mark !== mark).map((c) => ({ ...c, id: uid() })),
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((s) => ({ decks: [...s.decks, fork] }));
         return id;
       },
 

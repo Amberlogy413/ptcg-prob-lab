@@ -1,5 +1,6 @@
 import { useT } from "../i18n/index.ts";
 import { useDeckStore, deckTotal, type Deck, type DeckSection } from "../state/deckStore.ts";
+import { useUiStore } from "../state/uiStore.ts";
 import { CardRow } from "./CardRow.tsx";
 import { CountRing } from "./CountRing.tsx";
 import { DECK_SIZE } from "../constants.ts";
@@ -19,6 +20,7 @@ export function DeckEditor({ deck }: { deck: Deck }) {
   const addCard = useDeckStore((s) => s.addCard);
   const updateCard = useDeckStore((s) => s.updateCard);
   const removeCard = useDeckStore((s) => s.removeCard);
+  const rotationMark = useUiStore((s) => s.rotationMark);
 
   const total = deckTotal(deck);
   const groups = SECTION_ORDER.map((section) => ({
@@ -77,6 +79,7 @@ export function DeckEditor({ deck }: { deck: Deck }) {
                     card={card}
                     onUpdate={(patch) => updateCard(deck.id, card.id, patch)}
                     onRemove={() => removeCard(deck.id, card.id)}
+                    rotatingOut={rotationMark !== null && card.mark === rotationMark}
                   />
                 ))}
               </ul>
