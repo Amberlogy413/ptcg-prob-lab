@@ -10,7 +10,6 @@ import {
   stageKey,
   trainerTypeKey,
   energyTypeKey,
-  typeKey,
   kindOf,
   fnKey,
   FN_ORDER,
@@ -19,6 +18,7 @@ import {
 } from "../data/catalog.ts";
 import { openingBasics, percentStr } from "../lib/prob/index.ts";
 import { DECK_SIZE } from "../constants.ts";
+import { TypeChip } from "./TypeChip.tsx";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
 
@@ -288,10 +288,10 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                   type="button"
                   aria-pressed={type === ty}
                   onClick={() => setType(type === ty ? null : ty)}
-                  className={chip(type === ty)}
+                  className="inline-flex items-center gap-1 rounded-full"
                 >
-                  {label(typeKey(ty), ty)}{" "}
-                  <span className="font-mono text-xs">{typeCounts.get(ty)}</span>
+                  <TypeChip type={ty} solid={type === ty} />
+                  <span className="font-mono text-xs text-ink2">{typeCounts.get(ty)}</span>
                 </button>
               ))}
             </div>
@@ -360,7 +360,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                         </span>
                         {owned > 0 && (
                           <span
-                            className="shrink-0 rounded-full bg-blue px-1.5 font-mono text-xs text-white"
+                            className="shrink-0 rounded-full bg-pink px-1.5 font-mono text-xs text-white"
                             title={t("builder.copies", { n: owned })}
                           >
                             ×{owned}

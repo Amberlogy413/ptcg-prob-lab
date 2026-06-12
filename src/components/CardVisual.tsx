@@ -6,6 +6,7 @@ import {
   type CatalogCard,
   type CatalogSet,
 } from "../data/catalog.ts";
+import { TypeChip } from "./TypeChip.tsx";
 
 /**
  * Full-information card visual — an ORIGINAL text-only frame (no artwork, no
@@ -17,14 +18,6 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
   const t = useT();
   const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
   const kind = kindOf(card);
-  const typeChip = (ty: string, i: number) => (
-    <span
-      key={`${ty}${i}`}
-      className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border hairline bg-surface px-1 font-mono text-xs"
-    >
-      {label(typeKey(ty), ty)}
-    </span>
-  );
 
   return (
     <div
@@ -46,7 +39,9 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         </span>
         <span className="ml-auto flex items-center gap-1">
           {card.hp !== undefined && <span className="font-mono text-base">HP {card.hp}</span>}
-          {(card.types ?? []).map(typeChip)}
+          {(card.types ?? []).map((ty, i) => (
+            <TypeChip key={`${ty}${i}`} type={ty} />
+          ))}
         </span>
       </div>
       {card.evolveFrom !== undefined && (
@@ -90,7 +85,9 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         .map((atk, i) => (
         <div key={`${atk.name}-${i}`} className="mt-3 border-t hairline pt-2">
           <p className="flex flex-wrap items-center gap-1 font-medium">
-            {(atk.cost ?? []).map(typeChip)}
+            {(atk.cost ?? []).map((c, i) => (
+              <TypeChip key={`${c}${i}`} type={c} />
+            ))}
             <span className="ml-1">{atk.name}</span>
             {atk.damage !== undefined && <span className="ml-auto font-mono">{atk.damage}</span>}
           </p>

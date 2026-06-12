@@ -12,18 +12,20 @@ export default {
       transparent: "transparent",
       current: "currentColor",
       white: "#FFFFFF",
-      paper: "#FBF5F7", // global background (sakura paper, 2026-06-12 revision)
+      // 奇樹 (Iono) pastel scheme — docs/04 §2 revision two, 2026-06-12.
+      paper: "#F4F9FC", // global background (pastel ice-blue paper)
       surface: "#FFFFFF", // cards
-      ink: "#32222B", // primary text (warm plum ink)
-      ink2: "#7C5F6D", // secondary text (mauve)
-      line: "#F1DCE5", // hairline (pink)
-      // The single accent. Token KEY stays "blue" for class-name stability
-      // across ~50 files; the VALUE is now sakura rose (docs/04 §2 revision).
-      blue: "#C8447C",
+      ink: "#252B3D", // primary text (deep navy ink)
+      ink2: "#5E6B85", // secondary text (slate blue)
+      line: "#DCE9F2", // hairline (pastel blue)
+      // Twin accents (Iono's twin tails): blue = primary actions, pink =
+      // badges/counts/secondary highlights. Key "blue" kept for stability.
+      blue: "#2B76AD",
+      pink: "#BE3D8F",
       good: "#0E7A4A", // emerald: favorable / rising delta / ideal hand
       warn: "#B45309", // amber: caution / playable hand
       bad: "#B3261E", // crimson: unfavorable / falling delta / dead hand
-      receipt: "#FFFBFC", // receipt paper (pink-white)
+      receipt: "#FBFDFE", // receipt paper (ice white)
     },
     fontFamily: {
       sans: ['"Noto Sans TC"', '"IBM Plex Sans"', "system-ui", "sans-serif"],
