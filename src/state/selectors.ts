@@ -11,6 +11,7 @@ import {
   binom,
   add,
   sub,
+  mul,
   eq,
   isZero,
   div,
@@ -354,7 +355,13 @@ export function computeQ2Display(result: ComboResult, build: Q2BuildOk): Q2Data 
   const formula = `P = Σ ${products}·C(${rest},${H}−${sumLetters}) / C(${N},${H}) (${constraintText})`;
 
   const eventUncond = result.eventUnconditioned ?? result.event;
-  const numerator = numeratorOver(eventUncond, N, H);
+  // Conditioned receipts must chain EXACTLY: P(event∧valid) ÷ p_valid =
+  // P(event | valid). The unconditioned event is NOT that numerator (they
+  // differ whenever the constraints don't imply a valid hand) — it only
+  // feeds the grey naive-comparison line. Math-engine audit 2026-06-12.
+  const totalRat =
+    conditioned && result.pValid !== undefined ? mul(result.event, result.pValid) : eventUncond;
+  const numerator = numeratorOver(totalRat, N, H);
   const identityOk = eq(
     result.table.reduce((s, cell) => add(s, cell.p), R_ZERO),
     R_ONE,
@@ -413,7 +420,7 @@ export function computeQ2Display(result: ComboResult, build: Q2BuildOk): Q2Data 
     receipt: {
       formula,
       substitution: `C(${N},${H}) = ${groupDigits(binom(N, H))}`,
-      total: { num: groupDigits(numerator), frac: fractionStr(eventUncond) },
+      total: { num: groupDigits(numerator), frac: fractionStr(totalRat) },
       ...(conditioned && result.pValid !== undefined
         ? {
             cond: {

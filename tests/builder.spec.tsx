@@ -143,6 +143,18 @@ describe("layered deck builder", () => {
     expect(screen.getByRole("button", { name: /^加入 水水獺\(SV9-050\)/ })).toBeInTheDocument();
   });
 
+  it("熱門 cards rank first in the grid and wear the badge", async () => {
+    useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    await openBuilder();
+    const grid = await screen.findByRole("list", { name: "卡牌搜尋結果" });
+    const tiles = within(grid).getAllByRole("listitem");
+    // 調換票 carries pop:1 → first tile despite alphabetic/date order.
+    expect(
+      within(tiles[0]!).getByRole("button", { name: /^加入 調換票/ }),
+    ).toBeInTheDocument();
+    expect(within(tiles[0]!).getByText("熱門")).toBeInTheDocument();
+  });
+
   it("ⓘ in the grid opens the full card visual", async () => {
     useDeckStore.getState().importDeck("錨點", anchorDeckRows());
     const user = await openBuilder();

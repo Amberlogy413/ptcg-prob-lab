@@ -51,9 +51,11 @@ export function RotationPanel({ deck }: { deck: Deck }) {
     const d = sub(preview.after.q, preview.now.q);
     const sign = cmp(d, R_ZERO);
     if (sign === 0) return { text: "±0", worse: false };
+    // A difference of probabilities is percentage POINTS, not a percentage —
+    // unit consistency with every other delta badge (math audit 2026-06-12).
     return sign > 0
-      ? { text: `+${percentStr(d, 6)}`, worse: true }
-      : { text: `−${percentStr(sub(preview.now.q, preview.after.q), 6)}`, worse: false };
+      ? { text: `+${percentStr(d, 6).replace("%", "pp")}`, worse: true }
+      : { text: `−${percentStr(sub(preview.now.q, preview.after.q), 6).replace("%", "pp")}`, worse: false };
   }, [preview]);
 
   function fork(): void {

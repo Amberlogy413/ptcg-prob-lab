@@ -4,6 +4,7 @@ export type WorkspaceView =
   | "deck"
   | "report"
   | "trial"
+  | "midgame"
   | "ask"
   | "prizes"
   | "compare"

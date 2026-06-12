@@ -182,6 +182,16 @@ export function IconTemplate() {
   );
 }
 
+/** 中局 — hourglass (the game clock is running). */
+export function IconMidgame() {
+  return (
+    <I>
+      <path d="M4 2.5h8M4 13.5h8" />
+      <path d="M5 2.5v2.2c0 1.8 3 2.5 3 3.3 0 .8-3 1.5-3 3.3v2.2M11 2.5v2.2c0 1.8-3 2.5-3 3.3 0 .8 3 1.5 3 3.3v2.2" />
+    </I>
+  );
+}
+
 /** 搜尋 — magnifier. */
 export function IconSearch() {
   return (

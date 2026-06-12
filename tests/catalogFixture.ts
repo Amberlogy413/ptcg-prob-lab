@@ -71,6 +71,7 @@ export function makeCatalogFixture(): Catalog {
       regulationMark: "I",
       std: true,
       fn: ["draw"],
+      pop: 1,
       set: "SV9",
     },
     {

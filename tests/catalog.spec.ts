@@ -104,6 +104,18 @@ describe("searchCatalog", () => {
   it("finds cards by set/number identity", () => {
     expect(searchCatalog(FIXTURE, "sv9 090").map((c) => c.id)).toEqual(["SV9-090"]);
   });
+
+  it("熱門 names sort before unranked ones within the same match tier", () => {
+    const cat: Catalog = {
+      ...FIXTURE,
+      cards: [
+        card({ id: "T-1", name: "測試甲", stage: "Basic", std: true }),
+        card({ id: "T-2", name: "測試乙", stage: "Basic", pop: 1 }),
+      ],
+    };
+    // T-2 is NOT std-legal but pop outranks std in the sort order.
+    expect(searchCatalog(cat, "測試").map((c) => c.id)).toEqual(["T-2", "T-1"]);
+  });
 });
 
 describe("Basic-Pokémon rule and deck mapping", () => {

@@ -294,6 +294,7 @@ async function main() {
   console.log("[4/4] assemble…");
   sanityPass(cards);
   for (const c of cards) classify(c);
+  await applyPopularity(cards);
   const fnTally = new Map();
   for (const c of cards) for (const k of c.fn ?? []) fnTally.set(k, (fnTally.get(k) ?? 0) + 1);
   console.log(
@@ -333,6 +334,43 @@ async function main() {
   if (unknownFields.size > 0) {
     console.log(`    untriaged fields skipped: ${[...unknownFields].join(", ")}`);
   }
+}
+
+/**
+ * Popularity ranks (揀卡熱門排前): a curated seed list of current staples,
+ * then Trainer/Energy names ranked by REPRINT COUNT — an honest, fully
+ * data-derived proxy (cards reprinted 10+ times are staples by definition)
+ * until the Phase 11 tournament pipeline replaces it. The UI labels the
+ * source. Rank is stamped as `pop` on every print of a ranked name.
+ */
+async function applyPopularity(cards) {
+  const seedPath = path.join(ROOT, "scripts", "popularity_seed.json");
+  const seed = JSON.parse(await readFile(seedPath, "utf8"));
+  const baseName = (n) => n.split("(")[0].split("(")[0].trim();
+  const rankByBase = new Map(seed.names.map((n, i) => [n, i + 1]));
+
+  const reprints = new Map();
+  for (const c of cards) {
+    if (c.category === "Pokemon") continue;
+    const b = baseName(c.name);
+    if (rankByBase.has(b)) continue;
+    reprints.set(b, (reprints.get(b) ?? 0) + 1);
+  }
+  const proxy = [...reprints.entries()]
+    .filter(([, n]) => n >= 4)
+    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+  let next = seed.names.length + 1;
+  for (const [b] of proxy) rankByBase.set(b, next++);
+
+  let stamped = 0;
+  for (const c of cards) {
+    const r = rankByBase.get(baseName(c.name));
+    if (r !== undefined) {
+      c.pop = r;
+      stamped += 1;
+    }
+  }
+  console.log(`  popularity: ${rankByBase.size} ranked names → ${stamped} prints stamped`);
 }
 
 /** Tiny promise pool: run fn over items with at most n in flight. */

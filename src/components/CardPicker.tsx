@@ -117,6 +117,11 @@ export function CardPicker({ deckId }: { deckId: string }) {
                         <span className="shrink-0 rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
                           {kindBadge(card)}
                         </span>
+                        {card.pop !== undefined && card.pop <= 40 && (
+                          <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 text-xs text-pink">
+                            {t("catalog.pop")}
+                          </span>
+                        )}
                         {card.hp !== undefined && (
                           <span className="shrink-0 font-mono text-xs text-ink2">
                             HP{card.hp}

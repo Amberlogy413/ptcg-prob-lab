@@ -64,6 +64,9 @@ export interface CatalogCard {
    *  (pipeline classify(); keys: search/draw/accel/heal/disrupt/gust/recover/
    *  protect/boost/attacker/ability). */
   fn?: string[];
+  /** 熱門排名 (1 = hottest): curated seed + reprint-count proxy until the
+   *  Phase 11 tournament pipeline; lower sorts first, absent sorts last. */
+  pop?: number;
   set: string | null;
 }
 
@@ -129,8 +132,11 @@ export function searchCatalog(catalog: Catalog, query: string, max = 50): Catalo
   }
   hits.sort((a, b) => {
     if (a.rank !== b.rank) return a.rank - b.rank;
-    // Standard-legal prints first, then newest set, for the "which print do I
-    // own" case to land on the playable answer.
+    // 熱門排前: popular names first, then standard-legal prints, then the
+    // newest set, so the playable answer lands on top.
+    const pa = a.card.pop ?? Number.MAX_SAFE_INTEGER;
+    const pb = b.card.pop ?? Number.MAX_SAFE_INTEGER;
+    if (pa !== pb) return pa - pb;
     const aStd = a.card.std === true ? 0 : 1;
     const bStd = b.card.std === true ? 0 : 1;
     if (aStd !== bStd) return aStd - bStd;
@@ -174,10 +180,13 @@ export function toNewCardInput(card: CatalogCard): NewCardInput {
   };
 }
 
-/** std-legal prints first, then newest set, then id — the "which print do I
- *  actually play" order used by search, the builder grid and name matching. */
+/** 熱門 first, then std-legal prints, then newest set, then id — the order
+ *  used by search, the builder grid and name matching. */
 export function sortPrints(catalog: Catalog, cards: CatalogCard[]): CatalogCard[] {
   return [...cards].sort((a, b) => {
+    const pa = a.pop ?? Number.MAX_SAFE_INTEGER;
+    const pb = b.pop ?? Number.MAX_SAFE_INTEGER;
+    if (pa !== pb) return pa - pb;
     const aStd = a.std === true ? 0 : 1;
     const bStd = b.std === true ? 0 : 1;
     if (aStd !== bStd) return aStd - bStd;

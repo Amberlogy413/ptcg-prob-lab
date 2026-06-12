@@ -1,7 +1,7 @@
 {
  "meta": {
   "generator": "python3 fractions (independent reference, v2 pipeline)",
-  "scope": "docs/02 §6.4 energy shortfall (mulligan-aware) + §10 luck tail",
+  "scope": "docs/02 §6.4 energy shortfall (mulligan-aware) + §10 luck tail + 中局 outs (docs/09 #1)",
   "format": "exact reduced fractions 'n/d'; *_dec are 15-place round-half-up"
  },
  "cases": [
@@ -406,6 +406,132 @@
     },
     "best": "2_3",
     "best_dec": "0.196130852718117"
+   }
+  },
+  {
+   "id": "midgame_u30_x5_w1_k1",
+   "kind": "midgame",
+   "params": {
+    "u": 30,
+    "x": 5,
+    "w": 1,
+    "k": 1
+   },
+   "expect": {
+    "p": "1/6",
+    "p_dec": "0.166666666666667"
+   }
+  },
+  {
+   "id": "midgame_u25_x4_w2_k1",
+   "kind": "midgame",
+   "params": {
+    "u": 25,
+    "x": 4,
+    "w": 2,
+    "k": 1
+   },
+   "expect": {
+    "p": "3/10",
+    "p_dec": "0.300000000000000"
+   }
+  },
+  {
+   "id": "midgame_u40_x8_w3_k2",
+   "kind": "midgame",
+   "params": {
+    "u": 40,
+    "x": 8,
+    "w": 3,
+    "k": 2
+   },
+   "expect": {
+    "p": "119/1235",
+    "p_dec": "0.096356275303644"
+   }
+  },
+  {
+   "id": "midgame_u37_x6_w4_k1",
+   "kind": "midgame",
+   "params": {
+    "u": 37,
+    "x": 6,
+    "w": 4,
+    "k": 1
+   },
+   "expect": {
+    "p": "988/1887",
+    "p_dec": "0.523582405935347"
+   }
+  },
+  {
+   "id": "midgame_u12_x2_w6_k2",
+   "kind": "midgame",
+   "params": {
+    "u": 12,
+    "x": 2,
+    "w": 6,
+    "k": 2
+   },
+   "expect": {
+    "p": "5/22",
+    "p_dec": "0.227272727272727"
+   }
+  },
+  {
+   "id": "midgame_u20_x0_w5_k1",
+   "kind": "midgame",
+   "params": {
+    "u": 20,
+    "x": 0,
+    "w": 5,
+    "k": 1
+   },
+   "expect": {
+    "p": "0/1",
+    "p_dec": "0.000000000000000"
+   }
+  },
+  {
+   "id": "midgame_u10_x10_w1_k1",
+   "kind": "midgame",
+   "params": {
+    "u": 10,
+    "x": 10,
+    "w": 1,
+    "k": 1
+   },
+   "expect": {
+    "p": "1/1",
+    "p_dec": "1.000000000000000"
+   }
+  },
+  {
+   "id": "midgame_u7_x3_w7_k3",
+   "kind": "midgame",
+   "params": {
+    "u": 7,
+    "x": 3,
+    "w": 7,
+    "k": 3
+   },
+   "expect": {
+    "p": "1/1",
+    "p_dec": "1.000000000000000"
+   }
+  },
+  {
+   "id": "midgame_u15_x4_w2_k3",
+   "kind": "midgame",
+   "params": {
+    "u": 15,
+    "x": 4,
+    "w": 2,
+    "k": 3
+   },
+   "expect": {
+    "p": "0/1",
+    "p_dec": "0.000000000000000"
    }
   }
  ]

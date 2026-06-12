@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { Modal } from "./Modal.tsx";
 import { CardVisual } from "./CardVisual.tsx";
-import { useDeckStore, deckTotal, deckBasics, type Deck } from "../state/deckStore.ts";
+import { useDeckStore, type Deck } from "../state/deckStore.ts";
+import { computeDeckSummary } from "../state/selectors.ts";
 import {
   loadCatalog,
   toNewCardInput,
@@ -16,7 +17,6 @@ import {
   type Catalog,
   type CatalogCard,
 } from "../data/catalog.ts";
-import { openingBasics, percentStr } from "../lib/prob/index.ts";
 import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
 
@@ -158,9 +158,12 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     return m;
   }, [deck.cards]);
 
-  const total = deckTotal(deck);
-  const basics = deckBasics(deck);
-  const mulligan = total >= 7 ? percentStr(openingBasics(basics, total, 7).mulligan, 6) : null;
+  // Live readout via the selector bridge (UI never calls the math core
+  // directly) — and the full three-format contract, not a naked percent.
+  const summary = computeDeckSummary(deck);
+  const total = summary.total;
+  const basics = summary.basics;
+  const mulligan = summary.mulligan ?? null;
 
   const subOrder =
     category === "Pokemon" ? STAGE_ORDER : category === "Trainer" ? TRAINER_ORDER : ENERGY_ORDER;
@@ -197,7 +200,10 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           </span>
           {mulligan !== null && (
             <span>
-              {t("builder.mulligan")} <span className="font-mono">{mulligan}</span>
+              {t("builder.mulligan")} <span className="font-mono">{mulligan.percent}</span>{" "}
+              <span className="font-mono text-xs text-ink2">
+                {mulligan.fraction} · {mulligan.oneIn}
+              </span>
             </span>
           )}
         </span>
@@ -371,6 +377,11 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                         <span className="rounded-ctl border hairline px-1 py-0.5">
                           {label(kind.key, kind.raw)}
                         </span>
+                        {card.pop !== undefined && card.pop <= 40 && (
+                          <span className="rounded-full border border-pink px-1.5 py-0.5 text-pink">
+                            {t("catalog.pop")}
+                          </span>
+                        )}
                         {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}
                         <span className="font-mono">
                           {card.set ?? "?"} {card.localId}
@@ -400,7 +411,9 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
               {t("builder.more", { n: results.length - GRID_CAP })}
             </p>
           )}
-          <p className="mt-3 text-xs text-ink2">{t("catalog.source")}</p>
+          <p className="mt-3 text-xs text-ink2">
+            {t("catalog.source")} {t("catalog.popSource")}
+          </p>
         </>
       )}
 

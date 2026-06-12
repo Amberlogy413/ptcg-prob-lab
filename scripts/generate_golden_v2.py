@@ -378,11 +378,54 @@ cases.append(
     }
 )
 
+# ---------------------------------------------------------------------------
+# docs/09 §4 candidate #1 — mid-game outs engine.
+# P(at least k of the x outs appear in the next w draws from a deck of u
+# remaining cards) = hypergeometric tail over the CURRENT deck state. Also
+# covers hand-shuffle-back reconstruction (奇樹/judge): pool u+h, outs
+# x_deck + x_hand — same formula, different parameters.
+# ---------------------------------------------------------------------------
+
+MIDGAME_CASES = [
+    # (u, x, w, k) — remaining deck, outs, draws in window, at-least k
+    {"u": 30, "x": 5, "w": 1, "k": 1},  # next draw, 5 outs in 30 → 1/6
+    {"u": 25, "x": 4, "w": 2, "k": 1},  # 1 − C(21,2)/C(25,2) = 3/10
+    {"u": 40, "x": 8, "w": 3, "k": 2},  # need two pieces
+    {"u": 37, "x": 6, "w": 4, "k": 1},  # Iono-style reconstruction draw
+    {"u": 12, "x": 2, "w": 6, "k": 2},  # late game, both outs
+    {"u": 20, "x": 0, "w": 5, "k": 1},  # no outs left → 0
+    {"u": 10, "x": 10, "w": 1, "k": 1},  # all outs → 1
+    {"u": 7, "x": 3, "w": 7, "k": 3},  # draw the whole deck → 1
+    {"u": 15, "x": 4, "w": 2, "k": 3},  # k > w → impossible → 0
+]
+
+for spec in MIDGAME_CASES:
+    u, x, w, k = spec["u"], spec["x"], spec["w"], spec["k"]
+    p = hyper_at_least(u, x, w, k)
+
+    # Self-checks: complement identity and monotonicity in x.
+    assert p == 1 - hyper_at_most(u, x, w, k - 1), "tail complement failed"
+    if x + 1 <= u:
+        assert hyper_at_least(u, x + 1, w, k) >= p, "monotonicity in outs failed"
+    if x == 0 and k >= 1:
+        assert p == 0
+    if k > min(w, x):
+        assert p == 0
+
+    cases.append(
+        {
+            "id": "midgame_u{u}_x{x}_w{w}_k{k}".format(**spec),
+            "kind": "midgame",
+            "params": dict(spec),
+            "expect": {"p": frac_str(p), "p_dec": dec15(p)},
+        }
+    )
+
 
 out = {
     "meta": {
         "generator": "python3 fractions (independent reference, v2 pipeline)",
-        "scope": "docs/02 §6.4 energy shortfall (mulligan-aware) + §10 luck tail",
+        "scope": "docs/02 §6.4 energy shortfall (mulligan-aware) + §10 luck tail + 中局 outs (docs/09 #1)",
         "format": "exact reduced fractions 'n/d'; *_dec are 15-place round-half-up",
     },
     "cases": cases,

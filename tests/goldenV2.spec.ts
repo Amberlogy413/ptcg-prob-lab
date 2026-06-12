@@ -17,6 +17,7 @@ import { luckTail } from "../src/lib/probx/luck.ts";
 import { relayEvent } from "../src/lib/probx/relay.ts";
 import { searchFoldValid } from "../src/lib/probx/fold.ts";
 import { optimizeAllocations, type OptimizerCandidate } from "../src/lib/probx/optimizer.ts";
+import { midgameAtLeast } from "../src/lib/probx/midgame.ts";
 
 interface V2Case {
   id: string;
@@ -127,6 +128,12 @@ describe("golden v2 vectors (independent Python reference)", () => {
         }
         expect.soft(r.best.alloc.join("_"), `${c.id} :: best`).toBe(exp.best);
         expect.soft(decimalStr(r.best.p, 15), `${c.id} :: best_dec`).toBe(exp.best_dec);
+      } else if (c.kind === "midgame") {
+        const p = c.params as { u: number; x: number; w: number; k: number };
+        const exp = c.expect as { p: string; p_dec: string };
+        const r = midgameAtLeast(p);
+        expect.soft(fractionStr(r), `${c.id} :: p`).toBe(exp.p);
+        expect.soft(decimalStr(r, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }
