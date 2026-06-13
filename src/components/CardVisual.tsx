@@ -7,24 +7,28 @@ import {
   type CatalogSet,
 } from "../data/catalog.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { cardAccent } from "../data/typeColors.ts";
 import { useCardName } from "../state/cardLang.ts";
 
 /**
  * Full-information card visual — an ORIGINAL text-only frame (no artwork, no
  * official layout, docs/DECISIONS.md "真實卡牌目錄"). Renders every fact the
- * catalog records for a card; the design tokens allow exactly one accent
- * color, so type identity is carried by text chips, not a color code.
+ * catalog records for a card; a Pokémon's primary type color drives a left
+ * edge accent (owner request 2026-06-14), with detailed type identity still
+ * carried by the labelled type chips.
  */
 export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: CatalogSet | null }) {
   const t = useT();
   const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
   const kind = kindOf(card);
+  const accent = cardAccent(card);
   const { primary, others } = useCardName(card);
 
   return (
     <div
       role="group"
       aria-label={t("visual.aria", { name: primary })}
+      style={{ borderLeftColor: accent, borderLeftWidth: "4px" }}
       className="rounded-card border hairline bg-receipt p-4 text-sm shadow-receipt"
     >
       {/* Header: kind · name (primary large + other languages small) · HP · types */}

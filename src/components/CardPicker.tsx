@@ -7,11 +7,13 @@ import {
   groupByName,
   toNewCardInput,
   kindOf,
+  isFormatLegal,
   type Catalog,
   type CatalogCard,
 } from "../data/catalog.ts";
 import { CardVisual } from "./CardVisual.tsx";
 import { CardName } from "./CardName.tsx";
+import { cardAccent } from "../data/typeColors.ts";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -28,6 +30,9 @@ export function CardPicker({ deckId }: { deckId: string }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+  // 賽制法定 (owner 2026-06-14): default to standard-legal (H/I/J) only, so a
+  // legal deck is the default path; the toggle reveals out-of-format prints.
+  const [stdOnly, setStdOnly] = useState(true);
 
   function ensureCatalog() {
     if (status === "ready" || status === "loading") return;
@@ -43,13 +48,12 @@ export function CardPicker({ deckId }: { deckId: string }) {
 
   // One row per card NAME (owner request): the representative is the best
   // print; same-name prints stay available via the per-row version selector.
-  const groups = useMemo(
-    () =>
-      catalog !== null && query.trim() !== ""
-        ? groupByName(catalog, searchCatalog(catalog, query, 200)).slice(0, 50)
-        : [],
-    [catalog, query],
-  );
+  const groups = useMemo(() => {
+    if (catalog === null || query.trim() === "") return [];
+    let hits = searchCatalog(catalog, query, 200);
+    if (stdOnly) hits = hits.filter(isFormatLegal);
+    return groupByName(catalog, hits).slice(0, 50);
+  }, [catalog, query, stdOnly]);
 
   const kindBadge = (card: CatalogCard): string => {
     const kind = kindOf(card);
@@ -80,6 +84,16 @@ export function CardPicker({ deckId }: { deckId: string }) {
         }}
         className="h-10 w-full rounded-ctl border hairline bg-surface px-3 text-base"
       />
+
+      <label className="mt-2 flex items-center gap-1.5 text-xs text-ink2">
+        <input
+          type="checkbox"
+          checked={stdOnly}
+          onChange={(e) => setStdOnly(e.target.checked)}
+          className="h-4 w-4 accent-blue"
+        />
+        {t("catalog.stdOnly")}
+      </label>
 
       {status === "loading" && (
         <p className="mt-2 text-sm text-ink2" role="status">
@@ -121,6 +135,11 @@ export function CardPicker({ deckId }: { deckId: string }) {
                         onClick={() => add(card)}
                         className="flex min-w-0 flex-1 items-center gap-2 rounded-ctl px-1 py-1 text-left hover:bg-surface"
                       >
+                        <span
+                          aria-hidden
+                          className="h-4 w-1 shrink-0 rounded-full"
+                          style={{ backgroundColor: cardAccent(card) }}
+                        />
                         <CardName card={card} className="min-w-0 flex-1 truncate text-base" />
                         {card.usage !== undefined && (
                           <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 font-mono text-xs text-pink">

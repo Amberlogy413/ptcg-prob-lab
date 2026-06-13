@@ -209,6 +209,18 @@ export function isBasicPokemon(card: CatalogCard): boolean {
   return card.category === "Pokemon" && card.stage === "Basic";
 }
 
+/**
+ * Format-legal for the current Standard (H/I/J). The pipeline's `std` flag IS
+ * the verified legality: regulation marks H/I/J plus Basic Energy (which never
+ * rotates), per the official asia.pokemon-card.com rotation that drives
+ * catalog.format. Single source of truth so the picker, builder and battle
+ * sandbox can never offer an illegal card. (Verified 2026-06-14: the only
+ * non-H/I std cards are Basic Energy reprints — correct, not a bug.)
+ */
+export function isFormatLegal(card: CatalogCard): boolean {
+  return card.std === true;
+}
+
 export function sectionOf(card: CatalogCard): "pokemon" | "trainer" | "energy" {
   if (card.category === "Pokemon") return "pokemon";
   if (card.category === "Energy") return "energy";

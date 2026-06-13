@@ -114,9 +114,22 @@ describe("CardPicker", () => {
     expect(useDeckStore.getState().basicTags["綠毛蟲"]).toBe(true);
   });
 
+  it("defaults to standard-legal only — hides the out-of-format print", async () => {
+    seedDeck();
+    await openPickerAndSearch("綠毛蟲");
+
+    // The F-mark S11 reprint is filtered out by default, so the one 綠毛蟲 row
+    // has no version select (only the legal SV9-001 print remains).
+    await screen.findByRole("button", { name: "加入 綠毛蟲(SV9-001)" });
+    expect(screen.queryByLabelText("選擇版本:綠毛蟲")).not.toBeInTheDocument();
+  });
+
   it("collapses same-name prints to ONE row; the version select picks a print", async () => {
     const deckId = seedDeck();
     const user = await openPickerAndSearch("綠毛蟲");
+
+    // Reveal out-of-format prints so both 綠毛蟲 versions are selectable.
+    await user.click(screen.getByLabelText("只顯示賽制合法卡(H/I/J)"));
 
     // Only one add row for 綠毛蟲 (two prints collapsed).
     const adds = await screen.findAllByRole("button", { name: /^加入 綠毛蟲/ });

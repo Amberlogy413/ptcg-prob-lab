@@ -51,12 +51,12 @@ const DecksView = lazy(() =>
 export default function App() {
   const t = useT();
   const activeView = useUiStore((s) => s.activeView);
-  const locale = useSettingsStore((s) => s.locale);
+  const language = useSettingsStore((s) => s.language);
   const [shareError, setShareError] = useState(false);
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
+    document.documentElement.lang = language === "en" ? "en" : "zh-Hant";
+  }, [language]);
 
   // Share-URL intake (docs/03 §7): #/q=… imports the deck + query, then
   // clears the fragment. A bad payload shows a friendly error, never a crash.

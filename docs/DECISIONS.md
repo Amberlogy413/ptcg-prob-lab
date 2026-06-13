@@ -309,3 +309,26 @@
   高估重校、洗回重抽複合模組、mulligan-aware 回合曲線、三卡接力、類別
   聚合查詢、體檢報告/追蹤器/曲線/goldfish 收據全覆蓋等——全部記入
   Phase 13 與「收據全覆蓋」工作項。
+
+## 2026-06-14 — 語言捆綁 + 屬性顏色 + 賽制法定過濾(Phase 1 基礎/清債)
+
+- **語言捆綁(擁有者反饋:同一畫面太多語言唔專業)**:廢除「介面語言 +
+  卡名語言 + 三語開關」三件分散控制,合併為**單一語言選擇器**
+  (`settingsStore.language: "zh-Hant" | "en" | "tri"`)。卡名語言跟 UI 語言
+  走;`tri`(三語對照)係其中一個刻意選項——只有揀 tri 先會多語並列,
+  主力(擁有者繁中)大、其餘細。`uiLocaleOf()` 把 tri 解析為 zh-Hant UI。
+  persist v2→v3 migrate:舊 triLingual=true → "tri",否則跟舊 locale。
+  i18n/index、cardLang、App、TopNav 全部改讀 `language`;刪 cardlang.* keys。
+- **屬性顏色(擁有者:不同寶可夢按屬性顏色顯示)**:推翻舊「只准一個 accent
+  色、屬性只用文字 chip」決定。`typeColors.cardAccent(card)` = 寶可夢主屬性
+  色(Trainer/Energy → 中性灰)。卡片詳情框、搜尋列、視覺組牌格子各加屬性色
+  左緣 accent。卡名仍保留具名屬性 chip。**牌組列**暫未著色(列只存 name+count,
+  要 catalog join 取屬性;留待對戰沙盤階段——屆時列會解析成完整卡資料)。
+- **賽制法定過濾(擁有者:再三確保只有 H/I/J 卡)**:`catalog.isFormatLegal(card)
+  = card.std`(單一真相)。CardPicker 加**預設開啟**「只顯示賽制合法卡(H/I/J)」,
+  關掉先見非賽制版本。視覺組牌本來已有 stdOnly 預設開 + 誠實 format 行。
+- **誠實位(真實核對)**:`format.standard = ["H","I","J"]`(來源
+  asia.pokemon-card.com 標準賽制異動公告,生效 2026-02-06)。資料庫最新套
+  M3(2026-01-23,全 I 標);**J 標卡全球未發行/TCGdex 未收錄**,故實際可選
+  卡池 = H + I + 基礎能量。78 張 G 標 std=true **全部係基礎能量**(永不輪替,
+  正確非 bug)。一出 J 標,全自動更新會收。

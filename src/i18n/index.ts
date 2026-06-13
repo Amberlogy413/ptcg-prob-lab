@@ -7,7 +7,7 @@
 import { useCallback } from "react";
 import zhHantRaw from "./zh-Hant.json";
 import enRaw from "./en.json";
-import { useSettingsStore, type Locale } from "../state/settingsStore.ts";
+import { useSettingsStore, uiLocaleOf, type Locale } from "../state/settingsStore.ts";
 
 const dictionaries: Record<Locale, Record<string, string>> = {
   "zh-Hant": zhHantRaw as Record<string, string>,
@@ -36,15 +36,15 @@ export function translate(locale: Locale, key: string, params?: TranslateParams)
   return text;
 }
 
-/** Reactive translator for components — re-renders on locale change. */
+/** Reactive translator for components — re-renders on language change. */
 export function useT(): (key: string, params?: TranslateParams) => string {
-  const locale = useSettingsStore((s) => s.locale);
+  const locale = uiLocaleOf(useSettingsStore((s) => s.language));
   return useCallback((key: string, params?: TranslateParams) => translate(locale, key, params), [locale]);
 }
 
 /** Non-reactive translator for code outside the React tree. */
 export function t(key: string, params?: TranslateParams): string {
-  return translate(useSettingsStore.getState().locale, key, params);
+  return translate(uiLocaleOf(useSettingsStore.getState().language), key, params);
 }
 
 /** Exposed for the i18n parity test (zh-Hant and en key sets must match). */

@@ -21,6 +21,7 @@ import {
 import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
 import { CardName } from "./CardName.tsx";
+import { cardAccent } from "../data/typeColors.ts";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
 
@@ -358,7 +359,11 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                   (owned > 0 ? `,${t("builder.copies", { n: owned })}` : "") +
                   (card.std !== true ? `,${t("catalog.legal.not")}` : "");
                 return (
-                  <li key={rep.name} className="rounded-ctl border hairline bg-surface p-2">
+                  <li
+                    key={rep.name}
+                    style={{ borderLeftColor: cardAccent(card), borderLeftWidth: "3px" }}
+                    className="rounded-ctl border hairline bg-surface p-2"
+                  >
                     <button
                       type="button"
                       aria-label={addLabel}

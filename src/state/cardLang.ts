@@ -1,19 +1,19 @@
 /**
- * Resolve the active card-name language (owner request 2026-06-13): the
- * preference is `cardLang` (auto follows the UI locale), and `triLingual`
- * toggles the secondary names. Kept tiny and framework-light so any display
- * surface can localize a catalog card the same way.
+ * Resolve the active card-name language. Card names are bound to the single UI
+ * `language` choice (owner request 2026-06-14 — one control, no per-screen
+ * language clutter): zh-Hant/tri → zh, en → en; `tri` also turns on the small
+ * secondary names. Kept tiny so any surface localizes a catalog card the same.
  */
 
 import { useSettingsStore } from "./settingsStore.ts";
 import { cardName, otherNames, type CatalogCard, type NameLang } from "../data/catalog.ts";
 
 export function useCardLang(): { lang: NameLang; tri: boolean } {
-  const locale = useSettingsStore((s) => s.locale);
-  const pref = useSettingsStore((s) => s.cardLang);
-  const tri = useSettingsStore((s) => s.triLingual);
-  const lang: NameLang = pref === "auto" ? (locale === "en" ? "en" : "zh") : pref;
-  return { lang, tri };
+  const language = useSettingsStore((s) => s.language);
+  // Card names are bound to the UI language; 三語對照 keeps the owner's primary
+  // (zh) large and lists the other two small.
+  const lang: NameLang = language === "en" ? "en" : "zh";
+  return { lang, tri: language === "tri" };
 }
 
 /** Primary name (always) + secondary names (only when tri-lingual is on). */
