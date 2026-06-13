@@ -359,3 +359,20 @@
   + 有效起手剔)、CardRow(輪替出局循環圖示)。**全部限 UI 層,golden 不受影響。**
 - **餘下(下一批)**:TrackerView 三警告、RotationPanel 升跌箭、MidgameView 靶心、
   DecksView 名次、TrainerView 誤差方向箭;牌組列卡名本地化(loaded deck 顯繁中)。
+
+## 2026-06-14 — 全面屬性向配色:棄用奇樹拼色,改中性石墨框
+
+- **擁有者**:「全面放棄並刪走原有奇樹拼色,全面轉為屬性向配色。」
+- **落地**:推翻 §2 奇樹(Iono)藍+粉雙生強調。UI 框架改**中性石墨**
+  (paper #FAFBFC、ink #1E2530、ink2 #5F6976、line #E4E7EC、surface/receipt 白),
+  令**全 app 唯一彩色 = 資料色**(屬性色 typeColors.ts + 功能色 fnColors.ts)+
+  三語意(good/warn/bad)。token key `blue`/`pink` 保留(避免大改 class)但改值:
+  `blue` → #3B4658(中性石墨,主按鈕/作用 nav/focus ring/CountRing 嘅唯一 UI 強調),
+  `pink` → #CC5A33(火焰色,只用於人氣/熱度高亮,配 IconFlame,語意化)。
+  全部經 tailwind token 串連,改值即全 app 生效;runtime 無硬編 Iono hex
+  (favicon/manifest/SVG 收據/尺規均不受影響)。
+- **理據**:功能色已佔據大半色相,UI 框架保持中性先可以令資料色「跳出嚟」、
+  專業而唔花;呢個就係「屬性向」(色=意義)嘅最克制詮釋。docs/04 §2 待重寫對齊
+  (記入技術債);此 DECISIONS 條目為權威記錄。
+- ⚠️ 改 tailwind.config.js 後 dev server 要**重啟**先見效(HMR 唔食 config);
+  build/deploy 自動食。

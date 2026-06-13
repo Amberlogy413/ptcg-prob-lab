@@ -1,7 +1,10 @@
 /**
- * Design tokens per docs/04_UI_UX_SPEC.md §2 — these values are hard spec.
- * Colors are replaced (not extended): the product allows exactly one accent
- * color (blue) plus the three semantic colors, used only for good/bad/delta.
+ * Design tokens (docs/04_UI_UX_SPEC.md §2). 2026-06-14 — owner dropped the 奇樹
+ * (Iono) blue+pink scheme for a TYPE-ORIENTED system: a neutral graphite frame
+ * so the only chroma in the app is DATA color (Pokémon type colors in
+ * typeColors.ts + function colors in fnColors.ts) plus the three semantics.
+ * The `blue`/`pink` keys are kept for stability but now hold neutral/flame
+ * values (no longer Iono twins).
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -12,20 +15,20 @@ export default {
       transparent: "transparent",
       current: "currentColor",
       white: "#FFFFFF",
-      // 奇樹 (Iono) pastel scheme — docs/04 §2 revision two, 2026-06-12.
-      paper: "#F4F9FC", // global background (pastel ice-blue paper)
+      // Neutral graphite frame — lets type/function colors lead.
+      paper: "#FAFBFC", // global background (near-white neutral)
       surface: "#FFFFFF", // cards
-      ink: "#252B3D", // primary text (deep navy ink)
-      ink2: "#5E6B85", // secondary text (slate blue)
-      line: "#DCE9F2", // hairline (pastel blue)
-      // Twin accents (Iono's twin tails): blue = primary actions, pink =
-      // badges/counts/secondary highlights. Key "blue" kept for stability.
-      blue: "#2B76AD",
-      pink: "#BE3D8F",
+      ink: "#1E2530", // primary text (graphite)
+      ink2: "#5F6976", // secondary text (neutral slate)
+      line: "#E4E7EC", // hairline (neutral)
+      // `blue` = primary actions/nav/focus → neutral graphite-slate (the single
+      // UI accent). `pink` = popularity/"hot" highlight → flame (semantic).
+      blue: "#3B4658",
+      pink: "#CC5A33",
       good: "#0E7A4A", // emerald: favorable / rising delta / ideal hand
       warn: "#B45309", // amber: caution / playable hand
       bad: "#B3261E", // crimson: unfavorable / falling delta / dead hand
-      receipt: "#FBFDFE", // receipt paper (ice white)
+      receipt: "#FCFCFD", // receipt paper (neutral white)
     },
     fontFamily: {
       sans: ['"Noto Sans TC"', '"IBM Plex Sans"', "system-ui", "sans-serif"],
