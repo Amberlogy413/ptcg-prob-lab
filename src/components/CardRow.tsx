@@ -13,18 +13,33 @@ interface CardRowProps {
   rotatingOut?: boolean;
   /** Set when the row resolves to a catalog print — shows the ⓘ visual. */
   onShowVisual?: () => void;
+  /** Localized display name when the row resolves to a catalog card; shown
+   *  read-only (the canonical name stays the editable identity for manual rows). */
+  displayName?: string;
+  /** Type-color accent for the row's left edge (resolved rows). */
+  accent?: string;
 }
 
 /** One editor row: count stepper + name + Basic toggle + mark + delete (docs/04 §6). */
-export function CardRow({ card, onUpdate, onRemove, rotatingOut, onShowVisual }: CardRowProps) {
+export function CardRow({
+  card,
+  onUpdate,
+  onRemove,
+  rotatingOut,
+  onShowVisual,
+  displayName,
+  accent,
+}: CardRowProps) {
   const t = useT();
   const stepBtn =
     "h-9 w-9 rounded-ctl border hairline bg-surface font-mono text-base leading-none " +
     "text-ink2 hover:text-ink disabled:opacity-40";
+  const localized = displayName !== undefined && displayName !== card.name;
   return (
     <li
+      style={accent !== undefined ? { borderLeftColor: accent, borderLeftWidth: "3px" } : undefined}
       className={
-        "flex items-center gap-2 border-b hairline py-1.5 last:border-b-0" +
+        "flex items-center gap-2 border-b hairline py-1.5 pl-1 last:border-b-0" +
         (rotatingOut ? " opacity-40 line-through" : "")
       }
     >
@@ -59,14 +74,23 @@ export function CardRow({ card, onUpdate, onRemove, rotatingOut, onShowVisual }:
           ＋
         </button>
       </div>
-      <input
-        type="text"
-        value={card.name}
-        placeholder={t("deck.card.namePlaceholder")}
-        aria-label={t("deck.card.name")}
-        onChange={(e) => onUpdate({ name: e.target.value })}
-        className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-2 text-base"
-      />
+      {localized ? (
+        <span
+          title={card.name}
+          className="flex h-9 min-w-0 flex-1 items-center truncate px-2 text-base"
+        >
+          {displayName}
+        </span>
+      ) : (
+        <input
+          type="text"
+          value={card.name}
+          placeholder={t("deck.card.namePlaceholder")}
+          aria-label={t("deck.card.name")}
+          onChange={(e) => onUpdate({ name: e.target.value })}
+          className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-2 text-base"
+        />
+      )}
       <button
         type="button"
         role="switch"

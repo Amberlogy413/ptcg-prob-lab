@@ -104,6 +104,13 @@ export interface Catalog {
   };
   sets: Record<string, CatalogSet>;
   cards: CatalogCard[];
+  /** English-species → zh map (scripts/embed_en_zh.mjs, from the official dex)
+   *  so deck rows saved with an English Pokémon name can be localized even when
+   *  that card carries no nameEn field. Keys are lowercased English species. */
+  dexEnZh?: Record<string, string>;
+  /** Verified Trainer/Energy staple EN → zh (scripts/name_bridge.json). Keys
+   *  lowercased; unambiguous staples only (ambiguous names omitted, not guessed). */
+  trainerEnZh?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +154,15 @@ export function cardName(card: CatalogCard, lang: NameLang): string {
   if (lang === "ja") return ja ?? zh ?? en ?? card.name;
   if (lang === "en") return en ?? zh ?? ja ?? card.name;
   return zh ?? ja ?? en ?? card.name;
+}
+
+/** Whether a card actually carries a name in the requested language (so we can
+ *  avoid replacing an English deck name with a Japanese fallback when no real
+ *  zh exists yet). */
+export function hasLang(card: CatalogCard, lang: NameLang): boolean {
+  if (lang === "zh") return card.nameZh !== undefined;
+  if (lang === "en") return card.nameEn !== undefined;
+  return card.nameJa !== undefined;
 }
 
 /** The other two languages (for tri-lingual secondary lines), de-duplicated. */
@@ -319,6 +335,120 @@ export function matchRow(
   const prints = catalog.cards.filter((c) => c.name === name);
   if (prints.length === 0) return null;
   return sortPrints(catalog, prints)[0] ?? null;
+}
+
+/**
+ * Reverse index from EVERY known name variant (canonical / zh / ja / en) to the
+ * best print carrying it (popular → std → newest). Built once per catalog so a
+ * stored deck row — whatever language the import happened to save — can resolve
+ * back to its real card for localized display + type color.
+ */
+const nameIndexCache = new WeakMap<Catalog, Map<string, CatalogCard>>();
+function nameIndex(catalog: Catalog): Map<string, CatalogCard> {
+  let idx = nameIndexCache.get(catalog);
+  if (idx === undefined) {
+    idx = new Map();
+    const ranked = sortPrints(catalog, catalog.cards); // best print first
+    for (const c of ranked) {
+      for (const nm of [c.name, c.nameZh, c.nameJa, c.nameEn]) {
+        if (nm !== undefined && nm !== "" && !idx.has(nm)) idx.set(nm, c);
+      }
+    }
+    nameIndexCache.set(catalog, idx);
+  }
+  return idx;
+}
+
+/**
+ * Resolve a deck row to its catalog card: catalog id → exact print (set+number)
+ * → any known name. Used to localize and type-color deck rows that were saved
+ * in another language (owner request 2026-06-14).
+ */
+export function resolveDeckRow(
+  catalog: Catalog,
+  row: { name: string; set?: string; number?: string; catalogId?: string },
+): CatalogCard | null {
+  if (row.catalogId !== undefined) {
+    const byId = cardById(catalog, row.catalogId);
+    if (byId !== null) return byId;
+  }
+  if (row.set !== undefined && row.number !== undefined) {
+    const exact = catalog.cards.find((c) => c.set === row.set && c.localId === row.number);
+    if (exact !== undefined) return exact;
+  }
+  const nm = row.name.trim();
+  return nm !== "" ? (nameIndex(catalog).get(nm) ?? null) : null;
+}
+
+// English Pokémon name → zh, applying the official affix conventions (mirrors
+// scripts/fill_zh_names.mjs). Returns the full localized name plus the bare
+// species zh (for a type-color lookup when no exact print exists).
+const EN_REGION: Array<[RegExp, string]> = [
+  [/^alolan\s+/i, "阿羅拉"],
+  [/^galarian\s+/i, "伽勒爾"],
+  [/^hisuian\s+/i, "洗翠"],
+  [/^paldean\s+/i, "帕底亞"],
+];
+const EN_SUFFIX = ["ex", "V-UNION", "VMAX", "VSTAR", "V"];
+
+function enNameToZh(catalog: Catalog, name: string): { full: string; base: string } | null {
+  const map = catalog.dexEnZh;
+  if (map === undefined) return null;
+  let s = name.trim();
+  let prefix = "";
+  let suffix = "";
+  const mega = /^mega\s+/i.test(s);
+  if (mega) s = s.replace(/^mega\s+/i, "");
+  for (const [re, zh] of EN_REGION) {
+    if (re.test(s)) {
+      prefix = zh;
+      s = s.replace(re, "");
+      break;
+    }
+  }
+  if (mega) prefix = "超級" + prefix;
+  for (const suf of EN_SUFFIX) {
+    const re = new RegExp(`\\s*${suf.replace(/-/g, "\\-")}$`, "i");
+    if (re.test(s)) {
+      suffix = suf === "ex" ? "ex" : suf.toUpperCase();
+      s = s.replace(re, "");
+      break;
+    }
+  }
+  const base = map[s.trim().toLowerCase()];
+  if (base === undefined) return null;
+  return { full: `${prefix}${base}${suffix}`, base };
+}
+
+/**
+ * Localize a deck row for display: resolve to a catalog card and use its name
+ * in `lang`; if the row was saved with an English Pokémon name that has no
+ * matching card, bridge it through the official dex (owner request 2026-06-14 —
+ * "繁中要真係繁中" even for the deck list). Returns the display name plus the
+ * best card found (for the type-color accent), or null when nothing resolves.
+ */
+export function localizeDeckRow(
+  catalog: Catalog,
+  row: { name: string; set?: string; number?: string; catalogId?: string },
+  lang: NameLang,
+): { name: string; card: CatalogCard | null } {
+  const card = resolveDeckRow(catalog, row);
+  if (card !== null && hasLang(card, lang)) return { name: cardName(card, lang), card };
+  // English name with no matching card → verified bridges (zh display only).
+  const asciiOnly = /[a-zA-Z]/.test(row.name) && !/[一-鿿぀-ヿ]/.test(row.name);
+  if (lang === "zh" && asciiOnly) {
+    const idx = nameIndex(catalog);
+    // Trainer/Energy staples first (exact, verified fact table).
+    const staple = catalog.trainerEnZh?.[row.name.trim().toLowerCase()];
+    if (staple !== undefined) return { name: staple, card: idx.get(staple) ?? card };
+    // Then Pokémon species via the official dex (with affixes).
+    const zh = enNameToZh(catalog, row.name);
+    if (zh !== null) {
+      const card2 = idx.get(zh.full) ?? idx.get(zh.base) ?? card;
+      return { name: zh.full, card: card2 };
+    }
+  }
+  return { name: card !== null ? cardName(card, lang) : row.name, card };
 }
 
 /** The full tag patch a matched catalog card stamps onto a deck row. */

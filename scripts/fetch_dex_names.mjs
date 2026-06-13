@@ -53,6 +53,9 @@ async function fetchSpecies(id) {
 async function main() {
   const catalog = JSON.parse(await readFile(CATALOG, "utf8"));
   const ids = new Set();
+  // Full National Dex (1..1025) so any Pokémon a deck might name resolves, even
+  // when a card print lacks a dexId field; plus any catalog dexId beyond that.
+  for (let i = 1; i <= 1025; i++) ids.add(i);
   for (const c of catalog.cards) {
     if (c.category === "Pokemon" && Array.isArray(c.dexId)) {
       for (const d of c.dexId) if (Number.isInteger(d) && d > 0) ids.add(d);

@@ -14,8 +14,18 @@ import { CardVisual } from "./CardVisual.tsx";
 import { CountRing } from "./CountRing.tsx";
 import { Modal } from "./Modal.tsx";
 import { DECK_SIZE } from "../constants.ts";
-import { loadCatalog, cardById, matchRow, enrichPatch, cardName, type Catalog } from "../data/catalog.ts";
+import {
+  loadCatalog,
+  cardById,
+  matchRow,
+  enrichPatch,
+  cardName,
+  resolveDeckRow,
+  localizeDeckRow,
+  type Catalog,
+} from "../data/catalog.ts";
 import { useCardLang } from "../state/cardLang.ts";
+import { cardAccent } from "../data/typeColors.ts";
 import { IconWarn } from "./icons.tsx";
 
 const SECTION_ORDER: DeckSection[] = ["pokemon", "trainer", "energy", "unknown"];
@@ -39,12 +49,12 @@ export function DeckEditor({ deck }: { deck: Deck }) {
   const [visualId, setVisualId] = useState<string | null>(null);
   const [enrichMsg, setEnrichMsg] = useState<string | null>(null);
 
-  // Rows that came from the catalog can show the full card visual — load the
-  // catalog in the background once any such row exists (SW-cached after the
-  // first time; never blocks the editor).
-  const hasCatalogRows = deck.cards.some((c) => c.catalogId !== undefined);
+  // Load the catalog in the background for any non-empty deck so every row can
+  // show its localized name + type color and the full card visual (SW-cached
+  // after the first time; never blocks the editor).
+  const hasRows = deck.cards.length > 0;
   useEffect(() => {
-    if (!hasCatalogRows || catalog !== null) return;
+    if (!hasRows || catalog !== null) return;
     let alive = true;
     loadCatalog().then(
       (c) => {
@@ -55,7 +65,7 @@ export function DeckEditor({ deck }: { deck: Deck }) {
     return () => {
       alive = false;
     };
-  }, [hasCatalogRows, catalog]);
+  }, [hasRows, catalog]);
 
   /** 補完標籤: sweep unmapped rows and stamp every tag the catalog knows.
    *  A row resolving to a print that already has its own row merges into it
@@ -86,9 +96,10 @@ export function DeckEditor({ deck }: { deck: Deck }) {
   }
 
   const showVisualFor = (card: DeckCard) => {
-    const id = card.catalogId;
-    if (id === undefined || catalog === null || cardById(catalog, id) === null) return undefined;
-    return () => setVisualId(id);
+    if (catalog === null) return undefined;
+    const resolved = resolveDeckRow(catalog, card);
+    if (resolved === null) return undefined;
+    return () => setVisualId(resolved.id);
   };
 
   const visualCard = visualId !== null && catalog !== null ? cardById(catalog, visualId) : null;
@@ -147,16 +158,23 @@ export function DeckEditor({ deck }: { deck: Deck }) {
                 </h3>
               )}
               <ul aria-label={t("deck.rows.aria")}>
-                {cards.map((card) => (
-                  <CardRow
-                    key={card.id}
-                    card={card}
-                    onUpdate={(patch) => updateCard(deck.id, card.id, patch)}
-                    onRemove={() => removeCard(deck.id, card.id)}
-                    rotatingOut={rotationMark !== null && card.mark === rotationMark}
-                    onShowVisual={showVisualFor(card)}
-                  />
-                ))}
+                {cards.map((card) => {
+                  const loc = catalog !== null ? localizeDeckRow(catalog, card, lang) : null;
+                  const displayName = loc !== null ? loc.name : undefined;
+                  const accent = loc !== null && loc.card !== null ? cardAccent(loc.card) : undefined;
+                  return (
+                    <CardRow
+                      key={card.id}
+                      card={card}
+                      onUpdate={(patch) => updateCard(deck.id, card.id, patch)}
+                      onRemove={() => removeCard(deck.id, card.id)}
+                      rotatingOut={rotationMark !== null && card.mark === rotationMark}
+                      onShowVisual={showVisualFor(card)}
+                      displayName={displayName}
+                      accent={accent}
+                    />
+                  );
+                })}
               </ul>
             </div>
           ))
