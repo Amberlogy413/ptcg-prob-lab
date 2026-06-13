@@ -31,6 +31,7 @@ import {
 import { energyShortfallCurve } from "../lib/probx/energy.ts";
 import { luckTail } from "../lib/probx/luck.ts";
 import { prizePosterior } from "../lib/probx/prizesLeft.ts";
+import { seenCurveValid } from "../lib/probx/seenCurve.ts";
 import { deckTotal, deckBasics, type Deck } from "./deckStore.ts";
 import { HAND_SIZE, PRIZE_COUNT } from "../constants.ts";
 
@@ -56,6 +57,8 @@ export interface TurnCurveQuery {
   extraSeen: number;
   firstPlayerSkipsFirstDraw: boolean;
   maxTurn: number;
+  /** §6.3: when set, every point is conditioned on a valid opening hand. */
+  mulliganAware?: { xBasic: boolean; otherBasics: number };
 }
 
 export function computeTurnCurve(q: TurnCurveQuery, N = 60): TurnCurveRow[] {
@@ -65,11 +68,27 @@ export function computeTurnCurve(q: TurnCurveQuery, N = 60): TurnCurveRow[] {
     extraSeen: q.extraSeen,
     firstPlayerSkipsFirstDraw: q.firstPlayerSkipsFirstDraw,
   };
+
+  // Mulligan-aware path (§6.3): condition each point on a valid hand. nSeen
+  // is the same schedule; the per-point probability comes from the exact
+  // hand-then-draws mixture (golden v2 `seen_curve_valid`).
+  let validPoints: Map<number, Rat> | null = null;
+  if (q.mulliganAware !== undefined) {
+    const { xBasic, otherBasics } = q.mulliganAware;
+    const nSeens: number[] = [];
+    for (let turn = 1; turn <= q.maxTurn; turn++) {
+      const n = Math.min(cardsSeenByTurn(turn, q.goingFirst, opts), physicalCap);
+      if (!nSeens.includes(n)) nSeens.push(n);
+    }
+    const res = seenCurveValid(q.x, xBasic, otherBasics, q.want, nSeens, N, HAND_SIZE);
+    validPoints = new Map(res.points.map((pt) => [pt.nSeen, pt.p]));
+  }
+
   const rows: TurnCurveRow[] = [];
   for (let turn = 1; turn <= q.maxTurn; turn++) {
     const natural = cardsSeenByTurn(turn, q.goingFirst, opts);
     const nSeen = Math.min(natural, physicalCap);
-    const p = pSeenAtLeast(q.x, nSeen, q.want, N);
+    const p = validPoints !== null ? (validPoints.get(nSeen) as Rat) : pSeenAtLeast(q.x, nSeen, q.want, N);
     rows.push({
       turn,
       nSeen,

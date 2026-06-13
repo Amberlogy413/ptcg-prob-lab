@@ -20,6 +20,7 @@ import { optimizeAllocations, type OptimizerCandidate } from "../src/lib/probx/o
 import { midgameAtLeast } from "../src/lib/probx/midgame.ts";
 import { prizePosterior } from "../src/lib/probx/prizesLeft.ts";
 import { shuffleBackRedraw } from "../src/lib/probx/shuffleBack.ts";
+import { seenCurveValid } from "../src/lib/probx/seenCurve.ts";
 
 interface V2Case {
   id: string;
@@ -173,6 +174,31 @@ describe("golden v2 vectors (independent Python reference)", () => {
         const r = shuffleBackRedraw(p);
         expect.soft(fractionStr(r), `${c.id} :: p`).toBe(exp.p);
         expect.soft(decimalStr(r, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
+      } else if (c.kind === "seen_curve_valid") {
+        const p = c.params as {
+          N: number;
+          H: number;
+          x: number;
+          x_basic: boolean;
+          ob: number;
+          want: number;
+          n_seen: number[];
+        };
+        const exp = c.expect as {
+          p_valid: string;
+          by_n: Record<string, string>;
+          by_n_dec: Record<string, string>;
+        };
+        const r = seenCurveValid(p.x, p.x_basic, p.ob, p.want, p.n_seen, p.N, p.H);
+        expect.soft(fractionStr(r.pValid), `${c.id} :: p_valid`).toBe(exp.p_valid);
+        r.points.forEach((point) => {
+          expect
+            .soft(fractionStr(point.p), `${c.id} :: by_n[${point.nSeen}]`)
+            .toBe(exp.by_n[String(point.nSeen)]);
+          expect
+            .soft(decimalStr(point.p, 15), `${c.id} :: by_n_dec[${point.nSeen}]`)
+            .toBe(exp.by_n_dec[String(point.nSeen)]);
+        });
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }

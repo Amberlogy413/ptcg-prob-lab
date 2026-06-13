@@ -113,6 +113,59 @@ def energy_curve_valid(N: int, H: int, E: int, B: int, want: int, n_seen: int):
 
 
 # ---------------------------------------------------------------------------
+# §6.3 — mulligan-aware "seen by turn" curve (math audit 2026-06-12).
+# P(seen >= want of the target by nSeen | hand has >= 1 Basic). Categories:
+# x (target), ob (OTHER basics), R = N - x - ob. Validity counts the target
+# itself only when it is a Basic. Recombines the validity rule of
+# search_fold_valid with the hand-then-draws mixture of energy_curve_valid.
+# ---------------------------------------------------------------------------
+
+
+def seen_curve_valid(N, H, x, x_basic, ob, want, n_seen):
+    R = N - x - ob
+    assert R >= 0 and (x_basic or ob >= 1)
+    total_hand = comb(N, H)
+    M = N - H
+    d = n_seen - H
+    total_draw = comb(M, d)
+
+    def hand_inner(filter_valid):
+        p_valid = Fraction(0)
+        p_seen = Fraction(0)
+        for kx in range(0, min(x, H) + 1):
+            for kb in range(0, min(ob, H - kx) + 1):
+                kr = H - kx - kb
+                if kr < 0 or kr > R:
+                    continue
+                ph = Fraction(comb(x, kx) * comb(ob, kb) * comb(R, kr), total_hand)
+                basics = (kx if x_basic else 0) + kb
+                if filter_valid and basics < 1:
+                    continue
+                p_valid += ph
+                rem_x = x - kx
+                need = want - kx
+                if need <= 0:
+                    inner = Fraction(1)
+                else:
+                    inner = Fraction(0)
+                    for jx in range(need, min(rem_x, d) + 1):
+                        inner += Fraction(comb(rem_x, jx) * comb(M - rem_x, d - jx), total_draw)
+                p_seen += ph * inner
+        return p_seen, p_valid
+
+    seen_and_valid, p_valid = hand_inner(True)
+    assert p_valid > 0, "deck must be able to produce a valid hand"
+
+    # self-check 1: dropping the validity filter reproduces the single-category
+    # formula exactly (exchangeability).
+    seen_uncond, all_hands = hand_inner(False)
+    assert all_hands == 1, "unfiltered hand pmf must sum to 1"
+    assert seen_uncond == hyper_at_least(N, x, n_seen, want), "exchangeability failed"
+
+    return seen_and_valid / p_valid, p_valid
+
+
+# ---------------------------------------------------------------------------
 # §10 — luck tail: (1 - p)^n
 # ---------------------------------------------------------------------------
 
@@ -562,6 +615,52 @@ for spec in SHUFFLE_CASES:
             "kind": "shuffle_back_redraw",
             "params": dict(spec),
             "expect": {"p": frac_str(pr), "p_dec": dec15(pr)},
+        }
+    )
+
+# Mulligan-aware turn curve cases (§6.3). NS spans opening hand → mid-game.
+SEEN_CURVE_CASES = [
+    # target IS a Basic — the genuinely new branch (target count helps validity)
+    {"x": 4, "x_basic": True, "ob": 6, "want": 1},
+    {"x": 3, "x_basic": True, "ob": 7, "want": 1},
+    {"x": 4, "x_basic": True, "ob": 6, "want": 2},
+    # target is NON-Basic — must equal 1 − energy_curve_valid complement
+    {"x": 4, "x_basic": False, "ob": 10, "want": 1},
+    {"x": 8, "x_basic": False, "ob": 10, "want": 2},
+]
+SC_NS = [7, 8, 9, 10, 11, 12, 13]
+
+for spec in SEEN_CURVE_CASES:
+    by_n = {}
+    by_n_dec = {}
+    p_valid_out = None
+    prev = None
+    for n in SC_NS:
+        p, p_valid = seen_curve_valid(N, H, spec["x"], spec["x_basic"], spec["ob"], spec["want"], n)
+        if prev is not None:
+            assert p >= prev, "P(seen >= want) must be monotone non-decreasing in n"
+        prev = p
+        # self-check 2: non-Basic target equals the energy-curve complement.
+        if not spec["x_basic"]:
+            short, _ = energy_curve_valid(N, H, spec["x"], spec["ob"], spec["want"], n)
+            assert p == 1 - short, "energy-complement cross-check failed"
+        by_n[str(n)] = frac_str(p)
+        by_n_dec[str(n)] = dec15(p)
+        p_valid_out = p_valid
+    cases.append(
+        {
+            "id": "seen_valid_x{x}_{b}_ob{ob}_w{want}".format(b="B" if spec["x_basic"] else "N", **spec),
+            "kind": "seen_curve_valid",
+            "params": {
+                "N": N,
+                "H": H,
+                "x": spec["x"],
+                "x_basic": spec["x_basic"],
+                "ob": spec["ob"],
+                "want": spec["want"],
+                "n_seen": SC_NS,
+            },
+            "expect": {"p_valid": frac_str(p_valid_out), "by_n": by_n, "by_n_dec": by_n_dec},
         }
     )
 

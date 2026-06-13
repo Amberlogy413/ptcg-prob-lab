@@ -17,26 +17,48 @@ export function CurveSection() {
 
   const [source, setSource] = useState("custom");
   const [customX, setCustomX] = useState(4);
+  const [customBasic, setCustomBasic] = useState(false);
   const [want, setWant] = useState(1);
   const [goingFirst, setGoingFirst] = useState(false);
   const [extraSeen, setExtraSeen] = useState(0);
   const [legacyRule, setLegacyRule] = useState(false);
+  const [aware, setAware] = useState(false);
 
   const card = source !== "custom" ? deckCards.find((c) => c.id === source) : undefined;
   const x = card ? card.count : customX;
   const cardLabel = card ? card.name : t("q3.custom");
+  const xBasic = card ? card.isBasic : customBasic;
+
+  // §6.3 conditioning context: the OTHER Basics and the deck size come from
+  // the active deck. extraSeen has no exact mulligan-aware model, so the
+  // toggle is only available with a deck-backed, valid configuration.
+  const total = deck ? deckTotal(deck) : 0;
+  const basics = deck ? deckBasics(deck) : 0;
+  const otherBasics = Math.max(0, basics - (xBasic ? x : 0));
+  const awareN = total >= HAND_SIZE ? total : DECK_SIZE;
+  const awareOk =
+    aware &&
+    deck !== null &&
+    total >= HAND_SIZE &&
+    extraSeen === 0 &&
+    x + otherBasics <= awareN &&
+    (xBasic || otherBasics >= 1);
 
   const rows: TurnCurveRow[] = useMemo(
     () =>
-      computeTurnCurve({
-        x,
-        want: Math.max(1, Math.min(want, Math.min(x, HAND_SIZE) || 1)),
-        goingFirst,
-        extraSeen,
-        firstPlayerSkipsFirstDraw: legacyRule,
-        maxTurn: 12,
-      }),
-    [x, want, goingFirst, extraSeen, legacyRule],
+      computeTurnCurve(
+        {
+          x,
+          want: Math.max(1, Math.min(want, Math.min(x, HAND_SIZE) || 1)),
+          goingFirst,
+          extraSeen,
+          firstPlayerSkipsFirstDraw: legacyRule,
+          maxTurn: 12,
+          ...(awareOk ? { mulliganAware: { xBasic, otherBasics } } : {}),
+        },
+        awareOk ? awareN : DECK_SIZE,
+      ),
+    [x, want, goingFirst, extraSeen, legacyRule, awareOk, xBasic, otherBasics, awareN],
   );
 
   const segBtn = (active: boolean) =>
@@ -47,11 +69,29 @@ export function CurveSection() {
     <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-medium">{t("curve.title")}</h2>
-        <span className="rounded-ctl border hairline px-2 py-0.5 text-xs text-ink2">
-          {t("toggle.mulligan.off")}
-        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={awareOk}
+          onClick={() => setAware((v) => !v)}
+          className={
+            "rounded-ctl border px-2.5 py-0.5 text-xs transition-colors duration-fast " +
+            (awareOk
+              ? "border-blue bg-blue text-white"
+              : "hairline bg-surface text-ink2 hover:text-ink")
+          }
+        >
+          {awareOk ? t("toggle.mulligan.on") : t("toggle.mulligan.off")}
+        </button>
       </div>
-      <p className="mt-1 text-xs text-ink2">{t("curve.honesty")}</p>
+      <p className="mt-1 text-xs text-ink2">
+        {awareOk ? t("curve.aware") : t("curve.honesty")}
+      </p>
+      {aware && !awareOk && (
+        <p className="mt-1 text-xs text-warn" role="status">
+          {t("curve.awareNeed")}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
         <select
@@ -81,6 +121,17 @@ export function CurveSection() {
               }
               className="h-8 w-14 rounded-ctl border hairline bg-surface text-center font-mono text-sm"
             />
+          </label>
+        )}
+        {!card && aware && (
+          <label className="flex items-center gap-1.5 text-xs text-ink2">
+            <input
+              type="checkbox"
+              checked={customBasic}
+              onChange={(e) => setCustomBasic(e.target.checked)}
+              className="h-4 w-4 accent-blue"
+            />
+            {t("curve.targetBasic")}
           </label>
         )}
         <label className="flex items-center gap-1 text-xs text-ink2">

@@ -220,6 +220,24 @@
 - **多類聯合**:引擎已支援(黃金已釘),UI 留待 Q2 式建構器整合
   (Phase 13 後續)。
 
+## 2026-06-12 — mulligan-aware 回合曲線(§6.3 數學債清還)
+
+- **缺口**:回合曲線一直無條件(§6.3 標明這是誠實預設,但欠 mulligan-aware
+  變體)。審計指出:非基礎目標可由 energy.ts 補集即得,只有基礎目標係真新分支
+  (目標本身計入有效手條件)。
+- **實作**:`probx/seenCurve.ts` `seenCurveValid(x, xBasic, otherBasics, want,
+  nSeenList, N, H)` = 重組 searchFoldValid 嘅有效手規則
+  (basics = (xBasic?kx:0)+kb ≥ 1)同 energy 嘅「手→抽」兩段混合;零新數學。
+  黃金 kind `seen_curve_valid`(5 案例),Python 雙自檢:去掉有效條件 =
+  hyper_at_least(可交換性)、非基礎目標 = 1 − energy_curve_valid(補集交叉)。
+- **UI**:`computeTurnCurve` 加 `mulliganAware?: {xBasic, otherBasics}`;
+  CurveSection 加「含重抽修正」開關。條件化 context 取自當前牌組
+  (其他基礎 = deckBasics − (xBasic?x:0)、N = 牌組總數);開關只在
+  牌組已載入(≥7)、extraSeen=0、且能組有效手時生效(否則常駐提示原因——
+  extraSeen 無精確 mulligan-aware 模型,故互斥)。預設牌組卡自動帶 isBasic;
+  自訂卡開關時提供「此卡為基礎」勾選。錨點 x=4 基礎/ob=6,going-second
+  T1(n=8)= 57.366872%,已測試釘死。
+
 - **審計遺留帳(13 項,排程)**:追蹤器 v2(PRIZE_COUNT 寫死 6——首張獎賞
   被取走後後驗即錯,+15.3pp 級;修法 P=6−k 參數化,黃金先行)、02 §5.6
   中局抽牌引理補規格、四個 selector 同名多行投數合計、Worker 門檻 16–390×
