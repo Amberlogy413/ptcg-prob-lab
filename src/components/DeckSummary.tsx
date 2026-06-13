@@ -3,6 +3,7 @@ import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import { computeDeckSummary } from "../state/selectors.ts";
 import { PrecisionRuler } from "./PrecisionRuler.tsx";
+import { ProofNumber, type Proof } from "./ProofNumber.tsx";
 import { IconWarn, IconRotate, IconLegal } from "./icons.tsx";
 import { DECK_SIZE } from "../constants.ts";
 
@@ -60,7 +61,32 @@ export function DeckSummary() {
             )}
             {summary.status === "ok" && summary.mulligan && (
               <div className="mt-1">
-                <p className="font-mono text-xl">{summary.mulligan.percent}</p>
+                <ProofNumber
+                  className="font-mono text-xl"
+                  title={t("summary.mulligan")}
+                  value={summary.mulligan.percent}
+                  proof={
+                    ((): Proof => {
+                      const N = summary.total;
+                      const B = summary.basics;
+                      const m = summary.mulligan!;
+                      return {
+                        receipt: [
+                          { label: t("proof.formula"), text: "P = C(N−B, 7) / C(N, 7)" },
+                          { label: t("proof.sub"), text: `C(${N}−${B}, 7) / C(${N}, 7) = C(${N - B}, 7) / C(${N}, 7)` },
+                          { label: t("proof.frac"), text: m.fraction },
+                          { label: t("proof.pct"), text: m.percent },
+                          { label: t("proof.oneIn"), text: m.oneIn },
+                        ],
+                        interpret: t("proof.mulligan.interp", {
+                          basics: B,
+                          pct: m.percent,
+                          oneIn: m.oneIn,
+                        }),
+                      };
+                    })()
+                  }
+                />
                 <p className="font-mono text-xs text-ink2">
                   {summary.mulligan.fraction} · {summary.mulligan.oneIn}
                 </p>

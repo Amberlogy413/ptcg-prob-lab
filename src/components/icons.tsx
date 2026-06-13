@@ -348,3 +348,12 @@ export function IconArrowDown(p: IconProps) {
     </I>
   );
 }
+
+/** 數學證明 — a radical sign (show the full calculation). */
+export function IconProof(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M2 8.5h1.6l2 4.5L8 4h6" />
+    </I>
+  );
+}
