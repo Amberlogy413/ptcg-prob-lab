@@ -665,6 +665,62 @@ for spec in SEEN_CURVE_CASES:
     )
 
 
+# ---------------------------------------------------------------------------
+# Mid-game scenario joint (深度數學分析任何場景) — P(drawing w cards from a
+# deck of U, EACH tracked card i lands in [min_i, max_i]). Multi-card exact
+# joint via the multivariate hypergeometric; mirrors comboOpening(N=U,H=w).
+# ---------------------------------------------------------------------------
+
+
+def scenario_joint(U, counts, mins, maxs, w):
+    m = len(counts)
+
+    def rec(i, drawn, ks):
+        if i == m:
+            rest = U - sum(counts)
+            kr = w - drawn
+            if kr < 0 or kr > rest:
+                return Fraction(0)
+            return multi_hg(U, list(counts), w, list(ks))
+        acc = Fraction(0)
+        hi = min(counts[i], w - drawn)
+        for k in range(0, hi + 1):
+            ks.append(k)
+            if mins[i] <= k <= maxs[i]:
+                acc += rec(i + 1, drawn + k, ks)
+            ks.pop()
+        return acc
+
+    return rec(0, 0, [])
+
+
+SCENARIO_CASES = [
+    # next draw: 1 of a 4-of out of 30 remaining → 4/30 = 2/15
+    {"U": 30, "counts": [4], "mins": [1], "maxs": [4], "w": 1},
+    # draw 6 (Iono to 6 prizes): >=1 of a 3-of AND >=1 of a 2-of, 40 left
+    {"U": 40, "counts": [3, 2], "mins": [1, 1], "maxs": [3, 2], "w": 6},
+    # exactly 2 of a 4-of in 7 draws from 25
+    {"U": 25, "counts": [4], "mins": [2], "maxs": [2], "w": 7},
+    # three-card combo: >=1 each of 2/2/1 from 20 in 5 draws
+    {"U": 20, "counts": [2, 2, 1], "mins": [1, 1, 1], "maxs": [2, 2, 1], "w": 5},
+    # avoid: 0 of a dead 3-of in next 3 from 15
+    {"U": 15, "counts": [3], "mins": [0], "maxs": [0], "w": 3},
+]
+for spec in SCENARIO_CASES:
+    p = scenario_joint(spec["U"], spec["counts"], spec["mins"], spec["maxs"], spec["w"])
+    # single-card sanity: >=1 of one card == hyper_at_least
+    if len(spec["counts"]) == 1 and spec["mins"][0] == 1 and spec["maxs"][0] >= spec["counts"][0]:
+        assert p == hyper_at_least(spec["U"], spec["counts"][0], spec["w"], 1)
+    cases.append(
+        {
+            "id": "scenario_U{U}_w{w}_m{}".format(len(spec["counts"]), **spec),
+            "kind": "scenario_joint",
+            "params": dict(spec),
+            "expect": {"p": frac_str(p), "p_dec": dec15(p)},
+        }
+    )
+
+
 out = {
     "meta": {
         "generator": "python3 fractions (independent reference, v2 pipeline)",

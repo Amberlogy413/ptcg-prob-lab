@@ -1032,6 +1032,120 @@
      "13": "0.536554380016830"
     }
    }
+  },
+  {
+   "id": "scenario_U30_w1_m1",
+   "kind": "scenario_joint",
+   "params": {
+    "U": 30,
+    "counts": [
+     4
+    ],
+    "mins": [
+     1
+    ],
+    "maxs": [
+     4
+    ],
+    "w": 1
+   },
+   "expect": {
+    "p": "2/15",
+    "p_dec": "0.133333333333333"
+   }
+  },
+  {
+   "id": "scenario_U40_w6_m2",
+   "kind": "scenario_joint",
+   "params": {
+    "U": 40,
+    "counts": [
+     3,
+     2
+    ],
+    "mins": [
+     1,
+     1
+    ],
+    "maxs": [
+     3,
+     2
+    ],
+    "w": 6
+   },
+   "expect": {
+    "p": "10745/109668",
+    "p_dec": "0.097977532188059"
+   }
+  },
+  {
+   "id": "scenario_U25_w7_m1",
+   "kind": "scenario_joint",
+   "params": {
+    "U": 25,
+    "counts": [
+     4
+    ],
+    "mins": [
+     2
+    ],
+    "maxs": [
+     2
+    ],
+    "w": 7
+   },
+   "expect": {
+    "p": "3213/12650",
+    "p_dec": "0.253992094861660"
+   }
+  },
+  {
+   "id": "scenario_U20_w5_m3",
+   "kind": "scenario_joint",
+   "params": {
+    "U": 20,
+    "counts": [
+     2,
+     2,
+     1
+    ],
+    "mins": [
+     1,
+     1,
+     1
+    ],
+    "maxs": [
+     2,
+     2,
+     1
+    ],
+    "w": 5
+   },
+   "expect": {
+    "p": "481/15504",
+    "p_dec": "0.031024251805986"
+   }
+  },
+  {
+   "id": "scenario_U15_w3_m1",
+   "kind": "scenario_joint",
+   "params": {
+    "U": 15,
+    "counts": [
+     3
+    ],
+    "mins": [
+     0
+    ],
+    "maxs": [
+     0
+    ],
+    "w": 3
+   },
+   "expect": {
+    "p": "44/91",
+    "p_dec": "0.483516483516484"
+   }
   }
  ]
 }

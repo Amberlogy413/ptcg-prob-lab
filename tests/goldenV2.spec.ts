@@ -21,6 +21,7 @@ import { midgameAtLeast } from "../src/lib/probx/midgame.ts";
 import { prizePosterior } from "../src/lib/probx/prizesLeft.ts";
 import { shuffleBackRedraw } from "../src/lib/probx/shuffleBack.ts";
 import { seenCurveValid } from "../src/lib/probx/seenCurve.ts";
+import { computeScenarioJoint } from "../src/lib/probx/scenario.ts";
 
 interface V2Case {
   id: string;
@@ -199,6 +200,23 @@ describe("golden v2 vectors (independent Python reference)", () => {
             .soft(decimalStr(point.p, 15), `${c.id} :: by_n_dec[${point.nSeen}]`)
             .toBe(exp.by_n_dec[String(point.nSeen)]);
         });
+      } else if (c.kind === "scenario_joint") {
+        const p = c.params as {
+          U: number;
+          counts: number[];
+          mins: number[];
+          maxs: number[];
+          w: number;
+        };
+        const exp = c.expect as { p: string; p_dec: string };
+        const cards = p.counts.map((count, i) => ({
+          count,
+          min: p.mins[i] as number,
+          max: p.maxs[i] as number,
+        }));
+        const r = computeScenarioJoint(cards, p.U, p.w);
+        expect.soft(fractionStr(r.joint), `${c.id} :: p`).toBe(exp.p);
+        expect.soft(decimalStr(r.joint, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }

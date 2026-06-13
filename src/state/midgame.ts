@@ -21,6 +21,7 @@ import {
 } from "../lib/prob/index.ts";
 import { midgameAtLeast, type MidgameParams } from "../lib/probx/midgame.ts";
 import { shuffleBackRedraw } from "../lib/probx/shuffleBack.ts";
+import { computeScenarioJoint, type ScenarioCard } from "../lib/probx/scenario.ts";
 
 export interface MidgameSensitivity {
   /** Outs count this row describes (x−1 or x+1). */
@@ -151,4 +152,81 @@ export function computeShuffleBack(input: ShuffleBackInput): MidgameDisplay {
     out.down = { x: xU - 1, percent: percentStr(down, 6), deltaPp: ppDelta(sub(down, total)) };
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// 情境分析 (deep scenario): free multi-card exact joint over a custom state.
+
+export interface ScenarioInput {
+  /** Cards remaining in the deck (the draw pool). */
+  u: number;
+  /** Cards to draw next. */
+  w: number;
+  cards: Array<{ label: string; count: number; min: number; max: number }>;
+}
+
+export interface ScenarioCardDisplay {
+  label: string;
+  count: number;
+  constraint: string;
+  /** Marginal P(this card alone meets its requirement), three formats. */
+  percent: string;
+  fraction: string;
+}
+
+export interface ScenarioDisplay {
+  /** Joint P(all cards meet their windows), three formats + chart. */
+  percent: string;
+  fraction: string;
+  oneIn: string;
+  chart: number;
+  perCard: ScenarioCardDisplay[];
+  derivation: string[];
+}
+
+function constraintText(c: { min: number; max: number; count: number }): string {
+  if (c.min === c.max) return `=${c.min}`;
+  if (c.min <= 0) return `≤${c.max}`;
+  if (c.max >= c.count) return `≥${c.min}`;
+  return `${c.min}–${c.max}`;
+}
+
+export function computeScenario(input: ScenarioInput): ScenarioDisplay {
+  const { u, w, cards } = input;
+  const scenarioCards: ScenarioCard[] = cards.map((c) => ({
+    count: c.count,
+    min: c.min,
+    max: c.max,
+    label: c.label,
+  }));
+  const r = computeScenarioJoint(scenarioCards, u, w);
+
+  const perCard: ScenarioCardDisplay[] = cards.map((c, i) => ({
+    label: c.label,
+    count: c.count,
+    constraint: constraintText(c),
+    percent: percentStr(r.marginals[i] as Rat, 6),
+    fraction: fractionStr(r.marginals[i] as Rat),
+  }));
+
+  // Receipt: the joint over the multivariate hypergeometric.
+  const letters = cards.map((_, i) => String.fromCharCode(65 + i));
+  const products = cards.map((c, i) => `C(${c.count},${letters[i]})`).join("·");
+  const sumLetters = letters.join("+");
+  const rest = u - cards.reduce((s, c) => s + c.count, 0);
+  const cons = cards.map((c, i) => `${letters[i]}${constraintText(c)}`).join(", ");
+  const derivation = [
+    `P = Σ ${products}·C(${rest},${w}−${sumLetters}) ⁄ C(${u},${w})`,
+    `  條件:${cons}(於 ${u} 張中抽 ${w} 張)`,
+    `P = ${fractionStr(r.joint)} = ${percentStr(r.joint, 6)} = ${oneInStr(r.joint, 3)}`,
+  ];
+
+  return {
+    percent: percentStr(r.joint, 6),
+    fraction: fractionStr(r.joint),
+    oneIn: oneInStr(r.joint, 3),
+    chart: toChartNumber(r.joint),
+    perCard,
+    derivation,
+  };
 }

@@ -77,7 +77,7 @@ describe("中局 view", () => {
     // 實際意義: judgement + build sensitivity in plain language.
     expect(screen.getByText(/大約 1 in 3\.333 次處境成功 1 次/)).toBeInTheDocument();
     expect(screen.getByText(/x=5.*36\.666667%.*\+6\.67pp/)).toBeInTheDocument();
-    expect(screen.getByText(/練習與覆盤限定/)).toBeInTheDocument();
+    expect(screen.getAllByText(/練習與覆盤限定/).length).toBeGreaterThanOrEqual(1);
   });
 
   it("shuffle-back panel computes the Iono anchor with defaults", async () => {
