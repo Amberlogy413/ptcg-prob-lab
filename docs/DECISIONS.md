@@ -282,6 +282,27 @@
   lazy 載入;牌組推薦工作區一鍵 `載入此牌組` → importDeck(帶 isBasic)→
   體檢/組牌/數學。更新 = 重跑 fetch_decks.mjs。
 
+## 2026-06-13 — 中盤情境分析器 + 三語對照 + 全自動更新
+
+- **情境分析器**:中盤由抽象單目標升級為「自由加任何卡 + 自訂當前狀態(U/w
+  + 每卡 [min,max])→ 精確聯合概率」。重用種子核心 comboOpening(N=U,H=w),
+  零新公式;黃金 v2 `scenario_joint`。附單卡邊際 + 負相關提示 + 收據。
+- **三語對照表**:TCGdex ja 與 zh-tw **共用卡 id** → 日文名 1:1 免費齊全
+  (SV 世代 100%;pre-SV 唔共用 id 故缺)。`scripts/fetch_names.mjs` 加
+  nameZh(7436)/nameJa(3589)/nameEn(1435,寶可夢 dexId+staple)。
+  `name` 保留為儲存鍵(牌組匹配不變)。顯示由 cardName(card,lang) +
+  useCardName + <CardName> 驅動;TopNav 加「卡名語言(auto/中/英/日)」+
+  「三語對照」開關,主力語言大、其餘小。`scripts/zh_overrides.json`
+  (id→zh)供擁有者補最新世代缺口。
+- **全自動更新(擁有者選全自動)**:`.github/auto-update.yml.disabled`
+  每週一 cron:fetch_meta + restamp_meta(輕量重蓋採用率,免重爬)+
+  fetch_decks + 黃金/測試 gate + commit + 部署。**泊喺 .disabled**:
+  現 token 冇 workflow scope;啟用 = gh auth refresh -s workflow → 搬入
+  .github/workflows/ → push。重卡池/三語爬取仍手動(新卡包時)。
+- **官方賽事等級數據源**(研究結論,待建):RK9.gg(地區/世界賽 official
+  tier,HTML 無 API,需解析)+ limitlesstcg.com/tournaments;play API
+  無官方等級。FB 金球戰車 = HK 社群本地賽果(人手)。下一步建解析。
+
 - **審計遺留帳(13 項,排程)**:追蹤器 v2(PRIZE_COUNT 寫死 6——首張獎賞
   被取走後後驗即錯,+15.3pp 級;修法 P=6−k 參數化,黃金先行)、02 §5.6
   中局抽牌引理補規格、四個 selector 同名多行投數合計、Worker 門檻 16–390×
