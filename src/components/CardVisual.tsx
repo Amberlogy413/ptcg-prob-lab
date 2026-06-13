@@ -2,11 +2,11 @@ import { useT } from "../i18n/index.ts";
 import {
   kindOf,
   typeKey,
-  fnKey,
   type CatalogCard,
   type CatalogSet,
 } from "../data/catalog.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { FnChip } from "./FnChip.tsx";
 import { cardAccent } from "../data/typeColors.ts";
 import { useCardName } from "../state/cardLang.ts";
 
@@ -61,16 +61,11 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         </p>
       )}
 
-      {/* 功能標籤 (P10.2) — what this card actually DOES. */}
+      {/* 功能標籤 (P10.2) — what this card actually DOES, in semantic color+icon. */}
       {card.fn !== undefined && card.fn.length > 0 && (
         <p className="mt-1.5 flex flex-wrap gap-1">
           {card.fn.map((k) => (
-            <span
-              key={k}
-              className="rounded-full border hairline bg-surface px-2 py-0.5 text-xs text-ink2"
-            >
-              {label(fnKey(k), k)}
-            </span>
+            <FnChip key={k} tag={k} />
           ))}
         </p>
       )}

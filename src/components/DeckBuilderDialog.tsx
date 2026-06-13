@@ -14,14 +14,18 @@ import {
   energyTypeKey,
   kindOf,
   fnKey,
+  cardName,
   FN_ORDER,
   type Catalog,
   type CatalogCard,
 } from "../data/catalog.ts";
+import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { FnIcon } from "./FnChip.tsx";
 import { CardName } from "./CardName.tsx";
 import { cardAccent } from "../data/typeColors.ts";
+import { fnColor } from "../data/fnColors.ts";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
 
@@ -72,6 +76,7 @@ function subLabelKey(category: Category, sub: string): string | null {
  */
 export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () => void }) {
   const t = useT();
+  const { lang } = useCardLang();
   const addCardFrom = useDeckStore((s) => s.addCardFrom);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [failed, setFailed] = useState(false);
@@ -323,8 +328,11 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                   type="button"
                   aria-pressed={activeFn === k}
                   onClick={() => setFnTag(activeFn === k ? null : k)}
-                  className={chip(activeFn === k)}
+                  className={chip(activeFn === k) + " inline-flex items-center gap-1"}
                 >
+                  <span style={{ color: activeFn === k ? "#FFFFFF" : fnColor(k) }}>
+                    <FnIcon tag={k} />
+                  </span>
                   {label(fnKey(k), k)}{" "}
                   <span className="font-mono text-xs">{fnCounts.get(k)}</span>
                 </button>
@@ -451,7 +459,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
       )}
 
       {detail !== null && catalog !== null && (
-        <Modal title={detail.name} onClose={() => setDetail(null)}>
+        <Modal title={cardName(detail, lang)} onClose={() => setDetail(null)}>
           <CardVisual card={detail} setInfo={catalog.sets[detail.set ?? ""] ?? null} />
         </Modal>
       )}

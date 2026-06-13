@@ -14,7 +14,8 @@ import { CardVisual } from "./CardVisual.tsx";
 import { CountRing } from "./CountRing.tsx";
 import { Modal } from "./Modal.tsx";
 import { DECK_SIZE } from "../constants.ts";
-import { loadCatalog, cardById, matchRow, enrichPatch, type Catalog } from "../data/catalog.ts";
+import { loadCatalog, cardById, matchRow, enrichPatch, cardName, type Catalog } from "../data/catalog.ts";
+import { useCardLang } from "../state/cardLang.ts";
 
 const SECTION_ORDER: DeckSection[] = ["pokemon", "trainer", "energy", "unknown"];
 const SECTION_KEY: Record<DeckSection, string> = {
@@ -26,6 +27,7 @@ const SECTION_KEY: Record<DeckSection, string> = {
 
 export function DeckEditor({ deck }: { deck: Deck }) {
   const t = useT();
+  const { lang } = useCardLang();
   const renameDeck = useDeckStore((s) => s.renameDeck);
   const deleteDeck = useDeckStore((s) => s.deleteDeck);
   const addCard = useDeckStore((s) => s.addCard);
@@ -182,7 +184,7 @@ export function DeckEditor({ deck }: { deck: Deck }) {
       </div>
 
       {visualCard !== null && catalog !== null && (
-        <Modal title={visualCard.name} onClose={() => setVisualId(null)}>
+        <Modal title={cardName(visualCard, lang)} onClose={() => setVisualId(null)}>
           <CardVisual card={visualCard} setInfo={catalog.sets[visualCard.set ?? ""] ?? null} />
         </Modal>
       )}
