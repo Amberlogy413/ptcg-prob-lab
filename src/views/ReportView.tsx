@@ -9,6 +9,7 @@ import { computeGrades, computeEnergyCurve } from "../state/q5.ts";
 import { computeQ3Single } from "../state/q3.ts";
 import { useComboResult } from "../state/useComboResult.ts";
 import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
+import { IconLegal, IconWarn, IconIllegal } from "../components/icons.tsx";
 import { buildReportCardSvg, type ReportCardLine } from "../utils/reportCard.ts";
 import { downloadSvgPng } from "../utils/svgPng.ts";
 import { DECK_SIZE } from "../constants.ts";
@@ -205,17 +206,26 @@ export function ReportView() {
           <>
             <div className="grid gap-3 font-mono text-sm sm:grid-cols-3">
               <p>
-                <span className="text-ink2">{t("grade.ideal")}</span>
+                <span className="inline-flex items-center gap-1 text-ink2">
+                  <IconLegal size="sm" className="text-good" />
+                  {t("grade.ideal")}
+                </span>
                 <br />
                 <span className="text-good">{grades.ideal.percent}</span>
               </p>
               <p>
-                <span className="text-ink2">{t("grade.playableOnly")}</span>
+                <span className="inline-flex items-center gap-1 text-ink2">
+                  <IconWarn size="sm" className="text-warn" />
+                  {t("grade.playableOnly")}
+                </span>
                 <br />
                 <span className="text-warn">{grades.playableOnly.percent}</span>
               </p>
               <p>
-                <span className="text-ink2">{t("grade.dead")}</span>
+                <span className="inline-flex items-center gap-1 text-ink2">
+                  <IconIllegal size="sm" className="text-bad" />
+                  {t("grade.dead")}
+                </span>
                 <br />
                 <span className="text-bad">{grades.dead.percent}</span>
               </p>

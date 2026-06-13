@@ -332,3 +332,30 @@
   M3(2026-01-23,全 I 標);**J 標卡全球未發行/TCGdex 未收錄**,故實際可選
   卡池 = H + I + 基礎能量。78 張 G 標 std=true **全部係基礎能量**(永不輪替,
   正確非 bug)。一出 J 標,全自動更新會收。
+
+## 2026-06-14 — 功能性配色 + 人性化小圖示系統(屬性向重設計)
+
+- **背景**:擁有者要「重設配色,全面換成屬性向、直觀、功能性、人性化嘅配色 +
+  極致全面嘅小 icon」。先用 40-agent 級背景工作流(icon-color-coverage-audit)
+  盤點全 app 380 個資訊元素 + 色/icon 缺口,再依清單落地。
+- **設計原則(寫低做規格)**:UI token 仍只用 blue(主動作)+ pink(badge)+
+  good/warn/bad + ink/ink2/line/paper(克制、專業底);**屬性色同功能色係
+  data-encoding 色,inline 用 `cardAccent()`/`fnColor()`,唔入 token**;新 info
+  圖示一律 `stroke=currentColor`,由文字色驅動著色。
+- **功能色光譜(src/data/fnColors.ts)**:紅→橙→金=進攻(attacker/boost/accel);
+  青→藍=引擎(draw/search);紫=特性;洋紅=干擾;靛=防守;綠/橄欖=維持
+  (heal/recover);啡=gust。5 個邊緣色(boost/accel/draw/heal/recover)加深至
+  過 4.5:1 對比(淺紙底)。
+- **FnChip(src/components/FnChip.tsx)**:11 個功能各有原創 stroke icon + 語意色 +
+  i18n label,compact(icon-only+tooltip)模式俾窄位用。鋪到 CardVisual、
+  DeckBuilderDialog 功能過濾、CardPicker 結果列。
+- **info 圖示(src/components/icons.tsx 新增組)**:IconHP(心)/Weakness(下三角)/
+  Resistance(盾)/Retreat(回箭)/Stage(階梯)/Legal(圈剔)/Illegal(圈叉)/
+  Flame(火苗)/Energy(水滴)/Warn(三角驚嘆)/Rotate(循環箭)/ArrowUp/Down。
+  全部 `{className,size}`,`size="sm"` 內聯。`I` wrapper 升級支援 sm。
+- **已接線**:CardVisual(HP 紅心、戰鬥列拆 弱點紅/抗性綠/撤退中性、合法剔/叉)、
+  CardPicker(人氣火苗、HP 心、合法剔/叉、compact 功能 chip)、ReportView 三級評等
+  (理想✓good/可玩⚠warn/報廢✗bad)、DeckEditor+DeckSummary(60 張警告 + 重抽循環
+  + 有效起手剔)、CardRow(輪替出局循環圖示)。**全部限 UI 層,golden 不受影響。**
+- **餘下(下一批)**:TrackerView 三警告、RotationPanel 升跌箭、MidgameView 靶心、
+  DecksView 名次、TrainerView 誤差方向箭;牌組列卡名本地化(loaded deck 顯繁中)。

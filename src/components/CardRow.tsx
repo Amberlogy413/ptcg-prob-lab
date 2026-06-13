@@ -1,5 +1,6 @@
 import { useT } from "../i18n/index.ts";
 import type { DeckCard } from "../state/deckStore.ts";
+import { IconRotate } from "./icons.tsx";
 
 /** Regulation letters offered by the mark select (current era ± buffer). */
 export const REGULATION_MARKS = ["D", "E", "F", "G", "H", "I", "J"] as const;
@@ -27,6 +28,7 @@ export function CardRow({ card, onUpdate, onRemove, rotatingOut, onShowVisual }:
         (rotatingOut ? " opacity-40 line-through" : "")
       }
     >
+      {rotatingOut && <IconRotate size="sm" className="shrink-0 text-warn" />}
       <div className="flex items-center gap-1">
         <button
           type="button"

@@ -6,9 +6,16 @@
  * inside a labelled button.
  */
 
-import type { ReactNode, SVGProps } from "react";
+import type { ReactNode } from "react";
 
-function I({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
+/** Info-icon props: colored by `className` (text color), `sm` for inline use. */
+export interface IconProps {
+  className?: string;
+  size?: "sm" | "md";
+}
+
+function I({ children, size = "md", className = "" }: IconProps & { children: ReactNode }) {
+  const dim = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   return (
     <svg
       viewBox="0 0 16 16"
@@ -19,7 +26,7 @@ function I({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNo
       strokeWidth="1.5"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={"h-4 w-4 shrink-0 " + (props.className ?? "")}
+      className={`${dim} shrink-0 ${className}`}
     >
       {children}
     </svg>
@@ -209,6 +216,135 @@ export function IconSearch() {
     <I>
       <circle cx="7" cy="7" r="4.2" />
       <path d="m10.2 10.2 3.3 3.3" />
+    </I>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Info icons (audit 2026-06-14) — small, color-by-text glyphs that sit beside a
+// data value so players grok it at a glance. All accept {className,size}; pass a
+// text-color class to tint (e.g. text-bad for weakness, text-good for legal).
+
+/** HP — a heart. */
+export function IconHP(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 13.2S3 9.7 3 6.6A2.5 2.5 0 0 1 8 5.1a2.5 2.5 0 0 1 5 1.5C13 9.7 8 13.2 8 13.2Z" />
+    </I>
+  );
+}
+
+/** 弱點 — down triangle over a baseline (takes more damage). */
+export function IconWeakness(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 11 4 5h8L8 11Z" />
+      <path d="M3.5 13.5h9" />
+    </I>
+  );
+}
+
+/** 抗性 — a shield (reduces damage). */
+export function IconResistance(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 2.6 12.8 4.6V8.4c0 3-2.1 4.8-4.8 5.6C5.3 13.2 3.2 11.4 3.2 8.4V4.6L8 2.6Z" />
+    </I>
+  );
+}
+
+/** 撤退 — a back-turning arrow. */
+export function IconRetreat(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M9 4 5 8l4 4" />
+      <path d="M5 8h7" />
+    </I>
+  );
+}
+
+/** 階級 — rising steps (Basic → Stage 1 → Stage 2). */
+export function IconStage(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M3 12.5h3.2v-3h3.2v-3h3.4" />
+    </I>
+  );
+}
+
+/** 合法 — a circled check. */
+export function IconLegal(p: IconProps) {
+  return (
+    <I {...p}>
+      <circle cx="8" cy="8" r="6" />
+      <path d="m5 8 2 2.2 4-4.4" />
+    </I>
+  );
+}
+
+/** 不合法 — a circled cross. */
+export function IconIllegal(p: IconProps) {
+  return (
+    <I {...p}>
+      <circle cx="8" cy="8" r="6" />
+      <path d="M5.5 5.5 10.5 10.5M10.5 5.5 5.5 10.5" />
+    </I>
+  );
+}
+
+/** 人氣 — a flame. */
+export function IconFlame(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 2c1 2.5 4 3.5 4 7a4 4 0 0 1-8 0c0-2 1-3 2-4 0 1 .4 1.8 1 2.2C7.4 5.5 7.5 3.6 8 2Z" />
+    </I>
+  );
+}
+
+/** 能量 — a droplet. */
+export function IconEnergy(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 2.2C10.4 5.2 12 7.3 12 9.4a4 4 0 0 1-8 0c0-2.1 1.6-4.2 4-7.2Z" />
+    </I>
+  );
+}
+
+/** 警告 — a triangle with a bang. */
+export function IconWarn(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 2.8 14 13H2L8 2.8Z" />
+      <path d="M8 6.8v3" />
+      <circle cx="8" cy="11.4" r="0.5" fill="currentColor" />
+    </I>
+  );
+}
+
+/** 重抽／輪替 — a circular return arrow. */
+export function IconRotate(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M12.5 8a4.5 4.5 0 1 1-1.3-3.2" />
+      <path d="M12.5 3.5V6H10" />
+    </I>
+  );
+}
+
+/** Trend up — used for positive pp deltas. */
+export function IconArrowUp(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 12.5v-9M4.5 7 8 3.5 11.5 7" />
+    </I>
+  );
+}
+
+/** Trend down — used for negative pp deltas. */
+export function IconArrowDown(p: IconProps) {
+  return (
+    <I {...p}>
+      <path d="M8 3.5v9M4.5 9 8 12.5 11.5 9" />
     </I>
   );
 }

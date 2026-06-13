@@ -13,6 +13,8 @@ import {
 } from "../data/catalog.ts";
 import { CardVisual } from "./CardVisual.tsx";
 import { CardName } from "./CardName.tsx";
+import { FnChip } from "./FnChip.tsx";
+import { IconFlame, IconHP, IconLegal, IconIllegal } from "./icons.tsx";
 import { cardAccent } from "../data/typeColors.ts";
 
 type Status = "idle" | "loading" | "ready" | "error";
@@ -141,8 +143,12 @@ export function CardPicker({ deckId }: { deckId: string }) {
                           style={{ backgroundColor: cardAccent(card) }}
                         />
                         <CardName card={card} className="min-w-0 flex-1 truncate text-base" />
+                        {(card.fn ?? []).slice(0, 3).map((k) => (
+                          <FnChip key={k} tag={k} compact />
+                        ))}
                         {card.usage !== undefined && (
-                          <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 font-mono text-xs text-pink">
+                          <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-pink px-1.5 py-0.5 font-mono text-xs text-pink">
+                            <IconFlame size="sm" />
                             {t("catalog.usage", { p: card.usage })}
                           </span>
                         )}
@@ -150,18 +156,19 @@ export function CardPicker({ deckId }: { deckId: string }) {
                           {kindBadge(card)}
                         </span>
                         {card.hp !== undefined && (
-                          <span className="shrink-0 font-mono text-xs text-ink2">HP{card.hp}</span>
+                          <span className="inline-flex shrink-0 items-center gap-0.5 font-mono text-xs text-ink2">
+                            <IconHP size="sm" />
+                            {card.hp}
+                          </span>
                         )}
                         <span className="shrink-0 font-mono text-xs text-ink2">
                           {card.set ?? "?"} {card.localId}
                         </span>
-                        <span
-                          className={
-                            "shrink-0 text-xs " + (card.std === true ? "text-good" : "text-ink2")
-                          }
-                        >
-                          {card.std === true ? t("catalog.legal.std") : t("catalog.legal.not")}
-                        </span>
+                        {card.std === true ? (
+                          <IconLegal size="sm" className="shrink-0 text-good" />
+                        ) : (
+                          <IconIllegal size="sm" className="shrink-0 text-ink2" />
+                        )}
                         {addedId === card.id && (
                           <span className="shrink-0 text-xs text-good">{t("catalog.added")}</span>
                         )}

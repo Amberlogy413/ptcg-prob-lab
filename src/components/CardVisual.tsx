@@ -7,6 +7,14 @@ import {
 } from "../data/catalog.ts";
 import { TypeChip } from "./TypeChip.tsx";
 import { FnChip } from "./FnChip.tsx";
+import {
+  IconHP,
+  IconWeakness,
+  IconResistance,
+  IconRetreat,
+  IconLegal,
+  IconIllegal,
+} from "./icons.tsx";
 import { cardAccent } from "../data/typeColors.ts";
 import { useCardName } from "../state/cardLang.ts";
 
@@ -49,7 +57,12 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
             )}
         </span>
         <span className="ml-auto flex items-center gap-1">
-          {card.hp !== undefined && <span className="font-mono text-base">HP {card.hp}</span>}
+          {card.hp !== undefined && (
+            <span className="inline-flex items-center gap-0.5 font-mono text-base">
+              <IconHP className="text-bad" size="sm" />
+              {card.hp}
+            </span>
+          )}
           {(card.types ?? []).map((ty, i) => (
             <TypeChip key={`${ty}${i}`} type={ty} />
           ))}
@@ -112,20 +125,35 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         </div>
       )}
 
-      {/* Combat footer: weakness / resistance / retreat */}
+      {/* Combat footer: weakness (danger red) / resistance (defensive green) / retreat (neutral) */}
       {(card.weaknesses !== undefined ||
         card.resistances !== undefined ||
         card.retreat !== undefined) && (
-        <p className="mt-3 border-t hairline pt-2 text-xs text-ink2">
-          {card.weaknesses !== undefined &&
-            `${t("catalog.weakness")} ${card.weaknesses
-              .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
-              .join("、")}`}
-          {card.resistances !== undefined &&
-            ` · ${t("catalog.resistance")} ${card.resistances
-              .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
-              .join("、")}`}
-          {card.retreat !== undefined && ` · ${t("catalog.retreat")} ${card.retreat}`}
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t hairline pt-2 text-xs">
+          {card.weaknesses !== undefined && (
+            <span className="inline-flex items-center gap-1 text-bad">
+              <IconWeakness size="sm" />
+              {t("catalog.weakness")}{" "}
+              {card.weaknesses
+                .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
+                .join("、")}
+            </span>
+          )}
+          {card.resistances !== undefined && (
+            <span className="inline-flex items-center gap-1 text-good">
+              <IconResistance size="sm" />
+              {t("catalog.resistance")}{" "}
+              {card.resistances
+                .map((w) => `${label(typeKey(w.type), w.type)}${w.value ?? ""}`)
+                .join("、")}
+            </span>
+          )}
+          {card.retreat !== undefined && (
+            <span className="inline-flex items-center gap-1 text-ink2">
+              <IconRetreat size="sm" />
+              {t("catalog.retreat")} {card.retreat}
+            </span>
+          )}
         </p>
       )}
 
@@ -148,13 +176,17 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
             {card.regulationMark}
           </span>
         )}
-        <span className={card.std === true ? "text-good" : ""}>
-          {card.std === true
-            ? t("catalog.legal.std")
-            : card.exp === true
-              ? t("catalog.legal.exp")
-              : t("catalog.legal.not")}
-        </span>
+        {card.std === true ? (
+          <span className="inline-flex items-center gap-1 text-good">
+            <IconLegal size="sm" />
+            {t("catalog.legal.std")}
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1 text-ink2">
+            <IconIllegal size="sm" />
+            {card.exp === true ? t("catalog.legal.exp") : t("catalog.legal.not")}
+          </span>
+        )}
         {card.rarity !== undefined && card.rarity !== "None" && <span>{card.rarity}</span>}
         {card.dexId !== undefined && (
           <span>

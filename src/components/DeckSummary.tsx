@@ -3,6 +3,7 @@ import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import { computeDeckSummary } from "../state/selectors.ts";
 import { PrecisionRuler } from "./PrecisionRuler.tsx";
+import { IconWarn, IconRotate, IconLegal } from "./icons.tsx";
 import { DECK_SIZE } from "../constants.ts";
 
 /**
@@ -40,11 +41,15 @@ export function DeckSummary() {
           </dl>
 
           {summary.total !== DECK_SIZE && summary.total > 0 && (
-            <p className="text-xs text-warn">{t("error.deckCount", { n: summary.total })}</p>
+            <p className="flex items-center gap-1 text-xs text-warn">
+              <IconWarn size="sm" />
+              {t("error.deckCount", { n: summary.total })}
+            </p>
           )}
 
           <div className="border-t hairline pt-3">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-ink2">
+            <h3 className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-ink2">
+              <IconRotate size="sm" />
               {t("summary.mulligan")}
             </h3>
             {summary.status === "tooFewCards" && (
@@ -68,7 +73,10 @@ export function DeckSummary() {
                 />
                 <dl className="mt-2 space-y-1 text-xs">
                   <div className="flex items-baseline justify-between">
-                    <dt className="text-ink2">{t("summary.validHand")}</dt>
+                    <dt className="inline-flex items-center gap-1 text-ink2">
+                      <IconLegal size="sm" className="text-good" />
+                      {t("summary.validHand")}
+                    </dt>
                     <dd className="font-mono">{summary.mulligan.validPercent}</dd>
                   </div>
                   <div className="flex items-baseline justify-between">

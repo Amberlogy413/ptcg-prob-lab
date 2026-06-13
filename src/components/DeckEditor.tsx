@@ -16,6 +16,7 @@ import { Modal } from "./Modal.tsx";
 import { DECK_SIZE } from "../constants.ts";
 import { loadCatalog, cardById, matchRow, enrichPatch, cardName, type Catalog } from "../data/catalog.ts";
 import { useCardLang } from "../state/cardLang.ts";
+import { IconWarn } from "./icons.tsx";
 
 const SECTION_ORDER: DeckSection[] = ["pokemon", "trainer", "energy", "unknown"];
 const SECTION_KEY: Record<DeckSection, string> = {
@@ -125,7 +126,8 @@ export function DeckEditor({ deck }: { deck: Deck }) {
       </div>
 
       {total !== DECK_SIZE && (
-        <p className="mt-3 text-sm text-warn" role="status">
+        <p className="mt-3 flex items-center gap-1.5 text-sm text-warn" role="status">
+          <IconWarn size="sm" />
           {t("error.deckCount", { n: total })}
         </p>
       )}
