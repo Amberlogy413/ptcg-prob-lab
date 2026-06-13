@@ -643,5 +643,18 @@
   "midgame.meaning.down": "One fewer out (x={x0}): {p0} ({d})",
   "midgame.meaning.note": "Reading: if this is the spot you keep losing, the ±1 sensitivity above is the most direct build change — the exact rate shift per extra out is listed.",
   "midgame.invalid": "Invalid parameters: need 1 ≤ w ≤ u, 0 ≤ x ≤ u, k ≥ 1.",
-  "midgame.disclaimer": "Practice and review only — external tools during sanctioned play may violate tournament rules."
+  "midgame.disclaimer": "Practice and review only — external tools during sanctioned play may violate tournament rules.",
+  "midgame.sb.title": "Iono / shuffle-back redraw (exact composite)",
+  "midgame.sb.desc": "Your hand is shuffled into the deck, then you redraw — an exact mixture over three populations (unknown deck, facedown prizes, returned KNOWN hand), verifiable line by line.",
+  "midgame.sb.hint": "Iono: redraw = your remaining prizes; Judge: both redraw 4. Returned outs go into the returned-hand field, not into the unseen count.",
+  "midgame.sb.D": "Deck size D (pre-shuffle)",
+  "midgame.sb.p": "Prizes left p",
+  "midgame.sb.xU": "Unseen outs x (deck+prizes)",
+  "midgame.sb.xH": "Outs in the returned hand",
+  "midgame.sb.h": "Returned hand size h",
+  "midgame.sb.draw": "Cards redrawn",
+  "midgame.sb.k": "Need at least k",
+  "midgame.sb.ruler": "Shuffle-back probability ruler",
+  "midgame.sb.invalid": "Invalid parameters: outs cannot exceed their population; need 1 ≤ draw ≤ D+h.",
+  "midgame.sb.meaning": "After the shuffle these {draw} draws recover at least {k} out(s) with probability {p} — about 1 success per {oneIn} such spots."
 }

@@ -12,7 +12,7 @@ import App from "../src/App.tsx";
 import { viewReady } from "./helpers.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
-import { computeMidgame } from "../src/state/midgame.ts";
+import { computeMidgame, computeShuffleBack } from "../src/state/midgame.ts";
 
 beforeEach(() => {
   localStorage.clear();
@@ -41,6 +41,21 @@ describe("computeMidgame (selector)", () => {
   });
 });
 
+describe("computeShuffleBack (奇樹/裁判 composite)", () => {
+  it("matches the golden Iono anchor and lists every mixture term", () => {
+    // Golden case shuffle_D16_p4_h5_d4: 907456/1705725.
+    const r = computeShuffleBack({ D: 16, p: 4, xU: 3, xH: 1, h: 5, draw: 4, k: 1 });
+    expect(r.fraction).toBe("907456/1705725");
+    expect(r.percent).toBe("53.200604%");
+    // One mixture line per possible deck count j = 0..3, plus header + total.
+    expect(r.derivation.filter((l) => l.includes("j="))).toHaveLength(4);
+    expect(r.derivation.some((l) => l.includes("907456/1705725"))).toBe(true);
+    // Sensitivity rows exist on both sides.
+    expect(r.up?.x).toBe(4);
+    expect(r.down?.x).toBe(2);
+  });
+});
+
 describe("中局 view", () => {
   it("computes from inputs and shows derivation + meaning", async () => {
     const user = userEvent.setup();
@@ -55,7 +70,7 @@ describe("中局 view", () => {
     expect(await screen.findByText("30.000000%")).toBeInTheDocument();
     expect(screen.getByText(/3\/10 · 1 in 3\.333/)).toBeInTheDocument();
 
-    await user.click(screen.getByText("展開推導明細 ▾"));
+    await user.click(screen.getAllByText("展開推導明細 ▾")[0]!);
     expect(screen.getByText(/C\(25,2\) = 300/)).toBeInTheDocument();
     expect(screen.getByText(/P = 1 − 210\/300 = 3\/10/)).toBeInTheDocument();
 
@@ -63,6 +78,18 @@ describe("中局 view", () => {
     expect(screen.getByText(/大約 1 in 3\.333 次處境成功 1 次/)).toBeInTheDocument();
     expect(screen.getByText(/x=5.*36\.666667%.*\+6\.67pp/)).toBeInTheDocument();
     expect(screen.getByText(/練習與覆盤限定/)).toBeInTheDocument();
+  });
+
+  it("shuffle-back panel computes the Iono anchor with defaults", async () => {
+    render(<App />);
+    await viewReady();
+    // Defaults are exactly the golden Iono case.
+    expect(await screen.findByText("53.200604%")).toBeInTheDocument();
+    expect(screen.getAllByText(/907456\/1705725/).length).toBeGreaterThanOrEqual(1);
+    // Tightening the threshold to k=2 changes the exact number.
+    fireEvent.change(screen.getByLabelText("至少要中 k"), { target: { value: "2" } });
+    expect(await screen.findByText(/洗回後這 4 抽/)).toBeInTheDocument();
+    expect(screen.queryByText("53.200604%")).toBeNull();
   });
 
   it("rejects impossible parameter combinations gracefully", async () => {

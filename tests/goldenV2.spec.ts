@@ -19,6 +19,7 @@ import { searchFoldValid } from "../src/lib/probx/fold.ts";
 import { optimizeAllocations, type OptimizerCandidate } from "../src/lib/probx/optimizer.ts";
 import { midgameAtLeast } from "../src/lib/probx/midgame.ts";
 import { prizePosterior } from "../src/lib/probx/prizesLeft.ts";
+import { shuffleBackRedraw } from "../src/lib/probx/shuffleBack.ts";
 
 interface V2Case {
   id: string;
@@ -157,6 +158,21 @@ describe("golden v2 vectors (independent Python reference)", () => {
         expect.soft(fractionStr(r.next), `${c.id} :: next`).toBe(exp.next);
         expect.soft(fractionStr(r.atLeastOne), `${c.id} :: al1`).toBe(exp.al1);
         expect.soft(decimalStr(r.atLeastOne, 15), `${c.id} :: al1_dec`).toBe(exp.al1_dec);
+      } else if (c.kind === "shuffle_back_redraw") {
+        const p = c.params as {
+          D: number;
+          p: number;
+          unseen: number[];
+          returned: number[];
+          h: number;
+          draw: number;
+          mins: number[];
+          maxs: number[];
+        };
+        const exp = c.expect as { p: string; p_dec: string };
+        const r = shuffleBackRedraw(p);
+        expect.soft(fractionStr(r), `${c.id} :: p`).toBe(exp.p);
+        expect.soft(decimalStr(r, 15), `${c.id} :: p_dec`).toBe(exp.p_dec);
       } else {
         throw new Error(`no verifier for v2 kind '${c.kind}'`);
       }

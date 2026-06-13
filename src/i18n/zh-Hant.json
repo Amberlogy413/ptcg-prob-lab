@@ -643,5 +643,18 @@
   "midgame.meaning.down": "少 1 張解(x={x0}):{p0}({d})",
   "midgame.meaning.note": "判讀:若這個位置是你常輸的位置,上面的 ±1 張敏感度就是最直接的改牌依據——每加一張同類解,這一刻的成功率變化已精確列出。",
   "midgame.invalid": "參數不合法:需要 1 ≤ w ≤ u、0 ≤ x ≤ u、k ≥ 1。",
-  "midgame.disclaimer": "練習與覆盤限定——正式比賽中使用外部工具可能違反賽事規定。"
+  "midgame.disclaimer": "練習與覆盤限定——正式比賽中使用外部工具可能違反賽事規定。",
+  "midgame.sb.title": "奇樹/洗回重抽(精確複合)",
+  "midgame.sb.desc": "手牌被洗入牌庫後重抽——三個族群(未知牌庫、未翻獎賞、被洗回的已知手牌)的精確混合,逐項可驗算。",
+  "midgame.sb.hint": "奇樹:重抽張數 = 你的獎賞卡剩數;裁判:雙方各重抽 4 張。被洗回的解記入「洗回手牌中的解」,不要再算進未見解。",
+  "midgame.sb.D": "牌庫張數 D(洗回前)",
+  "midgame.sb.p": "獎賞卡剩 p",
+  "midgame.sb.xU": "未見解 x(牌庫+獎賞)",
+  "midgame.sb.xH": "洗回手牌中的解",
+  "midgame.sb.h": "洗回手牌張數 h",
+  "midgame.sb.draw": "重抽張數",
+  "midgame.sb.k": "至少要中 k",
+  "midgame.sb.ruler": "洗回重抽概率量尺",
+  "midgame.sb.invalid": "參數不合法:解不可多於所屬族群,重抽張數需 1 ≤ draw ≤ D+h。",
+  "midgame.sb.meaning": "洗回後這 {draw} 抽,有 {p} 概率至少拿回 {k} 張解——大約 {oneIn} 次處境成功 1 次。"
 }

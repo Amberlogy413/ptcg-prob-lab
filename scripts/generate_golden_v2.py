@@ -473,6 +473,98 @@ for spec in PRIZE_P_CASES:
         }
     )
 
+# ---------------------------------------------------------------------------
+# Shuffle-back redraw (奇樹/裁判; docs/09 #53, math audit 2026-06-12).
+# Three populations: the D unknown deck cards (a uniform D-subset of the
+# unseen pool U, |U| = D + p with p facedown prizes), the h KNOWN hand cards
+# shuffled back into the deck, then `draw` cards drawn from the new D + h
+# deck. For tracked categories with `unseen` copies in U and `returned`
+# copies in the shuffled-back hand:
+#   P(event) = Σ_js multiHG(u, unseen, D, js)
+#              · Σ_{ks: min≤ks≤max} multiHG(D+h, js+returned, draw, ks)
+# ---------------------------------------------------------------------------
+
+
+def enum_vectors(maxes, cap):
+    def rec(i, acc, s):
+        if i == len(maxes):
+            yield tuple(acc)
+            return
+        for v in range(0, min(maxes[i], cap - s) + 1):
+            acc.append(v)
+            yield from rec(i + 1, acc, s + v)
+            acc.pop()
+
+    yield from rec(0, [], 0)
+
+
+def shuffle_back_redraw(D, p, unseen, returned, h, draw, mins, maxs):
+    u = D + p
+    assert sum(unseen) <= u and sum(returned) <= h and draw <= D + h
+    total = Fraction(0)
+    norm = Fraction(0)
+    for js in enum_vectors([min(x, D) for x in unseen], D):
+        pj = multi_hg(u, list(unseen), D, list(js))
+        if pj == 0:
+            continue
+        norm += pj
+        merged = [js[i] + returned[i] for i in range(len(unseen))]
+        inner = Fraction(0)
+        for ks in enum_vectors([min(m, draw) for m in merged], draw):
+            q = multi_hg(D + h, merged, draw, list(ks))
+            if q == 0:
+                continue
+            if all(mins[i] <= ks[i] <= maxs[i] for i in range(len(ks))):
+                inner += q
+        total += pj * inner
+    assert norm == 1, "deck-split mixture must sum to 1"
+    return total
+
+
+SHUFFLE_CASES = [
+    # Iono: u=20 unseen (D=16 deck + p=4 prizes), 3 outs unseen, 1 out among
+    # the 5 returned hand cards, redraw 4 (= own prizes left), want >= 1.
+    {"D": 16, "p": 4, "unseen": [3], "returned": [1], "h": 5, "draw": 4, "mins": [1], "maxs": [4]},
+    # Two tracked categories jointly (combo after the shuffle).
+    {"D": 12, "p": 2, "unseen": [2, 3], "returned": [1, 0], "h": 4, "draw": 3, "mins": [1, 1], "maxs": [3, 3]},
+    # h=0 degeneration — must equal the plain unseen-pool window.
+    {"D": 10, "p": 4, "unseen": [4], "returned": [0], "h": 0, "draw": 3, "mins": [1], "maxs": [3]},
+    # p=0: the deck IS the unseen pool; both returned copies wanted back.
+    {"D": 8, "p": 0, "unseen": [2], "returned": [2], "h": 6, "draw": 2, "mins": [2], "maxs": [2]},
+    # Avoid case: probability the redraw dodges the card entirely.
+    {"D": 15, "p": 6, "unseen": [3], "returned": [2], "h": 7, "draw": 6, "mins": [0], "maxs": [0]},
+]
+
+for spec in SHUFFLE_CASES:
+    pr = shuffle_back_redraw(
+        spec["D"], spec["p"], spec["unseen"], spec["returned"], spec["h"], spec["draw"], spec["mins"], spec["maxs"]
+    )
+
+    if spec["h"] == 0 and len(spec["unseen"]) == 1 and spec["draw"] <= spec["D"]:
+        # Nested exchangeability: drawing from a uniform deck-subset of U is
+        # a uniform draw from U.
+        direct = hyper_at_least(
+            spec["D"] + spec["p"], spec["unseen"][0], spec["draw"], spec["mins"][0]
+        )
+        assert pr == direct, "h=0 degeneration failed"
+    if spec["p"] == 0:
+        # Deck composition is certain: a single direct multivariate draw.
+        merged = [spec["unseen"][i] + spec["returned"][i] for i in range(len(spec["unseen"]))]
+        direct = Fraction(0)
+        for ks in enum_vectors([min(m, spec["draw"]) for m in merged], spec["draw"]):
+            if all(spec["mins"][i] <= ks[i] <= spec["maxs"][i] for i in range(len(ks))):
+                direct += multi_hg(spec["D"] + spec["h"], merged, spec["draw"], list(ks))
+        assert pr == direct, "p=0 degeneration failed"
+
+    cases.append(
+        {
+            "id": "shuffle_D{D}_p{p}_h{h}_d{draw}".format(**spec),
+            "kind": "shuffle_back_redraw",
+            "params": dict(spec),
+            "expect": {"p": frac_str(pr), "p_dec": dec15(pr)},
+        }
+    )
+
 
 out = {
     "meta": {

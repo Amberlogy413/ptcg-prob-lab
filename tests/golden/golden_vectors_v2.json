@@ -688,6 +688,140 @@
     "al1": "0/1",
     "al1_dec": "0.000000000000000"
    }
+  },
+  {
+   "id": "shuffle_D16_p4_h5_d4",
+   "kind": "shuffle_back_redraw",
+   "params": {
+    "D": 16,
+    "p": 4,
+    "unseen": [
+     3
+    ],
+    "returned": [
+     1
+    ],
+    "h": 5,
+    "draw": 4,
+    "mins": [
+     1
+    ],
+    "maxs": [
+     4
+    ]
+   },
+   "expect": {
+    "p": "907456/1705725",
+    "p_dec": "0.532006038488033"
+   }
+  },
+  {
+   "id": "shuffle_D12_p2_h4_d3",
+   "kind": "shuffle_back_redraw",
+   "params": {
+    "D": 12,
+    "p": 2,
+    "unseen": [
+     2,
+     3
+    ],
+    "returned": [
+     1,
+     0
+    ],
+    "h": 4,
+    "draw": 3,
+    "mins": [
+     1,
+     1
+    ],
+    "maxs": [
+     3,
+     3
+    ]
+   },
+   "expect": {
+    "p": "7731/50960",
+    "p_dec": "0.151707221350078"
+   }
+  },
+  {
+   "id": "shuffle_D10_p4_h0_d3",
+   "kind": "shuffle_back_redraw",
+   "params": {
+    "D": 10,
+    "p": 4,
+    "unseen": [
+     4
+    ],
+    "returned": [
+     0
+    ],
+    "h": 0,
+    "draw": 3,
+    "mins": [
+     1
+    ],
+    "maxs": [
+     3
+    ]
+   },
+   "expect": {
+    "p": "61/91",
+    "p_dec": "0.670329670329670"
+   }
+  },
+  {
+   "id": "shuffle_D8_p0_h6_d2",
+   "kind": "shuffle_back_redraw",
+   "params": {
+    "D": 8,
+    "p": 0,
+    "unseen": [
+     2
+    ],
+    "returned": [
+     2
+    ],
+    "h": 6,
+    "draw": 2,
+    "mins": [
+     2
+    ],
+    "maxs": [
+     2
+    ]
+   },
+   "expect": {
+    "p": "6/91",
+    "p_dec": "0.065934065934066"
+   }
+  },
+  {
+   "id": "shuffle_D15_p6_h7_d6",
+   "kind": "shuffle_back_redraw",
+   "params": {
+    "D": 15,
+    "p": 6,
+    "unseen": [
+     3
+    ],
+    "returned": [
+     2
+    ],
+    "h": 7,
+    "draw": 6,
+    "mins": [
+     0
+    ],
+    "maxs": [
+     0
+    ]
+   },
+   "expect": {
+    "p": "142390/583737",
+    "p_dec": "0.243928344442788"
+   }
   }
  ]
 }

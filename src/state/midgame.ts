@@ -15,9 +15,12 @@ import {
   oneInStr,
   decimalStr,
   toChartNumber,
+  hypergeomPmf,
+  hypergeomAtLeast,
   type Rat,
 } from "../lib/prob/index.ts";
 import { midgameAtLeast, type MidgameParams } from "../lib/probx/midgame.ts";
+import { shuffleBackRedraw } from "../lib/probx/shuffleBack.ts";
 
 export interface MidgameSensitivity {
   /** Outs count this row describes (x−1 or x+1). */
@@ -79,6 +82,73 @@ export function computeMidgame(params: MidgameParams): MidgameDisplay {
   if (x - 1 >= 0) {
     const pDown = midgameAtLeast({ ...params, x: x - 1 });
     out.down = { x: x - 1, percent: percentStr(pDown, 6), deltaPp: ppDelta(sub(pDown, p)) };
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// 奇樹/裁判 shuffle-back redraw (docs/09 #53) — single tracked card display.
+
+export interface ShuffleBackInput {
+  /** Unknown deck cards before the shuffle. */
+  D: number;
+  /** Facedown prizes. */
+  p: number;
+  /** Copies among the unseen pool (deck + prizes). */
+  xU: number;
+  /** Copies among the shuffled-back hand. */
+  xH: number;
+  /** Returned hand size. */
+  h: number;
+  /** Cards redrawn from the new deck. */
+  draw: number;
+  /** Want at least k among the redraw. */
+  k: number;
+}
+
+export function computeShuffleBack(input: ShuffleBackInput): MidgameDisplay {
+  const { D, p, xU, xH, h, draw, k } = input;
+  const run = (xu: number): Rat =>
+    shuffleBackRedraw({
+      D,
+      p,
+      unseen: [xu],
+      returned: [xH],
+      h,
+      draw,
+      mins: [k],
+      maxs: [draw],
+    });
+  const total = run(xU);
+  const u = D + p;
+
+  // 推導明細: mixture over how many of the unseen copies hide in the deck.
+  // Single category ⇒ each term is a plain hypergeometric product.
+  const derivation = [
+    `P = Σ_j P(牌庫藏 j 張) · P(重抽≥${k} | 新牌庫 ${D + h} 張、解 j+${xH})`,
+    `  j ~ HG(u=${u}, x=${xU}, D=${D})`,
+  ];
+  for (let j = 0; j <= Math.min(xU, D); j++) {
+    const pj = hypergeomPmf(u, xU, D, j);
+    const inner = hypergeomAtLeast(D + h, j + xH, draw, k);
+    derivation.push(`  j=${j}: ${fractionStr(pj)} × ${fractionStr(inner)}`);
+  }
+  derivation.push(`合計 = ${fractionStr(total)} = ${percentStr(total, 6)} = ${oneInStr(total, 3)}`);
+
+  const out: MidgameDisplay = {
+    percent: percentStr(total, 6),
+    fraction: fractionStr(total),
+    oneIn: oneInStr(total, 3),
+    chart: toChartNumber(total),
+    derivation,
+  };
+  if (xU + 1 <= u) {
+    const up = run(xU + 1);
+    out.up = { x: xU + 1, percent: percentStr(up, 6), deltaPp: ppDelta(sub(up, total)) };
+  }
+  if (xU - 1 >= 0) {
+    const down = run(xU - 1);
+    out.down = { x: xU - 1, percent: percentStr(down, 6), deltaPp: ppDelta(sub(down, total)) };
   }
   return out;
 }
