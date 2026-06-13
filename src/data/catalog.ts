@@ -64,9 +64,11 @@ export interface CatalogCard {
    *  (pipeline classify(); keys: search/draw/accel/heal/disrupt/gust/recover/
    *  protect/boost/attacker/ability). */
   fn?: string[];
-  /** 熱門排名 (1 = hottest): curated seed + reprint-count proxy until the
-   *  Phase 11 tournament pipeline; lower sorts first, absent sorts last. */
+  /** 熱門排名 (1 = hottest) from REAL tournament inclusion rate (Limitless,
+   *  scripts/fetch_meta.mjs); lower sorts first, absent sorts last. */
   pop?: number;
+  /** Real inclusion rate: % of sampled tournament decks that play this card. */
+  usage?: number;
   set: string | null;
 }
 
@@ -87,6 +89,14 @@ export interface Catalog {
   format?: { standard: string[]; effective: string; source?: string };
   /** Newest set in the snapshot — honesty line for data freshness. */
   newest?: { id: string; name: string; date: string | null };
+  /** Real popularity sample provenance (Limitless tournament decklists). */
+  meta?: {
+    source: string;
+    sampleDecks: number;
+    tournaments: number;
+    dateFrom: string;
+    dateTo: string;
+  };
   sets: Record<string, CatalogSet>;
   cards: CatalogCard[];
 }
@@ -198,6 +208,35 @@ export function sortPrints(catalog: Catalog, cards: CatalogCard[]): CatalogCard[
     const db = catalog.sets[b.set ?? ""]?.date ?? "";
     if (da !== db) return da < db ? 1 : -1;
     return a.id < b.id ? -1 : 1;
+  });
+}
+
+/**
+ * Collapse a print-level list to one entry per card NAME (owner request,
+ * 2026-06-12): the representative is the best print (popular → std → newest,
+ * via sortPrints), and every same-name print is kept for a quick picker. The
+ * group order follows the input order of each name's first appearance, so a
+ * popularity- or relevance-sorted input stays sorted.
+ */
+export interface PrintGroup {
+  rep: CatalogCard;
+  prints: CatalogCard[];
+}
+export function groupByName(catalog: Catalog, cards: CatalogCard[]): PrintGroup[] {
+  const order: string[] = [];
+  const byName = new Map<string, CatalogCard[]>();
+  for (const c of cards) {
+    let g = byName.get(c.name);
+    if (g === undefined) {
+      g = [];
+      byName.set(c.name, g);
+      order.push(c.name);
+    }
+    g.push(c);
+  }
+  return order.map((name) => {
+    const prints = sortPrints(catalog, byName.get(name) as CatalogCard[]);
+    return { rep: prints[0] as CatalogCard, prints };
   });
 }
 

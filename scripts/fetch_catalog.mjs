@@ -370,7 +370,7 @@ async function main() {
   sanityPass(cards);
   applyFormat(cards);
   for (const c of cards) classify(c);
-  await applyPopularity(cards);
+  const metaProvenance = await applyMeta(cards);
   const fnTally = new Map();
   for (const c of cards) for (const k of c.fn ?? []) fnTally.set(k, (fnTally.get(k) ?? 0) + 1);
   console.log(
@@ -400,6 +400,7 @@ async function main() {
     count: cards.length,
     format: FORMAT_META,
     newest: { id: newestEntry[0], name: newestEntry[1].name, date: newestEntry[1].date },
+    ...(metaProvenance !== null ? { meta: metaProvenance } : {}),
     sets,
     cards,
   };
@@ -418,40 +419,39 @@ async function main() {
 }
 
 /**
- * Popularity ranks (揀卡熱門排前): a curated seed list of current staples,
- * then Trainer/Energy names ranked by REPRINT COUNT — an honest, fully
- * data-derived proxy (cards reprinted 10+ times are staples by definition)
- * until the Phase 11 tournament pipeline replaces it. The UI labels the
- * source. Rank is stamped as `pop` on every print of a ranked name.
+ * REAL popularity (揀卡熱門排前) — stamp `pop` rank + `usage` % onto cards from
+ * scripts/meta_usage.json, which is computed by fetch_meta.mjs purely from
+ * public tournament decklists (Limitless). NO GUESSING: if meta_usage.json is
+ * absent, no card gets a rank (the sort falls back to std + newest). Returns
+ * the sample provenance for the catalog payload, or null when unavailable.
  */
-async function applyPopularity(cards) {
-  const seedPath = path.join(ROOT, "scripts", "popularity_seed.json");
-  const seed = JSON.parse(await readFile(seedPath, "utf8"));
-  const baseName = (n) => n.split("(")[0].split("(")[0].trim();
-  const rankByBase = new Map(seed.names.map((n, i) => [n, i + 1]));
-
-  const reprints = new Map();
-  for (const c of cards) {
-    if (c.category === "Pokemon") continue;
-    const b = baseName(c.name);
-    if (rankByBase.has(b)) continue;
-    reprints.set(b, (reprints.get(b) ?? 0) + 1);
+async function applyMeta(cards) {
+  const metaPath = path.join(ROOT, "scripts", "meta_usage.json");
+  if (!existsSync(metaPath)) {
+    console.log("  meta: scripts/meta_usage.json absent — no popularity stamped (run fetch_meta.mjs)");
+    return null;
   }
-  const proxy = [...reprints.entries()]
-    .filter(([, n]) => n >= 4)
-    .sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
-  let next = seed.names.length + 1;
-  for (const [b] of proxy) rankByBase.set(b, next++);
-
+  const meta = JSON.parse(await readFile(metaPath, "utf8"));
+  // rank 1 = highest inclusion rate.
+  const usageByName = new Map();
+  meta.cards.forEach((c, i) => usageByName.set(c.zh, { rank: i + 1, pct: c.pct }));
   let stamped = 0;
   for (const c of cards) {
-    const r = rankByBase.get(baseName(c.name));
-    if (r !== undefined) {
-      c.pop = r;
+    const u = usageByName.get(c.name);
+    if (u !== undefined) {
+      c.pop = u.rank;
+      c.usage = u.pct;
       stamped += 1;
     }
   }
-  console.log(`  popularity: ${rankByBase.size} ranked names → ${stamped} prints stamped`);
+  console.log(`  meta: ${meta.cards.length} real-usage names → ${stamped} prints stamped (sample ${meta.meta.sampleDecks} decks)`);
+  return {
+    source: meta.meta.source,
+    sampleDecks: meta.meta.sampleDecks,
+    tournaments: meta.meta.tournaments,
+    dateFrom: meta.meta.dateFrom,
+    dateTo: meta.meta.dateTo,
+  };
 }
 
 /** Tiny promise pool: run fn over items with at most n in flight. */

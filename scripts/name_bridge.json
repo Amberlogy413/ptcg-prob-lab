@@ -1,0 +1,31 @@
+{
+  "note": "Verified EN→zh-tw FACT translations for Trainer/Energy staples (illustrator overlap is unreliable for non-Pokémon). Each zh name is existence-checked against the catalog by fetch_meta.mjs; any not found is dropped. These are factual card-name translations — the popularity numbers themselves come only from real tournament data. Only UNAMBIGUOUS staples are listed; ambiguous names (e.g. Professor's Research has multiple zh variants) are deliberately omitted rather than guessed.",
+  "map": {
+    "Ultra Ball": "超級球",
+    "Nest Ball": "巢穴球",
+    "Rare Candy": "神奇糖果",
+    "Switch": "寶可夢交替",
+    "Iono": "奇樹",
+    "Judge": "裁判",
+    "Energy Switch": "能量轉移",
+    "Energy Retrieval": "能量回收",
+    "Potion": "傷藥",
+    "Counter Catcher": "計數捕獲網",
+    "Earthen Vessel": "大地之壺",
+    "Super Rod": "厲害釣竿",
+    "Boss's Orders": "老大的指令（坂木）",
+    "Pokégear 3.0": "寶可夢手錶 3.0",
+    "Great Ball": "高級球",
+    "Level Ball": "等級球",
+    "Ordinary Rod": "普通釣竿",
+    "Air Balloon": "氣球",
+    "Basic Grass Energy": "基本草能量",
+    "Basic Fire Energy": "基本火能量",
+    "Basic Water Energy": "基本水能量",
+    "Basic Lightning Energy": "基本雷能量",
+    "Basic Psychic Energy": "基本超能量",
+    "Basic Fighting Energy": "基本鬥能量",
+    "Basic Darkness Energy": "基本惡能量",
+    "Basic Metal Energy": "基本鋼能量"
+  }
+}

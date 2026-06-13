@@ -8,6 +8,7 @@ import {
   loadCatalog,
   toNewCardInput,
   sortPrints,
+  groupByName,
   stageKey,
   trainerTypeKey,
   energyTypeKey,
@@ -126,12 +127,15 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     () => (activeFn === null ? pool3 : pool3.filter((c) => (c.fn ?? []).includes(activeFn))),
     [pool3, activeFn],
   );
+  // One tile per card NAME (owner request); same-name prints via a per-tile
+  // version select. Sorted by popularity/std/newest through groupByName.
   const results = useMemo(() => {
     if (catalog === null) return [];
     const q = search.trim().toLowerCase();
     const hits = q === "" ? pool4 : pool4.filter((c) => c.name.toLowerCase().includes(q));
-    return sortPrints(catalog, hits);
+    return groupByName(catalog, sortPrints(catalog, hits));
   }, [catalog, pool4, search]);
+  const [printChoice, setPrintChoice] = useState<Record<string, string>>({});
 
   const countBy = (cards: CatalogCard[], pick: (c: CatalogCard) => string | undefined) => {
     const m = new Map<string, number>();
@@ -343,17 +347,17 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
               aria-label={t("catalog.results.aria")}
               className="mt-2 grid max-h-96 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4"
             >
-              {results.slice(0, GRID_CAP).map((card) => {
+              {results.slice(0, GRID_CAP).map(({ rep, prints }) => {
+                const card = prints.find((p) => p.id === printChoice[rep.name]) ?? rep;
                 const kind = kindOf(card);
-                const owned = nameTotals.get(card.name) ?? 0;
-                // The label REPLACES inner text for AT — carry the facts a
-                // sighted user reads off the tile (owned count, legality).
+                const owned = nameTotals.get(rep.name) ?? 0;
                 const addLabel =
                   t("catalog.addAria", { name: card.name, id: card.id }) +
+                  (card.usage !== undefined ? `,${t("catalog.usageAria", { p: card.usage })}` : "") +
                   (owned > 0 ? `,${t("builder.copies", { n: owned })}` : "") +
                   (card.std !== true ? `,${t("catalog.legal.not")}` : "");
                 return (
-                  <li key={card.id} className="rounded-ctl border hairline bg-surface p-2">
+                  <li key={rep.name} className="rounded-ctl border hairline bg-surface p-2">
                     <button
                       type="button"
                       aria-label={addLabel}
@@ -377,30 +381,44 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                         <span className="rounded-ctl border hairline px-1 py-0.5">
                           {label(kind.key, kind.raw)}
                         </span>
-                        {card.pop !== undefined && card.pop <= 40 && (
-                          <span className="rounded-full border border-pink px-1.5 py-0.5 text-pink">
-                            {t("catalog.pop")}
+                        {card.usage !== undefined && (
+                          <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
+                            {t("catalog.usage", { p: card.usage })}
                           </span>
                         )}
                         {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}
                         <span className="font-mono">
                           {card.set ?? "?"} {card.localId}
                         </span>
-                        {card.regulationMark !== undefined && (
-                          <span className="font-mono">{card.regulationMark}</span>
-                        )}
                         {card.std !== true && <span>{t("catalog.legal.not")}</span>}
                       </span>
                     </button>
-                    <button
-                      type="button"
-                      aria-label={t("catalog.detailAria", { name: card.name })}
-                      aria-haspopup="dialog"
-                      onClick={() => setDetail(card)}
-                      className="mt-2 h-9 w-full rounded-ctl border hairline bg-surface text-sm text-ink2 hover:text-ink"
-                    >
-                      ⓘ
-                    </button>
+                    <div className="mt-2 flex gap-1">
+                      {prints.length > 1 && (
+                        <select
+                          aria-label={t("catalog.version", { name: rep.name })}
+                          value={card.id}
+                          onChange={(e) => setPrintChoice((m) => ({ ...m, [rep.name]: e.target.value }))}
+                          className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-1 font-mono text-xs text-ink2"
+                        >
+                          {prints.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.set ?? "?"} {p.localId}
+                              {p.std === true ? " ✓" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button
+                        type="button"
+                        aria-label={t("catalog.detailAria", { name: rep.name })}
+                        aria-haspopup="dialog"
+                        onClick={() => setDetail(card)}
+                        className="h-9 shrink-0 rounded-ctl border hairline bg-surface px-3 text-sm text-ink2 hover:text-ink"
+                      >
+                        ⓘ
+                      </button>
+                    </div>
                   </li>
                 );
               })}
@@ -417,10 +435,13 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                 marks: catalog.format.standard.join("/"),
                 date: catalog.format.effective,
               }) + " · "}
-            {catalog.newest !== undefined &&
-              t("catalog.freshness", { date: catalog.fetchedAt, newest: catalog.newest.name }) +
-                " · "}
-            {t("catalog.source")} {t("catalog.popSource")}
+            {catalog.meta !== undefined &&
+              t("catalog.metaSource", {
+                n: catalog.meta.sampleDecks,
+                from: catalog.meta.dateFrom,
+                to: catalog.meta.dateTo,
+              }) + " · "}
+            {t("catalog.source")}
           </p>
         </>
       )}

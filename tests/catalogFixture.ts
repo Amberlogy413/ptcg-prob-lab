@@ -72,6 +72,7 @@ export function makeCatalogFixture(): Catalog {
       std: true,
       fn: ["draw"],
       pop: 1,
+      usage: 89.7,
       set: "SV9",
     },
     {
@@ -101,6 +102,13 @@ export function makeCatalogFixture(): Catalog {
     source: "TCGdex",
     fetchedAt: "2026-06-12",
     count: cards.length,
+    meta: {
+      source: "Limitless TCG tournament decklists (play.limitlesstcg.com)",
+      sampleDecks: 4212,
+      tournaments: 53,
+      dateFrom: "2026-06-05",
+      dateTo: "2026-06-13",
+    },
     sets: {
       SV9: { name: "對戰搭檔", serie: "朱&紫系列", date: "2025-02-07", official: 100 },
       S11: { name: "舊系列", serie: "劍&盾系列", date: "2022-07-15", official: 100 },

@@ -65,16 +65,21 @@ describe("layered deck builder", () => {
     expect(screen.queryByRole("button", { name: "加入 綠毛蟲(S11-001)" })).toBeNull();
   });
 
-  it("std toggle reveals rotated prints (legality spoken in the label)", async () => {
+  it("std off: same-name prints collapse to one tile with a version select", async () => {
     useDeckStore.getState().importDeck("錨點", anchorDeckRows());
     const user = await openBuilder();
     await user.click(screen.getByRole("checkbox", { name: "只看標準賽制" }));
     await user.click(await screen.findByRole("button", { name: /^寶可夢 5$/ }));
     await user.click(await screen.findByRole("button", { name: /^基礎 3$/ }));
     await user.click(await screen.findByRole("button", { name: /^草 2$/ }));
-    expect(
-      screen.getByRole("button", { name: "加入 綠毛蟲(S11-001),非標準" }),
-    ).toBeInTheDocument();
+    // 綠毛蟲 has two prints but ONE tile; the rotated S11 print lives in the
+    // version select, not as a second add button.
+    const adds = screen.getAllByRole("button", { name: /^加入 綠毛蟲/ });
+    expect(adds).toHaveLength(1);
+    const select = screen.getByLabelText("選擇版本:綠毛蟲") as HTMLSelectElement;
+    const opts = [...select.options].map((o) => o.value);
+    expect(opts).toContain("SV9-001");
+    expect(opts).toContain("S11-001");
   });
 
   it("re-enabling std clears a sub filter whose chip vanished", async () => {
@@ -143,16 +148,16 @@ describe("layered deck builder", () => {
     expect(screen.getByRole("button", { name: /^加入 水水獺\(SV9-050\)/ })).toBeInTheDocument();
   });
 
-  it("熱門 cards rank first in the grid and wear the badge", async () => {
+  it("real-usage cards rank first in the grid and wear the % badge", async () => {
     useDeckStore.getState().importDeck("錨點", anchorDeckRows());
     await openBuilder();
     const grid = await screen.findByRole("list", { name: "卡牌搜尋結果" });
     const tiles = within(grid).getAllByRole("listitem");
-    // 調換票 carries pop:1 → first tile despite alphabetic/date order.
+    // 調換票 carries real usage 89.7% → first tile despite alphabetic/date order.
     expect(
       within(tiles[0]!).getByRole("button", { name: /^加入 調換票/ }),
     ).toBeInTheDocument();
-    expect(within(tiles[0]!).getByText("熱門")).toBeInTheDocument();
+    expect(within(tiles[0]!).getByText("89.7%採用")).toBeInTheDocument();
   });
 
   it("ⓘ in the grid opens the full card visual", async () => {

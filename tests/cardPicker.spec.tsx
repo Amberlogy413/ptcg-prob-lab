@@ -60,6 +60,8 @@ const FIXTURE: Catalog = {
       effect: "數過自己的獎賞卡張數後,全部翻回反面並重洗,放回牌庫下方。",
       regulationMark: "I",
       std: true,
+      pop: 1,
+      usage: 89.7,
       set: "SV9",
     },
   ],
@@ -112,14 +114,21 @@ describe("CardPicker", () => {
     expect(useDeckStore.getState().basicTags["綠毛蟲"]).toBe(true);
   });
 
-  it("re-adding the same print bumps its count; another print gets its own row", async () => {
+  it("collapses same-name prints to ONE row; the version select picks a print", async () => {
     const deckId = seedDeck();
     const user = await openPickerAndSearch("綠毛蟲");
 
-    const sv9 = await screen.findByRole("button", { name: "加入 綠毛蟲(SV9-001)" });
-    await user.click(sv9);
-    await user.click(sv9);
-    await user.click(screen.getByRole("button", { name: "加入 綠毛蟲(S11-001),非標準" }));
+    // Only one add row for 綠毛蟲 (two prints collapsed).
+    const adds = await screen.findAllByRole("button", { name: /^加入 綠毛蟲/ });
+    expect(adds).toHaveLength(1);
+    // Default representative is the std-legal newest print (SV9-001).
+    expect(adds[0]!.getAttribute("aria-label")).toContain("SV9-001");
+
+    // Add the rep twice (count 2), then switch the version to S11 and add it.
+    await user.click(adds[0]!);
+    await user.click(adds[0]!);
+    await user.selectOptions(screen.getByLabelText("選擇版本:綠毛蟲"), "S11-001");
+    await user.click(screen.getByRole("button", { name: /^加入 綠毛蟲\(S11-001\)/ }));
 
     const deck = useDeckStore.getState().decks.find((d) => d.id === deckId)!;
     const prints = deck.cards.filter((c) => c.name === "綠毛蟲");
@@ -128,19 +137,15 @@ describe("CardPicker", () => {
     expect(prints.find((c) => c.set === "S11")?.count).toBe(1);
   });
 
-  it("standard-legal print lists before the rotated one", async () => {
-    seedDeck();
-    await openPickerAndSearch("綠毛蟲");
-    const buttons = await screen.findAllByRole("button", { name: /^加入 綠毛蟲/ });
-    expect(buttons[0]?.getAttribute("aria-label")).toContain("SV9-001");
-    expect(buttons[1]?.getAttribute("aria-label")).toContain("S11-001");
-  });
-
-  it("trainer adds as non-Basic trainer-section row", async () => {
+  it("trainer adds as non-Basic trainer-section row and shows real usage", async () => {
     const deckId = seedDeck();
     const user = await openPickerAndSearch("調換票");
 
-    await user.click(await screen.findByRole("button", { name: "加入 調換票(SV9-090)" }));
+    // 調換票 carries real usage (89.7%) → the badge and aria reflect it.
+    const add = await screen.findByRole("button", { name: /^加入 調換票\(SV9-090\)/ });
+    expect(add.getAttribute("aria-label")).toContain("89.7");
+    expect(screen.getByText("89.7%採用")).toBeInTheDocument();
+    await user.click(add);
 
     const deck = useDeckStore.getState().decks.find((d) => d.id === deckId)!;
     const row = deck.cards.find((c) => c.name === "調換票")!;
@@ -159,8 +164,7 @@ describe("CardPicker", () => {
 
     await user.clear(screen.getByLabelText("卡牌目錄搜尋"));
     await user.type(screen.getByLabelText("卡牌目錄搜尋"), "綠毛蟲");
-    const details = await screen.findAllByRole("button", { name: "顯示 綠毛蟲 詳情" });
-    await user.click(details[0]!);
+    await user.click(await screen.findByRole("button", { name: "顯示 綠毛蟲 詳情" }));
     expect(screen.getByText("蟲咬")).toBeInTheDocument();
     expect(screen.getByText(/弱點 火×2/)).toBeInTheDocument();
   });

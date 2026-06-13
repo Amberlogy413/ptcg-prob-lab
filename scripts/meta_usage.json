@@ -1,0 +1,651 @@
+{
+ "meta": {
+  "source": "Limitless TCG tournament decklists (play.limitlesstcg.com)",
+  "format": "STANDARD",
+  "sampleDecks": 4212,
+  "tournaments": 53,
+  "dateFrom": "2026-06-05",
+  "dateTo": "2026-06-13",
+  "matchedNames": 106,
+  "rankedNames": 264,
+  "generatedFor": "2026-06-13"
+ },
+ "cards": [
+  {
+   "zh": "老大的指令（坂木）",
+   "en": "Boss's Orders",
+   "decks": 3780,
+   "pct": 89.7
+  },
+  {
+   "zh": "超級球",
+   "en": "Ultra Ball",
+   "decks": 3559,
+   "pct": 84.5
+  },
+  {
+   "zh": "ニャースex",
+   "en": "Meowth ex",
+   "decks": 2542,
+   "pct": 60.4
+  },
+  {
+   "zh": "含羞苞",
+   "en": "Budew",
+   "decks": 1457,
+   "pct": 34.6
+  },
+  {
+   "zh": "願增猿",
+   "en": "Munkidori",
+   "decks": 1377,
+   "pct": 32.7
+  },
+  {
+   "zh": "神奇糖果",
+   "en": "Rare Candy",
+   "decks": 1257,
+   "pct": 29.8
+  },
+  {
+   "zh": "氣球",
+   "en": "Air Balloon",
+   "decks": 1152,
+   "pct": 27.4
+  },
+  {
+   "zh": "謝米",
+   "en": "Shaymin",
+   "decks": 1083,
+   "pct": 25.7
+  },
+  {
+   "zh": "寶可夢交替",
+   "en": "Switch",
+   "decks": 1048,
+   "pct": 24.9
+  },
+  {
+   "zh": "多龍梅西亞",
+   "en": "Dreepy",
+   "decks": 988,
+   "pct": 23.5
+  },
+  {
+   "zh": "多龍奇",
+   "en": "Drakloak",
+   "decks": 988,
+   "pct": 23.5
+  },
+  {
+   "zh": "土龍弟弟",
+   "en": "Dunsparce",
+   "decks": 944,
+   "pct": 22.4
+  },
+  {
+   "zh": "土龍節節",
+   "en": "Dudunsparce",
+   "decks": 943,
+   "pct": 22.4
+  },
+  {
+   "zh": "裁判",
+   "en": "Judge",
+   "decks": 886,
+   "pct": 21
+  },
+  {
+   "zh": "拉帝亞斯",
+   "en": "Latias ex",
+   "decks": 840,
+   "pct": 19.9
+  },
+  {
+   "zh": "メガガルーラex",
+   "en": "Mega Kangaskhan ex",
+   "decks": 559,
+   "pct": 13.3
+  },
+  {
+   "zh": "ファイヤー",
+   "en": "Moltres",
+   "decks": 484,
+   "pct": 11.5
+  },
+  {
+   "zh": "夜巡靈",
+   "en": "Duskull",
+   "decks": 469,
+   "pct": 11.1
+  },
+  {
+   "zh": "彷徨夜靈",
+   "en": "Dusclops",
+   "decks": 457,
+   "pct": 10.8
+  },
+  {
+   "zh": "黑夜魔靈",
+   "en": "Dusknoir",
+   "decks": 457,
+   "pct": 10.8
+  },
+  {
+   "zh": "能量轉移",
+   "en": "Energy Switch",
+   "decks": 405,
+   "pct": 9.6
+  },
+  {
+   "zh": "巨金怪",
+   "en": "Metagross",
+   "decks": 324,
+   "pct": 7.7
+  },
+  {
+   "zh": "旋轉洛托姆",
+   "en": "Fan Rotom",
+   "decks": 323,
+   "pct": 7.7
+  },
+  {
+   "zh": "雪童子",
+   "en": "Snorunt",
+   "decks": 312,
+   "pct": 7.4
+  },
+  {
+   "zh": "呱頭蛙",
+   "en": "Frogadier",
+   "decks": 293,
+   "pct": 7
+  },
+  {
+   "zh": "伊裴爾塔爾",
+   "en": "Yveltal",
+   "decks": 288,
+   "pct": 6.8
+  },
+  {
+   "zh": "能量回收",
+   "en": "Energy Retrieval",
+   "decks": 286,
+   "pct": 6.8
+  },
+  {
+   "zh": "裹蜜蟲",
+   "en": "Dipplin",
+   "decks": 277,
+   "pct": 6.6
+  },
+  {
+   "zh": "啃果蟲",
+   "en": "Applin",
+   "decks": 277,
+   "pct": 6.6
+  },
+  {
+   "zh": "<火箭隊的>急凍鳥",
+   "en": "Team Rocket's Articuno",
+   "decks": 276,
+   "pct": 6.6
+  },
+  {
+   "zh": "月石",
+   "en": "Lunatone",
+   "decks": 266,
+   "pct": 6.3
+  },
+  {
+   "zh": "呆呆獸",
+   "en": "Slowpoke",
+   "decks": 258,
+   "pct": 6.1
+  },
+  {
+   "zh": "ゲノセクト",
+   "en": "Genesect",
+   "decks": 251,
+   "pct": 6
+  },
+  {
+   "zh": "チコリータ",
+   "en": "Chikorita",
+   "decks": 239,
+   "pct": 5.7
+  },
+  {
+   "zh": "ベイリーフ",
+   "en": "Bayleef",
+   "decks": 239,
+   "pct": 5.7
+  },
+  {
+   "zh": "メガニウム",
+   "en": "Meganium",
+   "decks": 239,
+   "pct": 5.7
+  },
+  {
+   "zh": "凱西",
+   "en": "Abra",
+   "decks": 238,
+   "pct": 5.7
+  },
+  {
+   "zh": "迷唇娃",
+   "en": "Smoochum",
+   "decks": 222,
+   "pct": 5.3
+  },
+  {
+   "zh": "古劍豹",
+   "en": "Chien-Pao",
+   "decks": 221,
+   "pct": 5.2
+  },
+  {
+   "zh": "メガスターミーex",
+   "en": "Mega Starmie ex",
+   "decks": 220,
+   "pct": 5.2
+  },
+  {
+   "zh": "ヒトデマン",
+   "en": "Staryu",
+   "decks": 220,
+   "pct": 5.2
+  },
+  {
+   "zh": "勇基拉",
+   "en": "Kadabra",
+   "decks": 207,
+   "pct": 4.9
+  },
+  {
+   "zh": "胡地",
+   "en": "Alakazam",
+   "decks": 206,
+   "pct": 4.9
+  },
+  {
+   "zh": "N的索羅亞",
+   "en": "N's Zorua",
+   "decks": 193,
+   "pct": 4.6
+  },
+  {
+   "zh": "セレビィ",
+   "en": "Celebi",
+   "decks": 192,
+   "pct": 4.6
+  },
+  {
+   "zh": "メガルカリオex",
+   "en": "Mega Lucario ex",
+   "decks": 183,
+   "pct": 4.3
+  },
+  {
+   "zh": "利歐路",
+   "en": "Riolu",
+   "decks": 183,
+   "pct": 4.3
+  },
+  {
+   "zh": "鐵殼蛹",
+   "en": "Kakuna",
+   "decks": 183,
+   "pct": 4.3
+  },
+  {
+   "zh": "獨角蟲",
+   "en": "Weedle",
+   "decks": 183,
+   "pct": 4.3
+  },
+  {
+   "zh": "雪妖女",
+   "en": "Froslass",
+   "decks": 176,
+   "pct": 4.2
+  },
+  {
+   "zh": "棄世猴",
+   "en": "Annihilape",
+   "decks": 165,
+   "pct": 3.9
+  },
+  {
+   "zh": "N的萊希拉姆",
+   "en": "N's Reshiram",
+   "decks": 155,
+   "pct": 3.7
+  },
+  {
+   "zh": "力壯雞",
+   "en": "Combusken",
+   "decks": 153,
+   "pct": 3.6
+  },
+  {
+   "zh": "咚咚鼠",
+   "en": "Dedenne",
+   "decks": 141,
+   "pct": 3.3
+  },
+  {
+   "zh": "赫普的古月鳥",
+   "en": "Hop's Cramorant",
+   "decks": 136,
+   "pct": 3.2
+  },
+  {
+   "zh": "メガミミロップex",
+   "en": "Mega Lopunny ex",
+   "decks": 132,
+   "pct": 3.1
+  },
+  {
+   "zh": "ミミロル",
+   "en": "Buneary",
+   "decks": 132,
+   "pct": 3.1
+  },
+  {
+   "zh": "<火箭隊的>謎擬Ｑ",
+   "en": "Team Rocket's Mimikyu",
+   "decks": 125,
+   "pct": 3
+  },
+  {
+   "zh": "蟲甲聖",
+   "en": "Rabsca",
+   "decks": 123,
+   "pct": 2.9
+  },
+  {
+   "zh": "蟲滾泥",
+   "en": "Rellor",
+   "decks": 123,
+   "pct": 2.9
+  },
+  {
+   "zh": "ハリテヤマ",
+   "en": "Hariyama",
+   "decks": 120,
+   "pct": 2.8
+  },
+  {
+   "zh": "ゲノセクトex",
+   "en": "Genesect ex",
+   "decks": 115,
+   "pct": 2.7
+  },
+  {
+   "zh": "啪咚猴",
+   "en": "Thwackey",
+   "decks": 113,
+   "pct": 2.7
+  },
+  {
+   "zh": "敲音猴",
+   "en": "Grookey",
+   "decks": 113,
+   "pct": 2.7
+  },
+  {
+   "zh": "小灰怪",
+   "en": "Elgyem",
+   "decks": 106,
+   "pct": 2.5
+  },
+  {
+   "zh": "N的火紅不倒翁",
+   "en": "N's Darumaka",
+   "decks": 105,
+   "pct": 2.5
+  },
+  {
+   "zh": "N的達摩狒狒",
+   "en": "N's Darmanitan",
+   "decks": 105,
+   "pct": 2.5
+  },
+  {
+   "zh": "赫普的毛辮羊",
+   "en": "Hop's Wooloo",
+   "decks": 104,
+   "pct": 2.5
+  },
+  {
+   "zh": "赫普的毛毛角羊",
+   "en": "Hop's Dubwool",
+   "decks": 103,
+   "pct": 2.4
+  },
+  {
+   "zh": "ミネズミ",
+   "en": "Patrat",
+   "decks": 101,
+   "pct": 2.4
+  },
+  {
+   "zh": "石居蟹",
+   "en": "Dwebble",
+   "decks": 101,
+   "pct": 2.4
+  },
+  {
+   "zh": "岩殿居蟹",
+   "en": "Crustle",
+   "decks": 101,
+   "pct": 2.4
+  },
+  {
+   "zh": "角金魚",
+   "en": "Goldeen",
+   "decks": 98,
+   "pct": 2.3
+  },
+  {
+   "zh": "<火箭隊的>黑暗鴉",
+   "en": "Team Rocket's Murkrow",
+   "decks": 94,
+   "pct": 2.2
+  },
+  {
+   "zh": "<火箭隊的>多邊獸",
+   "en": "Team Rocket's Porygon",
+   "decks": 93,
+   "pct": 2.2
+  },
+  {
+   "zh": "<火箭隊的>多邊獸Ⅱ",
+   "en": "Team Rocket's Porygon2",
+   "decks": 93,
+   "pct": 2.2
+  },
+  {
+   "zh": "金魚王",
+   "en": "Seaking",
+   "decks": 91,
+   "pct": 2.2
+  },
+  {
+   "zh": "古玉魚",
+   "en": "Chi-Yu",
+   "decks": 89,
+   "pct": 2.1
+  },
+  {
+   "zh": "投擲猴",
+   "en": "Passimian",
+   "decks": 84,
+   "pct": 2
+  },
+  {
+   "zh": "米立龍",
+   "en": "Tatsugiri",
+   "decks": 79,
+   "pct": 1.9
+  },
+  {
+   "zh": "プルリル",
+   "en": "Frillish",
+   "decks": 78,
+   "pct": 1.9
+  },
+  {
+   "zh": "雷吉奇卡斯",
+   "en": "Regigigas",
+   "decks": 78,
+   "pct": 1.9
+  },
+  {
+   "zh": "<火箭隊的>團珠蛛",
+   "en": "Team Rocket's Tarountula",
+   "decks": 77,
+   "pct": 1.8
+  },
+  {
+   "zh": "<火箭隊的>操陷蛛",
+   "en": "Team Rocket's Spidops",
+   "decks": 77,
+   "pct": 1.8
+  },
+  {
+   "zh": "咕咕",
+   "en": "Hoothoot",
+   "decks": 76,
+   "pct": 1.8
+  },
+  {
+   "zh": "貓頭夜鷹",
+   "en": "Noctowl",
+   "decks": 76,
+   "pct": 1.8
+  },
+  {
+   "zh": "メガアブソルex",
+   "en": "Mega Absol ex",
+   "decks": 64,
+   "pct": 1.5
+  },
+  {
+   "zh": "エースバーン",
+   "en": "Cinderace",
+   "decks": 61,
+   "pct": 1.4
+  },
+  {
+   "zh": "古空棘魚",
+   "en": "Relicanth",
+   "decks": 59,
+   "pct": 1.4
+  },
+  {
+   "zh": "席多藍恩",
+   "en": "Heatran",
+   "decks": 58,
+   "pct": 1.4
+  },
+  {
+   "zh": "月月熊 赫月",
+   "en": "Bloodmoon Ursaluna",
+   "decks": 57,
+   "pct": 1.4
+  },
+  {
+   "zh": "メガクチートex",
+   "en": "Mega Mawile ex",
+   "decks": 56,
+   "pct": 1.3
+  },
+  {
+   "zh": "オノノクス",
+   "en": "Haxorus",
+   "decks": 56,
+   "pct": 1.3
+  },
+  {
+   "zh": "<竹蘭的>圓陸鯊",
+   "en": "Cynthia's Gible",
+   "decks": 55,
+   "pct": 1.3
+  },
+  {
+   "zh": "<竹蘭的>尖牙陸鯊",
+   "en": "Cynthia's Gabite",
+   "decks": 55,
+   "pct": 1.3
+  },
+  {
+   "zh": "<竹蘭的>花岩怪",
+   "en": "Cynthia's Spiritomb",
+   "decks": 53,
+   "pct": 1.3
+  },
+  {
+   "zh": "<竹蘭的>羅絲雷朵",
+   "en": "Cynthia's Roserade",
+   "decks": 52,
+   "pct": 1.2
+  },
+  {
+   "zh": "<竹蘭的>毒薔薇",
+   "en": "Cynthia's Roselia",
+   "decks": 51,
+   "pct": 1.2
+  },
+  {
+   "zh": "夠讚狗",
+   "en": "Okidogi",
+   "decks": 48,
+   "pct": 1.1
+  },
+  {
+   "zh": "螺釘地鼠",
+   "en": "Drilbur",
+   "decks": 45,
+   "pct": 1.1
+  },
+  {
+   "zh": "<阿響的>火球鼠",
+   "en": "Ethan's Cyndaquil",
+   "decks": 44,
+   "pct": 1
+  },
+  {
+   "zh": "<阿響的>火岩鼠",
+   "en": "Ethan's Quilava",
+   "decks": 44,
+   "pct": 1
+  },
+  {
+   "zh": "<阿響的>火爆獸",
+   "en": "Ethan's Typhlosion",
+   "decks": 44,
+   "pct": 1
+  },
+  {
+   "zh": "迷你芙",
+   "en": "Smoliv",
+   "decks": 44,
+   "pct": 1
+  },
+  {
+   "zh": "奧利紐",
+   "en": "Dolliv",
+   "decks": 44,
+   "pct": 1
+  },
+  {
+   "zh": "炭小侍",
+   "en": "Charcadet",
+   "decks": 43,
+   "pct": 1
+  }
+ ]
+}

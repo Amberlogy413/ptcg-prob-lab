@@ -4,6 +4,7 @@ import { useDeckStore } from "../state/deckStore.ts";
 import {
   loadCatalog,
   searchCatalog,
+  groupByName,
   toNewCardInput,
   kindOf,
   type Catalog,
@@ -39,8 +40,13 @@ export function CardPicker({ deckId }: { deckId: string }) {
     );
   }
 
-  const results = useMemo(
-    () => (catalog !== null && query.trim() !== "" ? searchCatalog(catalog, query, 50) : []),
+  // One row per card NAME (owner request): the representative is the best
+  // print; same-name prints stay available via the per-row version selector.
+  const groups = useMemo(
+    () =>
+      catalog !== null && query.trim() !== ""
+        ? groupByName(catalog, searchCatalog(catalog, query, 200)).slice(0, 50)
+        : [],
     [catalog, query],
   );
 
@@ -48,6 +54,9 @@ export function CardPicker({ deckId }: { deckId: string }) {
     const kind = kindOf(card);
     return kind.key !== null ? t(kind.key) : kind.raw;
   };
+
+  // Which exact print is selected per name-group (defaults to the rep).
+  const [printChoice, setPrintChoice] = useState<Record<string, string>>({});
 
   function add(card: CatalogCard) {
     addCardFrom(deckId, toNewCardInput(card));
@@ -87,54 +96,45 @@ export function CardPicker({ deckId }: { deckId: string }) {
 
       {status === "ready" && catalog !== null && query.trim() !== "" && (
         <>
-          {results.length === 0 ? (
+          {groups.length === 0 ? (
             <p className="mt-2 text-sm text-ink2">{t("catalog.empty")}</p>
           ) : (
             <ul aria-label={t("catalog.results.aria")} className="mt-2 max-h-80 overflow-y-auto">
-              {results.map((card) => {
+              {groups.map(({ rep, prints }) => {
+                // Selected print (default = representative); same-name prints
+                // (e.g. which set's basic energy) chosen via the version select.
+                const card = prints.find((p) => p.id === printChoice[rep.name]) ?? rep;
                 const setInfo = catalog.sets[card.set ?? ""];
-                const open = detailId === card.id;
+                const open = detailId === rep.name;
                 return (
-                  <li key={card.id} className="border-b hairline last:border-b-0">
+                  <li key={rep.name} className="border-b hairline last:border-b-0">
                     <div className="flex items-center gap-2 py-1.5">
                       <button
                         type="button"
                         aria-label={
                           t("catalog.addAria", { name: card.name, id: card.id }) +
+                          (card.usage !== undefined ? `,${t("catalog.usageAria", { p: card.usage })}` : "") +
                           (card.std !== true ? `,${t("catalog.legal.not")}` : "") +
                           (addedId === card.id ? `,${t("catalog.added")}` : "")
                         }
                         onClick={() => add(card)}
                         className="flex min-w-0 flex-1 items-center gap-2 rounded-ctl px-1 py-1 text-left hover:bg-surface"
                       >
-                        <span className="min-w-0 flex-1 truncate text-base">
-                          {card.name}
-                          {card.suffix !== undefined &&
-                            !card.name.toLowerCase().endsWith(card.suffix.toLowerCase()) && (
-                              <span className="ml-1 text-sm text-ink2">{card.suffix}</span>
-                            )}
-                        </span>
+                        <span className="min-w-0 flex-1 truncate text-base">{card.name}</span>
+                        {card.usage !== undefined && (
+                          <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 font-mono text-xs text-pink">
+                            {t("catalog.usage", { p: card.usage })}
+                          </span>
+                        )}
                         <span className="shrink-0 rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
                           {kindBadge(card)}
                         </span>
-                        {card.pop !== undefined && card.pop <= 40 && (
-                          <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 text-xs text-pink">
-                            {t("catalog.pop")}
-                          </span>
-                        )}
                         {card.hp !== undefined && (
-                          <span className="shrink-0 font-mono text-xs text-ink2">
-                            HP{card.hp}
-                          </span>
+                          <span className="shrink-0 font-mono text-xs text-ink2">HP{card.hp}</span>
                         )}
                         <span className="shrink-0 font-mono text-xs text-ink2">
                           {card.set ?? "?"} {card.localId}
                         </span>
-                        {card.regulationMark !== undefined && (
-                          <span className="shrink-0 rounded-ctl border hairline px-1.5 py-0.5 font-mono text-xs text-ink2">
-                            {card.regulationMark}
-                          </span>
-                        )}
                         <span
                           className={
                             "shrink-0 text-xs " + (card.std === true ? "text-good" : "text-ink2")
@@ -146,11 +146,28 @@ export function CardPicker({ deckId }: { deckId: string }) {
                           <span className="shrink-0 text-xs text-good">{t("catalog.added")}</span>
                         )}
                       </button>
+                      {prints.length > 1 && (
+                        <select
+                          aria-label={t("catalog.version", { name: rep.name })}
+                          value={card.id}
+                          onChange={(e) =>
+                            setPrintChoice((m) => ({ ...m, [rep.name]: e.target.value }))
+                          }
+                          className="h-9 shrink-0 rounded-ctl border hairline bg-surface px-1 font-mono text-xs text-ink2"
+                        >
+                          {prints.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.set ?? "?"} {p.localId}
+                              {p.std === true ? " ✓" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         type="button"
-                        aria-label={t("catalog.detailAria", { name: card.name })}
+                        aria-label={t("catalog.detailAria", { name: rep.name })}
                         aria-expanded={open}
-                        onClick={() => setDetailId(open ? null : card.id)}
+                        onClick={() => setDetailId(open ? null : rep.name)}
                         className="h-9 w-9 shrink-0 rounded-ctl border hairline bg-surface text-sm text-ink2 hover:text-ink"
                       >
                         ⓘ
@@ -175,6 +192,13 @@ export function CardPicker({ deckId }: { deckId: string }) {
           ? t("catalog.count", {
               n: catalog.count,
               sets: Object.keys(catalog.sets).length,
+            }) + " · "
+          : ""}
+        {status === "ready" && catalog?.meta !== undefined
+          ? t("catalog.metaSource", {
+              n: catalog.meta.sampleDecks,
+              from: catalog.meta.dateFrom,
+              to: catalog.meta.dateTo,
             }) + " · "
           : ""}
         {t("catalog.source")} {t("catalog.hint")}
