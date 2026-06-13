@@ -11,6 +11,7 @@ import {
   type CatalogCard,
 } from "../data/catalog.ts";
 import { CardVisual } from "./CardVisual.tsx";
+import { CardName } from "./CardName.tsx";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -120,7 +121,7 @@ export function CardPicker({ deckId }: { deckId: string }) {
                         onClick={() => add(card)}
                         className="flex min-w-0 flex-1 items-center gap-2 rounded-ctl px-1 py-1 text-left hover:bg-surface"
                       >
-                        <span className="min-w-0 flex-1 truncate text-base">{card.name}</span>
+                        <CardName card={card} className="min-w-0 flex-1 truncate text-base" />
                         {card.usage !== undefined && (
                           <span className="shrink-0 rounded-full border border-pink px-1.5 py-0.5 font-mono text-xs text-pink">
                             {t("catalog.usage", { p: card.usage })}

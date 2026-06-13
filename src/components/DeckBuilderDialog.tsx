@@ -20,6 +20,7 @@ import {
 } from "../data/catalog.ts";
 import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { CardName } from "./CardName.tsx";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
 
@@ -365,9 +366,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                       className="block w-full text-left hover:bg-paper"
                     >
                       <span className="flex items-baseline gap-1">
-                        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                          {card.name}
-                        </span>
+                        <CardName card={card} className="min-w-0 flex-1 truncate text-sm font-medium" />
                         {owned > 0 && (
                           <span
                             className="shrink-0 rounded-full bg-pink px-1.5 font-mono text-xs text-white"

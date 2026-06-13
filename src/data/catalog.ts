@@ -69,6 +69,11 @@ export interface CatalogCard {
   pop?: number;
   /** Real inclusion rate: % of sampled tournament decks that play this card. */
   usage?: number;
+  /** Trilingual names (scripts/fetch_names.mjs): nameZh complete, nameJa
+   *  SV-era, nameEn partial. `name` stays the canonical storage key. */
+  nameZh?: string;
+  nameJa?: string;
+  nameEn?: string;
   set: string | null;
 }
 
@@ -124,6 +129,40 @@ export function loadCatalog(): Promise<Catalog> {
 /** Test hook: replace (or clear) the catalog without touching the network. */
 export function setCatalogForTests(catalog: Catalog | null): void {
   catalogPromise = catalog === null ? null : Promise.resolve(catalog);
+}
+
+// ---------------------------------------------------------------------------
+// Trilingual display (owner request 2026-06-13): show the card name in the
+// chosen language; the data (nameZh / nameJa / nameEn) is built by
+// scripts/fetch_names.mjs. Missing a language → fall back so a name always
+// shows (never blank), preferring the requested language first.
+
+export type NameLang = "zh" | "en" | "ja";
+
+/** The card name in the requested language, with a graceful fallback chain. */
+export function cardName(card: CatalogCard, lang: NameLang): string {
+  const zh = card.nameZh ?? card.name;
+  const ja = card.nameJa;
+  const en = card.nameEn;
+  if (lang === "ja") return ja ?? zh ?? en ?? card.name;
+  if (lang === "en") return en ?? zh ?? ja ?? card.name;
+  return zh ?? ja ?? en ?? card.name;
+}
+
+/** The other two languages (for tri-lingual secondary lines), de-duplicated. */
+export function otherNames(card: CatalogCard, primary: NameLang): string[] {
+  const primaryName = cardName(card, primary);
+  const all: Array<[NameLang, string | undefined]> = [
+    ["zh", card.nameZh ?? card.name],
+    ["en", card.nameEn],
+    ["ja", card.nameJa],
+  ];
+  const out: string[] = [];
+  for (const [lang, name] of all) {
+    if (lang === primary || name === undefined || name === primaryName || out.includes(name)) continue;
+    out.push(name);
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

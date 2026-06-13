@@ -7,6 +7,7 @@ import {
   type CatalogSet,
 } from "../data/catalog.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { useCardName } from "../state/cardLang.ts";
 
 /**
  * Full-information card visual — an ORIGINAL text-only frame (no artwork, no
@@ -18,22 +19,28 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
   const t = useT();
   const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
   const kind = kindOf(card);
+  const { primary, others } = useCardName(card);
 
   return (
     <div
       role="group"
-      aria-label={t("visual.aria", { name: card.name })}
+      aria-label={t("visual.aria", { name: primary })}
       className="rounded-card border hairline bg-receipt p-4 text-sm shadow-receipt"
     >
-      {/* Header: kind · name+suffix · HP · types */}
+      {/* Header: kind · name (primary large + other languages small) · HP · types */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
           {label(kind.key, kind.raw)}
         </span>
         <span className="text-lg font-medium">
-          {card.name}
+          {primary}
+          {others.map((n) => (
+            <span key={n} className="ml-1 text-sm font-normal text-ink2">
+              {n}
+            </span>
+          ))}
           {card.suffix !== undefined &&
-            !card.name.toLowerCase().endsWith(card.suffix.toLowerCase()) && (
+            !primary.toLowerCase().endsWith(card.suffix.toLowerCase()) && (
               <span className="ml-1 text-sm text-ink2">{card.suffix}</span>
             )}
         </span>

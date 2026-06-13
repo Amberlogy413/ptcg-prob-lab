@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
 import { useUiStore, type WorkspaceView } from "../state/uiStore.ts";
-import { useSettingsStore, type Locale } from "../state/settingsStore.ts";
+import { useSettingsStore, type Locale, type CardLang } from "../state/settingsStore.ts";
 import {
   IconDeck,
   IconDecks,
@@ -34,6 +34,10 @@ export function TopNav() {
   const setActiveView = useUiStore((s) => s.setActiveView);
   const locale = useSettingsStore((s) => s.locale);
   const setLocale = useSettingsStore((s) => s.setLocale);
+  const cardLang = useSettingsStore((s) => s.cardLang);
+  const setCardLang = useSettingsStore((s) => s.setCardLang);
+  const triLingual = useSettingsStore((s) => s.triLingual);
+  const setTriLingual = useSettingsStore((s) => s.setTriLingual);
 
   return (
     <header className="border-b hairline bg-paper">
@@ -64,7 +68,7 @@ export function TopNav() {
             );
           })}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-xs text-ink2">
             <span>{t("locale.label")}</span>
             <select
@@ -75,6 +79,28 @@ export function TopNav() {
               <option value="zh-Hant">{t("locale.zhHant")}</option>
               <option value="en">{t("locale.en")}</option>
             </select>
+          </label>
+          <label className="flex items-center gap-2 text-xs text-ink2">
+            <span>{t("cardlang.label")}</span>
+            <select
+              value={cardLang}
+              onChange={(e) => setCardLang(e.target.value as CardLang)}
+              className="rounded-ctl border hairline bg-surface px-2 py-1 text-xs text-ink"
+            >
+              <option value="auto">{t("cardlang.auto")}</option>
+              <option value="zh">{t("cardlang.zh")}</option>
+              <option value="en">{t("cardlang.en")}</option>
+              <option value="ja">{t("cardlang.ja")}</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-ink2">
+            <input
+              type="checkbox"
+              checked={triLingual}
+              onChange={(e) => setTriLingual(e.target.checked)}
+              className="h-4 w-4 accent-blue"
+            />
+            {t("cardlang.tri")}
           </label>
         </div>
       </div>
