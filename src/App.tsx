@@ -44,6 +44,9 @@ const ReportView = lazy(() =>
 const MidgameView = lazy(() =>
   import("./views/MidgameView.tsx").then((m) => ({ default: m.MidgameView })),
 );
+const DecksView = lazy(() =>
+  import("./views/DecksView.tsx").then((m) => ({ default: m.DecksView })),
+);
 
 export default function App() {
   const t = useT();
@@ -113,6 +116,7 @@ export default function App() {
             }
           >
             {activeView === "deck" && <DeckView />}
+            {activeView === "decks" && <DecksView />}
             {activeView === "report" && <ReportView />}
             {activeView === "trial" && <TrialView />}
             {activeView === "midgame" && <MidgameView />}

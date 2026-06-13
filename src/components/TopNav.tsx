@@ -4,6 +4,7 @@ import { useUiStore, type WorkspaceView } from "../state/uiStore.ts";
 import { useSettingsStore, type Locale } from "../state/settingsStore.ts";
 import {
   IconDeck,
+  IconDecks,
   IconReport,
   IconTrial,
   IconMidgame,
@@ -16,6 +17,7 @@ import {
 
 const WORKSPACES: Array<{ id: WorkspaceView; labelKey: string; icon: ReactNode }> = [
   { id: "deck", labelKey: "nav.deck", icon: <IconDeck /> },
+  { id: "decks", labelKey: "nav.decks", icon: <IconDecks /> },
   { id: "report", labelKey: "nav.report", icon: <IconReport /> },
   { id: "trial", labelKey: "nav.trial", icon: <IconTrial /> },
   { id: "midgame", labelKey: "nav.midgame", icon: <IconMidgame /> },

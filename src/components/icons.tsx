@@ -182,6 +182,17 @@ export function IconTemplate() {
   );
 }
 
+/** 牌組推薦 — trophy. */
+export function IconDecks() {
+  return (
+    <I>
+      <path d="M5 2.5h6v3a3 3 0 0 1-6 0v-3Z" />
+      <path d="M5 3.5H3.2v1a2 2 0 0 0 2 2M11 3.5h1.8v1a2 2 0 0 1-2 2" />
+      <path d="M8 8.5v2M5.8 13.5h4.4M6.5 13.5c0-1.2.7-2 1.5-2s1.5.8 1.5 2" />
+    </I>
+  );
+}
+
 /** 中局 — hourglass (the game clock is running). */
 export function IconMidgame() {
   return (

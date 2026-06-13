@@ -263,6 +263,25 @@
   收喺該行嘅「版本」下拉(例如基本能量 4 個版本任揀)。picker 與組牌器同步。
 - 更新數據:重跑 `node scripts/fetch_meta.mjs` 再 `node scripts/fetch_catalog.mjs`。
 
+## 2026-06-13 — 真實比賽牌組推薦(Phase 11.2)
+
+- **指示**:每個熱門主軸寶可夢要有一系列不同組合的真實比賽牌組,以最新公開
+  比賽為依據排序(同賽制下:世界賽>地區大賽>道館賽>常規店賽)。
+- **數據**:`scripts/fetch_decks.mjs` 由 Limitless 公開 API 抓真實 STANDARD
+  decklist。**原型分類唔使估**——standings 嘅 `deck` 欄已帶 Limitless 官方
+  分類(`{id,name,icons}`,如 `ogerpon-meganium-hydrapple`)。按原型分組,
+  組內去重(卡多重集雜湊)保留多套不同組合。
+- **等級限制(誠實)**:官方賽事等級(世界賽/地區/道館/店賽)**未開放 API**
+  ——play API 只有社群/線上/店賽,冇官方頭銜欄。**唔扮官方等級**(扮就係猜);
+  改以**客觀真實信號排序**:賽事規模(參賽人數)→ 近期 → 名次,並於 UI
+  明示係依規模分級、非官方頭銜。若日後有官方結果源(RK9 等)再對齊。
+- **卡片本地化**:每張卡解析成 zh+isBasic+section(寶可夢 dexId 橋、staple
+  事實表、TCGdex en 後備定 isBasic);math 只需 count+isBasic,必定齊全。
+  最新世代卡繁中未發行者顯示英/日名(誠實),math 照準。
+- **輸出**:`public/catalog/decks-zh-Hant.json`(top 原型、每原型 ~5 套),
+  lazy 載入;牌組推薦工作區一鍵 `載入此牌組` → importDeck(帶 isBasic)→
+  體檢/組牌/數學。更新 = 重跑 fetch_decks.mjs。
+
 - **審計遺留帳(13 項,排程)**:追蹤器 v2(PRIZE_COUNT 寫死 6——首張獎賞
   被取走後後驗即錯,+15.3pp 級;修法 P=6−k 參數化,黃金先行)、02 §5.6
   中局抽牌引理補規格、四個 selector 同名多行投數合計、Worker 門檻 16–390×

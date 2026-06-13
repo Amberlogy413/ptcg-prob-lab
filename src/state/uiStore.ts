@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 export type WorkspaceView =
   | "deck"
+  | "decks"
   | "report"
   | "trial"
   | "midgame"
