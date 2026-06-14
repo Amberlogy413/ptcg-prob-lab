@@ -24,6 +24,7 @@ export default {
       // `blue` = primary actions/nav/focus → neutral graphite-slate (the single
       // UI accent). `pink` = popularity/"hot" highlight → flame (semantic).
       blue: "#3B4658",
+      "accent-50": "#EEF0F3", // blue @ ~8% — option-card/step selected wash, neutral hints (graphite, NOT a new hue)
       pink: "#CC5A33",
       good: "#0E7A4A", // emerald: favorable / rising delta / ideal hand
       warn: "#B45309", // amber: caution / playable hand
@@ -54,8 +55,11 @@ export default {
         // 4px scale is Tailwind's default; nothing extra needed.
       },
       boxShadow: {
-        // The ONLY shadow in the product — reserved for the math receipt.
+        // The math receipt's signature shadow.
         receipt: "0 1px 2px rgba(21, 24, 28, 0.08), 0 4px 12px rgba(21, 24, 28, 0.06)",
+        // Design-system shadows (docs/07) — graphite-tinted, NOT a green glow.
+        soft: "0 4px 24px -8px rgba(30, 37, 48, 0.10)",
+        glow: "0 8px 28px -8px rgba(59, 70, 88, 0.30)",
       },
       transitionDuration: {
         fast: "120ms",

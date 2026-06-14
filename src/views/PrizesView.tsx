@@ -8,7 +8,16 @@ import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
 import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
 import { DistTable } from "../components/DistTable.tsx";
 import { JointTable } from "../components/JointTable.tsx";
+import { OptionCard, OptionGrid } from "../components/ui/OptionCard.tsx";
+import { HintBar } from "../components/ui/HintBar.tsx";
+import { IconRotate, IconLegal, IconBattle } from "../components/icons.tsx";
 import { HAND_SIZE, PRIZE_COUNT, DECK_SIZE } from "../constants.ts";
+
+const MODE_ICON: Record<Q3Mode, JSX.Element> = {
+  uncond: <IconRotate />,
+  givenHand: <IconLegal />,
+  preGame: <IconBattle />,
+};
 
 const MODES: Q3Mode[] = ["uncond", "givenHand", "preGame"];
 
@@ -121,29 +130,30 @@ function Q3SingleSection() {
     }
   }, [mode, eff, h, preGameImpossible]);
 
-  const segBtn = (active: boolean) =>
-    "rounded-ctl px-3 py-1.5 text-sm transition-colors duration-fast " +
-    (active ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2 hover:text-ink");
-
   return (
     <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
       <h2 className="text-xl font-medium">{t("q3.title")}</h2>
 
-      {/* Mode segmented control + ⓘ explanation */}
-      <div role="group" aria-label={t("q3.mode.aria")} className="mt-3 flex flex-wrap gap-1">
-        {MODES.map((m) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={mode === m}
-            onClick={() => setMode(m)}
-            className={segBtn(mode === m)}
-          >
-            {t(`q3.mode.${m}`)}
-          </button>
-        ))}
+      {/* Mode chooser — numbered OptionCards (docs/07 §2.1) + a contextual HintBar
+          explaining the active conditioning. Neutral graphite accent only. */}
+      <div role="group" aria-label={t("q3.mode.aria")} className="mt-3">
+        <OptionGrid>
+          {MODES.map((m, i) => (
+            <OptionCard
+              key={m}
+              selected={mode === m}
+              onSelect={() => setMode(m)}
+              icon={MODE_ICON[m]}
+              badge={`0${i + 1}`}
+              title={t(`q3.mode.${m}`)}
+              subline={t(`q3.mode.${m}.facets`)}
+            />
+          ))}
+        </OptionGrid>
       </div>
-      <p className="mt-1.5 text-xs text-ink2">{t(`q3.mode.${mode}.info`)}</p>
+      <div className="mt-3">
+        <HintBar variant="neutral">{t(`q3.mode.${mode}.info`)}</HintBar>
+      </div>
 
       {/* Sentence controls */}
       <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-2 leading-relaxed">

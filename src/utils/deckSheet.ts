@@ -96,7 +96,7 @@ export function buildDeckCardSvg(deck: Deck, labels: DeckCardLabels): DeckCardSv
   parts.push(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${height}" viewBox="0 0 ${W} ${height}">`,
     `<rect width="${W}" height="${height}" fill="#FAF8F3"/>`,
-    `<rect x="16" y="16" width="${W - 32}" height="${height - 32}" rx="10" fill="#FFFFFF" stroke="#E3DFD6"/>`,
+    `<rect x="16" y="16" width="${W - 32}" height="${height - 32}" rx="10" fill="#FFFFFF" stroke="#E4E7EC"/>`,
     `<text x="40" y="62" font-family="${SANS}" font-size="22" fill="#15181C">${esc(deck.name || "—")}</text>`,
   );
 
@@ -104,10 +104,10 @@ export function buildDeckCardSvg(deck: Deck, labels: DeckCardLabels): DeckCardSv
   for (const g of groups) {
     y += sectionHeadH;
     parts.push(
-      `<text x="40" y="${y - 9}" font-family="${SANS}" font-size="14" fill="#5A6069">${esc(
+      `<text x="40" y="${y - 9}" font-family="${SANS}" font-size="14" fill="#5F6976">${esc(
         labels.sections[g.section],
       )} · ${g.count}</text>`,
-      `<line x1="40" y1="${y - 4}" x2="${W - 40}" y2="${y - 4}" stroke="#E3DFD6"/>`,
+      `<line x1="40" y1="${y - 4}" x2="${W - 40}" y2="${y - 4}" stroke="#E4E7EC"/>`,
     );
     for (const r of g.rows) {
       y += rowH;
@@ -129,16 +129,16 @@ export function buildDeckCardSvg(deck: Deck, labels: DeckCardLabels): DeckCardSv
   ].join("   ·   ");
   y += 30;
   parts.push(
-    `<line x1="40" y1="${y - 22}" x2="${W - 40}" y2="${y - 22}" stroke="#E3DFD6"/>`,
+    `<line x1="40" y1="${y - 22}" x2="${W - 40}" y2="${y - 22}" stroke="#E4E7EC"/>`,
     `<text x="40" y="${y}" font-family="${MONO}" font-size="15" fill="#15181C">${esc(badgeText)}</text>`,
   );
 
   const fy = height - 40;
   parts.push(
-    `<rect x="40" y="${fy - 20}" width="170" height="28" rx="6" fill="none" stroke="#2B59C3"/>`,
-    `<text x="125" y="${fy - 1}" font-family="${SANS}" font-size="12" fill="#2B59C3" text-anchor="middle">${esc(labels.badge)}</text>`,
+    `<rect x="40" y="${fy - 20}" width="170" height="28" rx="6" fill="none" stroke="#3B4658"/>`,
+    `<text x="125" y="${fy - 1}" font-family="${SANS}" font-size="12" fill="#3B4658" text-anchor="middle">${esc(labels.badge)}</text>`,
     `<text x="226" y="${fy - 1}" font-family="${SANS}" font-size="14" fill="#15181C">${esc(labels.product)}</text>`,
-    `<text x="${W - 40}" y="${fy - 1}" font-family="${SANS}" font-size="11" fill="#5A6069" text-anchor="end">${esc(labels.footer)}</text>`,
+    `<text x="${W - 40}" y="${fy - 1}" font-family="${SANS}" font-size="11" fill="#5F6976" text-anchor="end">${esc(labels.footer)}</text>`,
     `</svg>`,
   );
 

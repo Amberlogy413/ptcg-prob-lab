@@ -17,7 +17,7 @@ export function DistChart({ rows, ariaLabel }: { rows: DistRowData[]; ariaLabel:
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="w-full max-w-md" role="img" aria-label={ariaLabel}>
-      <line x1="0" y1={h - padB + 0.5} x2={w} y2={h - padB + 0.5} stroke="#E3DFD6" strokeWidth="1" />
+      <line x1="0" y1={h - padB + 0.5} x2={w} y2={h - padB + 0.5} stroke="#E4E7EC" strokeWidth="1" />
       {rows.map((r) => {
         const barH = (r.chart / max) * (h - padB - padT);
         const x = r.k * band + (band - barW) / 2;
@@ -29,7 +29,7 @@ export function DistChart({ rows, ariaLabel }: { rows: DistRowData[]; ariaLabel:
               y={y}
               width={barW}
               height={Math.max(barH, r.chart > 0 ? 1 : 0)}
-              fill="#2B59C3"
+              fill="#3B4658"
             >
               <title>{t("q1.chart.barTitle", { k: r.k, percent: r.percent, fraction: r.fraction })}</title>
             </rect>
@@ -38,7 +38,7 @@ export function DistChart({ rows, ariaLabel }: { rows: DistRowData[]; ariaLabel:
               y={h - 5}
               textAnchor="middle"
               fontSize="9"
-              fill="#5A6069"
+              fill="#5F6976"
               className="font-mono"
             >
               {r.k}

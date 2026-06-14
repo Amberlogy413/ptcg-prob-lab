@@ -17,13 +17,13 @@ export function CountRing({ total }: { total: number }) {
       aria-label={t("deck.count.aria", { n: total })}
       className="shrink-0"
     >
-      <circle cx="32" cy="32" r={r} fill="none" stroke="#E3DFD6" strokeWidth="4" />
+      <circle cx="32" cy="32" r={r} fill="none" stroke="#E4E7EC" strokeWidth="4" />
       <circle
         cx="32"
         cy="32"
         r={r}
         fill="none"
-        stroke={exact ? "#2B59C3" : "#5A6069"}
+        stroke={exact ? "#3B4658" : "#5F6976"}
         strokeWidth="4"
         strokeDasharray={`${c * frac} ${c}`}
         strokeLinecap="butt"
@@ -46,7 +46,7 @@ export function CountRing({ total }: { total: number }) {
         textAnchor="middle"
         className="font-mono"
         fontSize="9"
-        fill="#5A6069"
+        fill="#5F6976"
       >
         /{DECK_SIZE}
       </text>

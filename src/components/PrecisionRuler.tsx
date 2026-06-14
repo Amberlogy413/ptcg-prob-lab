@@ -27,25 +27,25 @@ export function PrecisionRuler({ value, ariaLabel, labels = false }: PrecisionRu
         y1={base}
         x2={(i / 20) * w}
         y2={base - (major ? 7 : 4)}
-        stroke="#E3DFD6"
+        stroke="#E4E7EC"
         strokeWidth="1"
       />,
     );
   }
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-2 w-full max-w-md" role="img" aria-label={ariaLabel}>
-      <line x1="0" y1={base - 0.5} x2={w} y2={base - 0.5} stroke="#E3DFD6" strokeWidth="1" />
+      <line x1="0" y1={base - 0.5} x2={w} y2={base - 0.5} stroke="#E4E7EC" strokeWidth="1" />
       {ticks}
-      <line x1={x} y1={base} x2={x} y2={2} stroke="#2B59C3" strokeWidth="2" />
+      <line x1={x} y1={base} x2={x} y2={2} stroke="#3B4658" strokeWidth="2" />
       {labels && (
         <>
-          <text x="0" y={h} fontSize="6.5" fill="#5A6069" className="font-mono">
+          <text x="0" y={h} fontSize="6.5" fill="#5F6976" className="font-mono">
             0%
           </text>
-          <text x={w / 2} y={h} fontSize="6.5" fill="#5A6069" textAnchor="middle" className="font-mono">
+          <text x={w / 2} y={h} fontSize="6.5" fill="#5F6976" textAnchor="middle" className="font-mono">
             50%
           </text>
-          <text x={w} y={h} fontSize="6.5" fill="#5A6069" textAnchor="end" className="font-mono">
+          <text x={w} y={h} fontSize="6.5" fill="#5F6976" textAnchor="end" className="font-mono">
             100%
           </text>
         </>

@@ -456,3 +456,25 @@
     auto-update 出官方即覆蓋)+ 卡集名以英文官方名為據翻譯。
 - **介面改革**:已開背景 workflow(study-priceright-design)深扒參考站 design token
   /IA/表達手法,產出 design-logic spec + 分階段計劃。**主調維持中性石墨**,只借 layout。
+
+## 2026-06-15 — 介面改革 Phase 1:設計系統基建(借 PriceRight 表達,主調石墨灰)
+
+- **背景**:背景 workflow(study-priceright-design)深扒參考站,產出 docs/07_DESIGN_SYSTEM.md
+  (完整 design-logic spec + 分階段計劃)。鐵律:**只借 layout/IA/互動/解剖/節奏/語氣,
+  主調永遠中性石墨 #3B4658**,飽和色只做 data(屬性/功能)+ 三語意。見 [[ui-accent-no-type-colors]]。
+- **Phase 1 落地(本批)**:
+  - **Token**:tailwind 加 `accent-50 #EEF0F3`(blue@~8% 石墨灰 wash)、`shadow-soft`、
+    `shadow-glow`(石墨灰 tint,非綠 glow)。
+  - **5 個共用組件** `src/components/ui/`:`Button`(buttonClass 統一幾何,全石墨灰)、
+    `SectionHeader`(標題+｜facet+助手句)、`HintBar`(5 variant,色相石墨灰化,語意色
+    只做 transient)、`OptionCard`/`OptionGrid`(編號 icon-tile 選擇卡,**單一石墨灰 accent**,
+    subtype 用 outline chip 唔用第二色)、`Stepper`/`StepNav`(頁內步進器,current/done✓/
+    locked🔒 + maxStep gating;非全域導覽)。
+  - **試點**:獎賞卡 Q3 三模式 segmented → 3 張 OptionCard(01–03 + ｜副標)+ mode HintBar。
+    實測:選中 = accent-50 底 + 石墨灰邊 + soft shadow,零綠/藍 chrome。
+  - **修 token drift**:8 個檔嘅舊 Iono hex(#2B59C3/#E3DFD6/#5A6069)→ 現行
+    #3B4658/#E4E7EC/#5F6976(PrecisionRuler/CurveSection/CountRing/DistChart/Q2 MC-band
+    + 3 個 SVG 匯出工具),共 42 處。
+- **質量**:tsc 乾淨 · 296 測試(+4 組件測試) · 黃金 27/507 · 0 console error · 數學零改動。
+- **下階段**:Phase 2(ask Q2 + 組牌工坊上 Stepper、deck empty-state OptionGrid)、
+  Phase 3(逐頁 SectionHeader/HintBar)、Phase 4(decks #40 系列選擇器、LiveSummaryPanel、文檔)。

@@ -296,17 +296,17 @@ function McVerifyBlock({
             </span>
           </p>
           <svg viewBox="0 0 240 14" className="mt-1 w-full max-w-md" role="img" aria-label={t("mc.band.aria")}>
-            <line x1="0" y1="7" x2="240" y2="7" stroke="#E3DFD6" strokeWidth="1" />
+            <line x1="0" y1="7" x2="240" y2="7" stroke="#E4E7EC" strokeWidth="1" />
             <rect
               x={mc.lo * 240}
               y="3"
               width={Math.max((mc.hi - mc.lo) * 240, 1)}
               height="8"
-              fill="#2B59C3"
+              fill="#3B4658"
               opacity="0.25"
             />
-            <line x1={mc.phat * 240} y1="2" x2={mc.phat * 240} y2="12" stroke="#5A6069" strokeWidth="1.5" />
-            <line x1={exactChart * 240} y1="0" x2={exactChart * 240} y2="14" stroke="#2B59C3" strokeWidth="2" />
+            <line x1={mc.phat * 240} y1="2" x2={mc.phat * 240} y2="12" stroke="#5F6976" strokeWidth="1.5" />
+            <line x1={exactChart * 240} y1="0" x2={exactChart * 240} y2="14" stroke="#3B4658" strokeWidth="2" />
           </svg>
         </div>
       )}

@@ -378,19 +378,19 @@ function CurveChart({ rows, ariaLabel }: { rows: TurnCurveRow[]; ariaLabel: stri
     <svg viewBox={`0 0 ${w} ${h}`} className="mt-3 w-full max-w-lg" role="img" aria-label={ariaLabel}>
       {[0, 0.25, 0.5, 0.75, 1].map((g) => (
         <g key={g}>
-          <line x1={padL} y1={yPos(g)} x2={w - 8} y2={yPos(g)} stroke="#E3DFD6" strokeWidth="1" />
-          <text x={padL - 4} y={yPos(g) + 3} fontSize="8" fill="#5A6069" textAnchor="end" className="font-mono">
+          <line x1={padL} y1={yPos(g)} x2={w - 8} y2={yPos(g)} stroke="#E4E7EC" strokeWidth="1" />
+          <text x={padL - 4} y={yPos(g) + 3} fontSize="8" fill="#5F6976" textAnchor="end" className="font-mono">
             {Math.round(g * 100)}%
           </text>
         </g>
       ))}
-      <path d={path} fill="none" stroke="#2B59C3" strokeWidth="2" />
+      <path d={path} fill="none" stroke="#3B4658" strokeWidth="2" />
       {rows.map((r, i) => (
         <g key={r.turn}>
-          <circle cx={xPos(i)} cy={yPos(r.chart)} r="2.5" fill="#2B59C3">
+          <circle cx={xPos(i)} cy={yPos(r.chart)} r="2.5" fill="#3B4658">
             <title>{`T${r.turn} (n=${r.nSeen}): ${r.percent} = ${r.fraction}`}</title>
           </circle>
-          <text x={xPos(i)} y={h - 6} fontSize="8" fill="#5A6069" textAnchor="middle" className="font-mono">
+          <text x={xPos(i)} y={h - 6} fontSize="8" fill="#5F6976" textAnchor="middle" className="font-mono">
             T{r.turn}
           </text>
         </g>
