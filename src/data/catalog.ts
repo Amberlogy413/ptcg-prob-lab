@@ -114,6 +114,9 @@ export interface Catalog {
   /** Verified Trainer/Energy staple EN → zh (scripts/name_bridge.json). Keys
    *  lowercased; unambiguous staples only (ambiguous names omitted, not guessed). */
   trainerEnZh?: Record<string, string>;
+  /** dexId → pre-evolution dexId (PokéAPI), for evolution-family grouping in
+   *  the deck workshop. */
+  dexEvolvesFrom?: Record<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -307,6 +310,64 @@ export function groupByName(catalog: Catalog, cards: CatalogCard[]): PrintGroup[
   return order.map((name) => {
     const prints = sortPrints(catalog, byName.get(name) as CatalogCard[]);
     return { rep: prints[0] as CatalogCard, prints };
+  });
+}
+
+// Evolution stage ordering (basic first) for laying out a family.
+const STAGE_RANK: Record<string, number> = {
+  Basic: 0,
+  Stage1: 1,
+  Stage2: 2,
+  VMAX: 2,
+  VSTAR: 2,
+  MEGA: 3,
+  BREAK: 3,
+  "LEVEL-UP": 3,
+};
+
+export interface EvolutionFamily {
+  /** Root (basic) dexId, or null for non-dex / non-Pokémon singletons. */
+  rootDex: number | null;
+  /** Member print-groups, ordered Basic → Stage 1 → Stage 2. */
+  members: PrintGroup[];
+}
+
+/**
+ * Group print-groups into EVOLUTION FAMILIES (owner request 2026-06-14 — same
+ * evolution line shows as one combo in the deck workshop). Walks each card's
+ * dexId up through catalog.dexEvolvesFrom to its basic; non-Pokémon and
+ * dex-less cards become singletons. Family order follows first appearance, so a
+ * popularity/relevance-sorted input stays sorted.
+ */
+export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): EvolutionFamily[] {
+  const evo = catalog.dexEvolvesFrom ?? {};
+  const rootOf = (dex: number): number => {
+    let cur = dex;
+    for (let guard = 0; guard < 6; guard++) {
+      const next = evo[cur];
+      if (next === undefined) break;
+      cur = next;
+    }
+    return cur;
+  };
+  const order: string[] = [];
+  const byKey = new Map<string, PrintGroup[]>();
+  for (const g of groups) {
+    const dex = g.rep.category === "Pokemon" ? g.rep.dexId?.[0] : undefined;
+    const key = dex !== undefined ? `d${rootOf(dex)}` : `n${g.rep.name}`;
+    let fam = byKey.get(key);
+    if (fam === undefined) {
+      fam = [];
+      byKey.set(key, fam);
+      order.push(key);
+    }
+    fam.push(g);
+  }
+  return order.map((key) => {
+    const members = (byKey.get(key) as PrintGroup[])
+      .slice()
+      .sort((a, b) => (STAGE_RANK[a.rep.stage ?? "Basic"] ?? 9) - (STAGE_RANK[b.rep.stage ?? "Basic"] ?? 9));
+    return { rootDex: key.startsWith("d") ? Number(key.slice(1)) : null, members };
   });
 }
 

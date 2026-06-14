@@ -17,15 +17,45 @@ export const TYPE_COLORS: Record<string, string> = {
   Fairy: "#D173A8",
 };
 
-/** Neutral accent for cards without a Pokémon type (Trainer / Energy). */
+/** Neutral accent for cards without a typed identity (most Trainers). */
 export const NEUTRAL_ACCENT = "#8A9298";
 
+/** Elemental character in an Energy card's zh name → type (owner 2026-06-14:
+ *  "能量卡要跟返屬性顏色"). Deterministic; names with no element stay neutral. */
+const ENERGY_CHAR_TYPE: Array<[string, string]> = [
+  ["草", "Grass"],
+  ["火", "Fire"],
+  ["水", "Water"],
+  ["雷", "Lightning"],
+  ["超", "Psychic"],
+  ["鬥", "Fighting"],
+  ["惡", "Darkness"],
+  ["鋼", "Metal"],
+  ["龍", "Dragon"],
+  ["妖精", "Fairy"],
+];
+
+function energyType(name: string): string | null {
+  for (const [ch, ty] of ENERGY_CHAR_TYPE) if (name.includes(ch)) return ty;
+  return null;
+}
+
 /**
- * Whole-card accent color (owner request 2026-06-14 — "不同寶可夢的卡片應該按
- * 其屬性顏色顯示"): a Pokémon's PRIMARY type color drives a card-edge accent on
- * every surface (visual, picker, builder). Trainer/Energy stay neutral.
+ * Whole-card accent color (owner request 2026-06-14): a Pokémon's PRIMARY type
+ * color drives a card-edge accent on every surface; Energy cards follow their
+ * elemental type; Trainers stay neutral.
  */
-export function cardAccent(card: { types?: string[] }): string {
+export function cardAccent(card: {
+  types?: string[];
+  category?: string;
+  name?: string;
+  nameZh?: string;
+}): string {
   const ty = card.types?.[0];
-  return (ty !== undefined && TYPE_COLORS[ty]) || NEUTRAL_ACCENT;
+  if (ty !== undefined && TYPE_COLORS[ty] !== undefined) return TYPE_COLORS[ty];
+  if (card.category === "Energy") {
+    const et = energyType(card.nameZh ?? card.name ?? "");
+    if (et !== null) return TYPE_COLORS[et] as string;
+  }
+  return NEUTRAL_ACCENT;
 }

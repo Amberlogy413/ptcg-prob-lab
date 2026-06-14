@@ -38,8 +38,8 @@ async function openBuilder() {
   const user = userEvent.setup();
   render(<App />);
   await viewReady();
-  await user.click(screen.getByRole("button", { name: "視覺組牌" }));
-  await screen.findByRole("dialog", { name: "逐層組牌:由大類到細項,點卡即加入" });
+  await user.click(screen.getByRole("button", { name: "組牌工坊" }));
+  await screen.findByRole("dialog", { name: /組牌工坊/ });
   return user;
 }
 
@@ -123,7 +123,7 @@ describe("layered deck builder", () => {
     const user = await openBuilder();
 
     // B=10 / N=60 anchor.
-    const dialog = screen.getByRole("dialog", { name: "逐層組牌:由大類到細項,點卡即加入" });
+    const dialog = screen.getByRole("dialog", { name: /組牌工坊/ });
     expect(within(dialog).getByText("25.862923%")).toBeInTheDocument();
 
     // Adding one Basic (B=11/N=61) moves the exact number.

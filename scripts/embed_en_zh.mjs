@@ -36,8 +36,16 @@ async function main() {
   }
   catalog.trainerEnZh = tr;
 
+  // Evolution links (dexId → pre-evolution dexId) for evolution-family grouping
+  // in the deck workshop. Official PokéAPI data.
+  const evo = {};
+  for (const [id, v] of Object.entries(dex)) {
+    if (v && typeof v.from === "number") evo[id] = v.from;
+  }
+  catalog.dexEvolvesFrom = evo;
+
   await writeFile(CATALOG, JSON.stringify(catalog));
-  console.log(`embedded dexEnZh: ${Object.keys(map).length} species; trainerEnZh: ${Object.keys(tr).length} staples`);
+  console.log(`embedded dexEnZh: ${Object.keys(map).length} species; trainerEnZh: ${Object.keys(tr).length} staples; dexEvolvesFrom: ${Object.keys(evo).length} links`);
   console.log(`  sample: dragapult=${map["dragapult"]}, charizard=${map["charizard"]}, fire energy=${tr["fire energy"]}, ultra ball=${tr["ultra ball"]}`);
 }
 

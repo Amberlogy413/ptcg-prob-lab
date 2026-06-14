@@ -15,9 +15,11 @@ import {
   kindOf,
   fnKey,
   cardName,
+  evolutionFamilies,
   FN_ORDER,
   type Catalog,
   type CatalogCard,
+  type PrintGroup,
 } from "../data/catalog.ts";
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
@@ -201,6 +203,91 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     }
   }
 
+  // One card tile (shared by the flat grid and the evolution-family layout).
+  const renderTile = (group: PrintGroup) => {
+    const { rep, prints } = group;
+    const card = prints.find((p) => p.id === printChoice[rep.name]) ?? rep;
+    const kind = kindOf(card);
+    const owned = nameTotals.get(rep.name) ?? 0;
+    const addLabel =
+      t("catalog.addAria", { name: card.name, id: card.id }) +
+      (card.usage !== undefined ? `,${t("catalog.usageAria", { p: card.usage })}` : "") +
+      (owned > 0 ? `,${t("builder.copies", { n: owned })}` : "") +
+      (card.std !== true ? `,${t("catalog.legal.not")}` : "");
+    return (
+      <li
+        key={rep.name}
+        style={{ borderLeftColor: cardAccent(card), borderLeftWidth: "3px" }}
+        className="rounded-ctl border hairline bg-surface p-2"
+      >
+        <button
+          type="button"
+          aria-label={addLabel}
+          onClick={() => addCardFrom(deck.id, toNewCardInput(card))}
+          className="block w-full text-left hover:bg-paper"
+        >
+          <span className="flex items-baseline gap-1">
+            <CardName card={card} className="min-w-0 flex-1 truncate text-sm font-medium" />
+            {owned > 0 && (
+              <span
+                className="shrink-0 rounded-full bg-pink px-1.5 font-mono text-xs text-white"
+                title={t("builder.copies", { n: owned })}
+              >
+                ×{owned}
+              </span>
+            )}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
+            <span className="rounded-ctl border hairline px-1 py-0.5">{label(kind.key, kind.raw)}</span>
+            {card.usage !== undefined && (
+              <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
+                {t("catalog.usage", { p: card.usage })}
+              </span>
+            )}
+            {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}
+            <span className="font-mono">
+              {card.set ?? "?"} {card.localId}
+            </span>
+            {card.std !== true && <span>{t("catalog.legal.not")}</span>}
+          </span>
+        </button>
+        <div className="mt-2 flex gap-1">
+          {prints.length > 1 && (
+            <select
+              aria-label={t("catalog.version", { name: rep.name })}
+              value={card.id}
+              onChange={(e) => setPrintChoice((m) => ({ ...m, [rep.name]: e.target.value }))}
+              className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-1 font-mono text-xs text-ink2"
+            >
+              {prints.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.set ?? "?"} {p.localId}
+                  {p.std === true ? " ✓" : ""}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            type="button"
+            aria-label={t("catalog.detailAria", { name: rep.name })}
+            aria-haspopup="dialog"
+            onClick={() => setDetail(card)}
+            className="h-9 shrink-0 rounded-ctl border hairline bg-surface px-3 text-sm text-ink2 hover:text-ink"
+          >
+            ⓘ
+          </button>
+        </div>
+      </li>
+    );
+  };
+
+  // Pokémon results group into evolution families (owner request: same line =
+  // one combo); capped to keep the grid light.
+  const families =
+    catalog !== null && category === "Pokemon"
+      ? evolutionFamilies(catalog, results).slice(0, GRID_CAP)
+      : null;
+
   return (
     <Modal wide title={t("builder.title")} onClose={onClose}>
       {/* Live deck bar: the builder's instrument readout. */}
@@ -352,91 +439,36 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           <p className="mt-2 text-xs text-ink2">{t("builder.results", { n: results.length })}</p>
           {results.length === 0 ? (
             <p className="mt-2 text-sm text-ink2">{t("builder.empty")}</p>
+          ) : families !== null ? (
+            <div className="mt-2 max-h-96 space-y-2 overflow-y-auto" aria-label={t("catalog.results.aria")}>
+              {families.map((fam) => {
+                const multi = fam.members.length > 1;
+                return (
+                  <div
+                    key={fam.rootDex ?? fam.members[0]!.rep.name}
+                    className={multi ? "rounded-ctl border hairline bg-paper p-2" : ""}
+                  >
+                    {multi && (
+                      <p className="mb-1 text-xs font-medium text-ink2">
+                        {t("builder.family", { name: cardName(fam.members[0]!.rep, lang) })}
+                      </p>
+                    )}
+                    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                      {fam.members.map(renderTile)}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
             <ul
               aria-label={t("catalog.results.aria")}
               className="mt-2 grid max-h-96 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4"
             >
-              {results.slice(0, GRID_CAP).map(({ rep, prints }) => {
-                const card = prints.find((p) => p.id === printChoice[rep.name]) ?? rep;
-                const kind = kindOf(card);
-                const owned = nameTotals.get(rep.name) ?? 0;
-                const addLabel =
-                  t("catalog.addAria", { name: card.name, id: card.id }) +
-                  (card.usage !== undefined ? `,${t("catalog.usageAria", { p: card.usage })}` : "") +
-                  (owned > 0 ? `,${t("builder.copies", { n: owned })}` : "") +
-                  (card.std !== true ? `,${t("catalog.legal.not")}` : "");
-                return (
-                  <li
-                    key={rep.name}
-                    style={{ borderLeftColor: cardAccent(card), borderLeftWidth: "3px" }}
-                    className="rounded-ctl border hairline bg-surface p-2"
-                  >
-                    <button
-                      type="button"
-                      aria-label={addLabel}
-                      onClick={() => addCardFrom(deck.id, toNewCardInput(card))}
-                      className="block w-full text-left hover:bg-paper"
-                    >
-                      <span className="flex items-baseline gap-1">
-                        <CardName card={card} className="min-w-0 flex-1 truncate text-sm font-medium" />
-                        {owned > 0 && (
-                          <span
-                            className="shrink-0 rounded-full bg-pink px-1.5 font-mono text-xs text-white"
-                            title={t("builder.copies", { n: owned })}
-                          >
-                            ×{owned}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
-                        <span className="rounded-ctl border hairline px-1 py-0.5">
-                          {label(kind.key, kind.raw)}
-                        </span>
-                        {card.usage !== undefined && (
-                          <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
-                            {t("catalog.usage", { p: card.usage })}
-                          </span>
-                        )}
-                        {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}
-                        <span className="font-mono">
-                          {card.set ?? "?"} {card.localId}
-                        </span>
-                        {card.std !== true && <span>{t("catalog.legal.not")}</span>}
-                      </span>
-                    </button>
-                    <div className="mt-2 flex gap-1">
-                      {prints.length > 1 && (
-                        <select
-                          aria-label={t("catalog.version", { name: rep.name })}
-                          value={card.id}
-                          onChange={(e) => setPrintChoice((m) => ({ ...m, [rep.name]: e.target.value }))}
-                          className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-1 font-mono text-xs text-ink2"
-                        >
-                          {prints.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.set ?? "?"} {p.localId}
-                              {p.std === true ? " ✓" : ""}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={t("catalog.detailAria", { name: rep.name })}
-                        aria-haspopup="dialog"
-                        onClick={() => setDetail(card)}
-                        className="h-9 shrink-0 rounded-ctl border hairline bg-surface px-3 text-sm text-ink2 hover:text-ink"
-                      >
-                        ⓘ
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
+              {results.slice(0, GRID_CAP).map(renderTile)}
             </ul>
           )}
-          {results.length > GRID_CAP && (
+          {families === null && results.length > GRID_CAP && (
             <p className="mt-2 text-xs text-ink2">
               {t("builder.more", { n: results.length - GRID_CAP })}
             </p>

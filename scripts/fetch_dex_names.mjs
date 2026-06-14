@@ -38,10 +38,14 @@ async function fetchSpecies(id) {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       const pick = (code) => (j.names.find((n) => n.language.name === code) || {}).name;
+      // Pre-evolution dexId (for evolution-family grouping in the builder).
+      const fromUrl = j.evolves_from_species?.url ?? "";
+      const fromMatch = /\/pokemon-species\/(\d+)\/?$/.exec(fromUrl);
       return {
         zh: pick("zh-hant") ?? null,
         ja: pick("ja") ?? pick("ja-hrkt") ?? null,
         en: pick("en") ?? null,
+        from: fromMatch ? Number(fromMatch[1]) : null,
       };
     } catch {
       await new Promise((res) => setTimeout(res, 400 * (attempt + 1)));
@@ -63,7 +67,8 @@ async function main() {
   }
   const sorted = [...ids].sort((a, b) => a - b);
   const out = await loadExisting();
-  const todo = sorted.filter((id) => out[id] === undefined);
+  // Re-fetch entries that predate the `from` (evolves-from) field too.
+  const todo = sorted.filter((id) => out[id] === undefined || out[id].from === undefined);
   console.log(`dexIds in catalog: ${sorted.length} | already cached: ${sorted.length - todo.length} | to fetch: ${todo.length}`);
 
   let done = 0;
