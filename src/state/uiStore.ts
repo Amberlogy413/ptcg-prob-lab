@@ -6,6 +6,7 @@ export type WorkspaceView =
   | "report"
   | "trial"
   | "midgame"
+  | "battle"
   | "ask"
   | "prizes"
   | "compare"

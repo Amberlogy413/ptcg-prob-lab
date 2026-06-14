@@ -349,6 +349,17 @@ export function IconArrowDown(p: IconProps) {
   );
 }
 
+/** 對戰 — crossed blades. */
+export function IconBattle() {
+  return (
+    <I>
+      <path d="M3 3.5 9.5 10M11 3.5 4.5 10" />
+      <path d="M2.5 11.5 4.5 13.5M13.5 11.5 11.5 13.5" />
+      <path d="M8 8.5 6 10.5M8 8.5l2 2" />
+    </I>
+  );
+}
+
 /** 數學證明 — a radical sign (show the full calculation). */
 export function IconProof(p: IconProps) {
   return (
