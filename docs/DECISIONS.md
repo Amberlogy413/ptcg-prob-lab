@@ -376,3 +376,16 @@
   (記入技術債);此 DECISIONS 條目為權威記錄。
 - ⚠️ 改 tailwind.config.js 後 dev server 要**重啟**先見效(HMR 唔食 config);
   build/deploy 自動食。
+
+## 2026-06-14 — 繁中零殘留:補齊全部非寶可夢卡繁中名
+
+- **擁有者**:繁中版仲見到日文(M 世代日文源卡),要求全部修正,未有官方繁中名嘅
+  參考 52poke 翻譯。
+- **落地**:`scripts/fill_extra_zh.mjs` 兩步補 nameZh:(1)再版橋接(日文名→既有
+  繁中印刷,7 張);(2)人手核實表 `scripts/extra_zh.json`(89 張,訓練家/能量/
+  競技場)。確定官方繁中名為主(氣球/神奇糖果/稜鏡星能量/寶可夢交替…),少數最新
+  M 世代卡用忠實翻譯(待官方發行修正)。結果:**全 8201 張卡 nameZh 齊全,std 0 缺**。
+  實測組牌工坊能量分頁零日文。
+- **新套更新管線次序**(更新):fetch_catalog → fetch_names → fill_zh_names →
+  fetch_dex_names → embed_en_zh → **fill_extra_zh** → reclassify → restamp_meta。
+  (restamp 保留所有 nameZh embed。)
