@@ -46,6 +46,42 @@ describe("evolutionFamilies", () => {
     const fams = evolutionFamilies(catalog, groups);
     expect(fams).toHaveLength(3);
   });
+
+  it("a Baby Basic (含羞苞/Budew) does NOT drag its dex-evolutions into a line", () => {
+    // Dex chains Budew(406)→Roselia(315)→Roserade(407); but Budew AND Roselia are
+    // printed Basic, so only Roselia→Roserade is a real TCG line (owner 2026-06-15).
+    const cat = { dexEvolvesFrom: { 315: 406, 407: 315 } } as unknown as Catalog;
+    const fams = evolutionFamilies(cat, [
+      group(pk("含羞苞", 406, "Basic")),
+      group(pk("毒薔薇", 315, "Basic")),
+      group(pk("羅絲雷朵", 407, "Stage1")),
+    ]);
+    const budew = fams.find((f) => f.members.some((m) => m.rep.name === "含羞苞"));
+    const roselia = fams.find((f) => f.members.some((m) => m.rep.name === "毒薔薇"));
+    expect(budew!.members.map((m) => m.rep.name)).toEqual(["含羞苞"]); // standalone
+    expect(roselia!.members.map((m) => m.rep.name)).toEqual(["毒薔薇", "羅絲雷朵"]);
+  });
+
+  it("alternate Basics of one species are singletons, not a fake series", () => {
+    const cat = { dexEvolvesFrom: {} } as unknown as Catalog;
+    const fams = evolutionFamilies(cat, [
+      group(pk("謝米", 492, "Basic")),
+      group(pk("天空謝米", 492, "Basic")),
+    ]);
+    expect(fams).toHaveLength(2);
+    for (const f of fams) expect(f.members).toHaveLength(1);
+  });
+
+  it("rep (collapsed face) is the highest-採用率 member", () => {
+    const cat = { dexEvolvesFrom: { 407: 315 }, sets: {} } as unknown as Catalog;
+    const basic = pk("毒薔薇", 315, "Basic");
+    const stage1 = pk("羅絲雷朵", 407, "Stage1");
+    stage1.usage = 50; // the evolution is the hot card
+    const fams = evolutionFamilies(cat, [group(basic), group(stage1)]);
+    expect(fams).toHaveLength(1);
+    expect(fams[0]!.rep.rep.name).toBe("羅絲雷朵"); // 主軸 = most-played
+    expect(fams[0]!.members.map((m) => m.rep.name)).toEqual(["毒薔薇", "羅絲雷朵"]); // stage order
+  });
 });
 
 describe("cardAccent — energy by type", () => {

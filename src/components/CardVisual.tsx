@@ -206,6 +206,23 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
           </span>
         )}
       </p>
+
+      {/* 賽事數據 — every card records its real 採用率 (owner request 2026-06-15);
+          0% means it was not seen in the current Limitless sample. */}
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink2">
+        <span
+          className={
+            card.usage !== undefined
+              ? "rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink"
+              : "rounded-full border hairline px-1.5 py-0.5 font-mono opacity-60"
+          }
+          title={card.usage === undefined ? t("catalog.usageNoneTitle") : undefined}
+        >
+          {t("catalog.usageLine", { p: card.usage ?? 0 })}
+        </span>
+        {card.pop !== undefined && <span>{t("catalog.popRank", { n: card.pop })}</span>}
+        {card.owner !== undefined && <span>{t("catalog.ownerOf", { name: card.owner })}</span>}
+      </p>
     </div>
   );
 }

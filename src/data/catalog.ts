@@ -292,8 +292,11 @@ export function searchCatalog(catalog: Catalog, query: string, max = 50): Catalo
   }
   hits.sort((a, b) => {
     if (a.rank !== b.rank) return a.rank - b.rank;
-    // 熱門排前: popular names first, then standard-legal prints, then the
-    // newest set, so the playable answer lands on top.
+    // Within a relevance tier: 採用率 first (real usage), then the popularity
+    // rank, then standard-legal prints, then the newest set.
+    const ua = a.card.usage ?? -1;
+    const ub = b.card.usage ?? -1;
+    if (ua !== ub) return ub - ua;
     const pa = a.card.pop ?? Number.MAX_SAFE_INTEGER;
     const pb = b.card.pop ?? Number.MAX_SAFE_INTEGER;
     if (pa !== pb) return pa - pb;
@@ -356,6 +359,12 @@ export function toNewCardInput(card: CatalogCard): NewCardInput {
  *  used by search, the builder grid and name matching. */
 export function sortPrints(catalog: Catalog, cards: CatalogCard[]): CatalogCard[] {
   return [...cards].sort((a, b) => {
+    // 採用率 (real tournament usage) is the primary order — owner request,
+    // 2026-06-15: "真真正正地按熱門程度採用率排序". Higher usage first; cards not
+    // seen in the sample (undefined) sort after any seen card.
+    const ua = a.usage ?? -1;
+    const ub = b.usage ?? -1;
+    if (ua !== ub) return ub - ua;
     const pa = a.pop ?? Number.MAX_SAFE_INTEGER;
     const pb = b.pop ?? Number.MAX_SAFE_INTEGER;
     if (pa !== pb) return pa - pb;
@@ -423,32 +432,62 @@ export interface EvolutionFamily {
   rep: PrintGroup;
 }
 
+/** A card that is its own TCG evolution root — it does NOT evolve from anything,
+ *  whatever the species Pokédex says. This is the authoritative signal (owner
+ *  request 2026-06-15): a Baby Pokémon like 含羞苞 (Budew) is printed as a Basic
+ *  and CANNOT evolve in the TCG, even though the dex chains Budew→Roselia. So we
+ *  stop the evolution walk at any Basic card — no external baby list needed. */
+function isRootStage(stage: string | undefined): boolean {
+  return stage === undefined || stage === "Basic";
+}
+
 /**
  * Group print-groups into EVOLUTION FAMILIES (owner request 2026-06-14 — same
- * evolution line shows as one combo in the deck workshop). Walks each card's
- * dexId up through catalog.dexEvolvesFrom to its basic; non-Pokémon and
- * dex-less cards become singletons. A Trainer's Pokémon (card.owner) is keyed
- * per-owner so 竹蘭's line never merges with the ordinary line of the same dex
- * (owner request 2026-06-15). Family order follows first appearance, so a
- * popularity/relevance-sorted input stays sorted.
+ * line shows as one combo). We link a card to its dex pre-evolution ONLY when
+ * the card itself is an evolution (stage ≠ Basic); a Basic card is always a
+ * line root, so Baby Pokémon (含羞苞) stand alone and Roselia→Roserade group
+ * without dragging Budew in (owner request 2026-06-15). A Trainer's Pokémon
+ * (card.owner) is keyed per-owner so 竹蘭's line never merges with the ordinary
+ * line. Dex-less / non-Pokémon cards become singletons. Family order follows
+ * first appearance, so a usage-sorted input stays sorted.
  */
 export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): EvolutionFamily[] {
   const evo = catalog.dexEvolvesFrom ?? {};
-  const rootOf = (dex: number): number => {
-    let cur = dex;
-    for (let guard = 0; guard < 6; guard++) {
-      const next = evo[cur];
-      if (next === undefined) break;
-      cur = next;
+  const dexOf = (g: PrintGroup) => (g.rep.category === "Pokemon" ? g.rep.dexId?.[0] : undefined);
+  const scopeOf = (g: PrintGroup) => (g.rep.owner !== undefined ? `o${g.rep.owner}:` : "");
+  // Resolve a (scope, dex) to a representative print-group so the walk can read
+  // the parent's stage; prefer a Basic print (the TCG root) when a dex has both.
+  const byScopeDex = new Map<string, PrintGroup>();
+  for (const g of groups) {
+    const dex = dexOf(g);
+    if (dex === undefined) continue;
+    const k = `${scopeOf(g)}${dex}`;
+    const prev = byScopeDex.get(k);
+    if (prev === undefined || (isRootStage(g.rep.stage) && !isRootStage(prev.rep.stage))) {
+      byScopeDex.set(k, g);
     }
-    return cur;
+  }
+  const rootKeyOf = (g: PrintGroup): string => {
+    const dex0 = dexOf(g);
+    if (dex0 === undefined) return `n${g.rep.name}`;
+    const scope = scopeOf(g);
+    let curDex = dex0;
+    let curGroup = g;
+    for (let guard = 0; guard < 6; guard++) {
+      if (isRootStage(curGroup.rep.stage)) break; // TCG root reached — stop
+      const parentDex = evo[curDex];
+      if (parentDex === undefined) break;
+      curDex = parentDex;
+      const parent = byScopeDex.get(`${scope}${parentDex}`);
+      if (parent === undefined) break; // parent not in pool → its dex is the root
+      curGroup = parent;
+    }
+    return `${scope}d${curDex}`;
   };
   const order: string[] = [];
   const byKey = new Map<string, PrintGroup[]>();
   for (const g of groups) {
-    const dex = g.rep.category === "Pokemon" ? g.rep.dexId?.[0] : undefined;
-    const ownerTag = g.rep.owner !== undefined ? `o${g.rep.owner}:` : "";
-    const key = dex !== undefined ? `${ownerTag}d${rootOf(dex)}` : `n${g.rep.name}`;
+    const key = rootKeyOf(g);
     let fam = byKey.get(key);
     if (fam === undefined) {
       fam = [];
@@ -457,23 +496,41 @@ export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): Evolu
     }
     fam.push(g);
   }
-  return order.map((key) => {
+  const dexFromKey = (key: string): number | null => {
+    const dexPart = key.includes("d") ? key.slice(key.indexOf("d") + 1) : "";
+    return /^\d+$/.test(dexPart) ? Number(dexPart) : null;
+  };
+  const families: EvolutionFamily[] = [];
+  for (const key of order) {
     const raw = byKey.get(key) as PrintGroup[];
+    // A "進化系列" must hold a REAL evolution (≥1 non-Basic). Alternate Basics of
+    // one species (謝米 formes, the 洛托姆 forms, many 皮卡丘 prints) are NOT a
+    // line — split them back to singletons so the series box stays meaningful
+    // (owner request 2026-06-15: a series is a real evolution chain).
+    if (raw.length > 1 && raw.every((g) => isRootStage(g.rep.stage))) {
+      for (const g of sortPrints(catalog, raw.map((m) => m.rep)).map(
+        (rep) => raw.find((m) => m.rep.id === rep.id) as PrintGroup,
+      )) {
+        families.push({ key: `s${g.rep.id}`, rootDex: dexOf(g) ?? null, members: [g], rep: g });
+      }
+      continue;
+    }
     const members = raw
       .slice()
       .sort((a, b) => (STAGE_RANK[a.rep.stage ?? "Basic"] ?? 9) - (STAGE_RANK[b.rep.stage ?? "Basic"] ?? 9));
-    // 主軸 = most-played member (input is already popularity-sorted, so the
-    // earliest-appearing member in the raw order is the representative).
+    // 主軸 = most-played member (sortPrints = 採用率 first), so the collapsed card
+    // shows the line's hottest card (owner request 2026-06-15).
     const bestId = sortPrints(catalog, raw.map((g) => g.rep))[0]?.id;
     const rep = members.find((m) => m.rep.id === bestId) ?? members[0]!;
-    const dexPart = key.includes("d") ? key.slice(key.indexOf("d") + 1) : "";
-    return {
-      key,
-      rootDex: /^\d+$/.test(dexPart) ? Number(dexPart) : null,
-      members,
-      rep,
-    };
-  });
+    families.push({ key, rootDex: dexFromKey(key), members, rep });
+  }
+  // Order families STRICTLY by their 主軸's 採用率 (owner request 2026-06-15) —
+  // so a Basic split off an all-Basic group falls to its own usage spot instead
+  // of staying clustered at the original family position.
+  const repRank = new Map(
+    sortPrints(catalog, families.map((f) => f.rep.rep)).map((c, i) => [c.id, i] as const),
+  );
+  return families.sort((a, b) => (repRank.get(a.rep.rep.id) ?? 0) - (repRank.get(b.rep.rep.id) ?? 0));
 }
 
 /** Per-catalog id → card index, built once per catalog object. */

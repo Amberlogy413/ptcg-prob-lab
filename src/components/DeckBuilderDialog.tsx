@@ -85,6 +85,28 @@ function inCategory(card: CatalogCard, category: Category): boolean {
   return card.category === category;
 }
 
+/** 採用率 badge shown on EVERY card (owner request 2026-06-15). A real sampled
+ *  rate is the pink 熱門 badge; a card not seen in the current Limitless sample
+ *  shows a muted 0% (honest — its inclusion rate in that sample is zero). */
+function UsageBadge({ usage }: { usage?: number }) {
+  const t = useT();
+  if (usage !== undefined) {
+    return (
+      <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
+        {t("catalog.usage", { p: usage })}
+      </span>
+    );
+  }
+  return (
+    <span
+      title={t("catalog.usageNoneTitle")}
+      className="rounded-full border hairline px-1.5 py-0.5 font-mono text-ink2 opacity-60"
+    >
+      {t("catalog.usage", { p: 0 })}
+    </span>
+  );
+}
+
 /**
  * 逐層組牌 (docs/DECISIONS.md "真實卡牌目錄"): a layered, visual deck builder
  * over the full catalog — 大類 → 細分 → 屬性 → cards, each layer one row of
@@ -273,11 +295,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
             <span className="rounded-ctl border hairline px-1 py-0.5">{label(kind.key, kind.raw)}</span>
             {cardType(card) !== null && <TypeChip type={cardType(card) as string} />}
-            {card.usage !== undefined && (
-              <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
-                {t("catalog.usage", { p: card.usage })}
-              </span>
-            )}
+            <UsageBadge usage={card.usage} />
             {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}
             <span className="font-mono">
               {card.set ?? "?"} {card.localId}
@@ -356,6 +374,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
               {t("builder.seriesTag", { n: fam.members.length })}
             </span>
             {faceType !== null && <TypeChip type={faceType} />}
+            <UsageBadge usage={face.usage} />
             <span className="min-w-0 truncate">{stages.join(" › ")}</span>
           </span>
           <span className="mt-1 block text-xs text-blue">▾ {t("builder.seriesHint")}</span>

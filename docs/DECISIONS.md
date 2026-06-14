@@ -522,3 +522,25 @@
   發行自動歸類(graceful)。進化鏈成員完整度受 `dexEvolvesFrom`(PokéAPI)限制,
   個別線可能少一階——係資料完整度,非邏輯問題。
 - **質量**:tsc 乾淨 · 300 測試(+4)· 黃金 27/507 · 0 console error · 數學零改動。
+
+## 2026-06-15 (二) — 真‧採用率排序、寶寶寶可夢、每卡採用率、每卡資料庫
+
+- **採用率排序(產品負責人多次要求)**:`sortPrints` + `searchCatalog` 主排序鍵
+  改為 **usage(真實賽事採用率)降序**(pop/std/newest 做 tiebreak);
+  `evolutionFamilies` 結尾再按各系列「主軸」採用率排序,令拆出嚟嘅單卡跌返自己
+  位(唔再黐喺原系列位置)。組牌工坊網格現嚴格由高到低:60.2→34.6→32.8→…。
+- **寶寶寶可夢唔入進化鏈(含羞苞 = Budew)**:進化分組由「dex 種族進化」改為
+  **卡面 stage 主導**——`isRootStage(stage)= Basic/undefined`,行 dexEvolvesFrom
+  時遇到 Basic 即停(Basic 卡係 TCG 進化根)。所以含羞苞(Basic)同毒薔薇(Basic)
+  各自成根,只有羅絲雷朵(Stage1)接毒薔薇。**無需外部寶寶名單**;PokéAPI 嘅
+  is_baby 反而錯(連 Riolu 都標 baby,但 TCG 路卡利歐的確由利歐路進化)——卡面
+  stage 先係權威。另:全 Basic 同種多印(謝米 formes、洛托姆 forms、超級袋獸ex
+  係 Basic Mega)會拆返做單卡,因為「進化系列」必須含 ≥1 真進化。
+- **每張卡顯示採用率**:`UsageBadge` 喺每張卡(網格 + 摺疊系列主軸 + CardVisual
+  詳情)顯示真實採用率;未入賽事樣本 = 灰底 0%(誠實 = 該樣本 0% 入選率)。
+- **每卡極詳盡資料庫**:CardVisual 詳情新增「賽事數據」行(採用率 + 熱門排名 #N
+  + 訓練家所屬),連同原有 name(三語)/stage/evolveFrom/types/HP/特性/招式/規則/
+  弱抗逃/圖鑑/set/mark/legality/rarity/illustrator——catalog 本身就係資料庫。
+- **新標準作業(產品負責人 2026-06-15)**:由此每次更新後都自動 commit & push,
+  唔再等指示;繼續每批 build + 部署 gh-pages。
+- **質量**:tsc 乾淨 · 303 測試(+3)· 黃金 27/507 · 0 console error · 數學零改動。
