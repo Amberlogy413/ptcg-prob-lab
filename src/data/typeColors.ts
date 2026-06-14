@@ -59,3 +59,20 @@ export function cardAccent(card: {
   }
   return NEUTRAL_ACCENT;
 }
+
+/**
+ * Whole-card SURFACE styling (owner request 2026-06-15: 「寶可夢卡成張連底色都係
+ *跟返屬性顏色」). The card's type color tints the entire surface — a soft fill +
+ * a matching border + a stronger left edge — not just an edge accent. Tints are
+ * low-alpha so card text stays readable on the light theme. `strength` lets
+ * dense list rows use a fainter wash than standalone card tiles.
+ */
+export function cardSurface(
+  card: { types?: string[]; category?: string; name?: string; nameZh?: string },
+  strength: "tile" | "row" = "tile",
+): { backgroundColor: string; borderColor: string; borderLeftColor: string } {
+  const accent = cardAccent(card);
+  const fill = strength === "tile" ? "16" : "0D"; // ~9% vs ~5%
+  const edge = strength === "tile" ? "59" : "40"; // ~35% vs ~25%
+  return { backgroundColor: `${accent}${fill}`, borderColor: `${accent}${edge}`, borderLeftColor: accent };
+}

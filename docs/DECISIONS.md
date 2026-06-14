@@ -418,3 +418,22 @@
 - **新套更新管線次序**(更新):fetch_catalog → fetch_names → fill_zh_names →
   fetch_dex_names → embed_en_zh → fill_extra_zh → reclassify → **strip_brackets** →
   restamp_meta →(fetch_decks 後必跑)**relocalize_decks**。
+
+## 2026-06-15 — 整張卡屬性底色 + 特性子分類 + 介面改革方向
+
+- **擁有者**:① 寶可夢卡「成張卡連底色」都跟屬性色(唔淨係左邊框);② 功能標籤
+  (例:特性系)之下要有子分類;③ 極致參考 PriceRight (priceright-moving-core.vercel.app)
+  做徹底介面轉換;④ 同主軸寶可夢的熱門牌組要喺同一卡欄以系列形式揀。
+- **本批落地(③④下批做)**:
+  - **整張卡屬性底色**:`typeColors.ts` 新增 `cardSurface(card, strength)` → 柔和
+    屬性色填充 + 同色邊框 + 較深左緣(tile ≈9% / row ≈5% alpha,文字仍清晰)。
+    套用:組牌工坊 tile、CardVisual、CardPicker 結果列、CardRow(已解析列淡染)。
+  - **特性子分類**:`classify.mjs` 新增 `ABILITY_SUB_RULES`,**只掃特性文字**(招式
+    措辭唔會污染),父 fn = ability。8 類:ability.draw/search/accel/gust/damage/
+    heal/disrupt/protect。reclassify 後 fnSub 由 1810→2145 張;抽樣核實準確
+    (奇諾栗鼠抽2張→draw、布莉姆溫互換→gust、巨炭山充能→accel)。FN_SUB_ORDER/
+    KEYS + i18n(繁/英)齊。
+- **介面改革方向(緊記)**:借 PriceRight 嘅**版面/表達系統**(編號選項卡 + 圖示磚 +
+  兩行 pipe 描述、置頂步驟列、右側即時摘要面板、情境提示條),但**主調維持中性石墨**
+  ——唔跟佢哋嘅綠色主調(會撞 草/火/水 屬性色,不專業)。即:借 layout,唔借 accent hue。
+  見 memory ui-accent-no-type-colors。

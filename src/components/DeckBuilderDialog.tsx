@@ -26,7 +26,7 @@ import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
 import { FnIcon } from "./FnChip.tsx";
 import { CardName } from "./CardName.tsx";
-import { cardAccent } from "../data/typeColors.ts";
+import { cardSurface } from "../data/typeColors.ts";
 import { fnColor } from "../data/fnColors.ts";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
@@ -217,14 +217,14 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     return (
       <li
         key={rep.name}
-        style={{ borderLeftColor: cardAccent(card), borderLeftWidth: "3px" }}
-        className="rounded-ctl border hairline bg-surface p-2"
+        style={{ ...cardSurface(card), borderLeftWidth: "3px" }}
+        className="rounded-ctl border p-2"
       >
         <button
           type="button"
           aria-label={addLabel}
           onClick={() => addCardFrom(deck.id, toNewCardInput(card))}
-          className="block w-full text-left hover:bg-paper"
+          className="block w-full rounded-ctl text-left transition-colors hover:bg-white/40"
         >
           <span className="flex items-baseline gap-1">
             <CardName card={card} className="min-w-0 flex-1 truncate text-sm font-medium" />

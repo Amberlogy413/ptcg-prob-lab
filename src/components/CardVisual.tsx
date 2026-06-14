@@ -15,7 +15,7 @@ import {
   IconLegal,
   IconIllegal,
 } from "./icons.tsx";
-import { cardAccent } from "../data/typeColors.ts";
+import { cardSurface } from "../data/typeColors.ts";
 import { useCardName } from "../state/cardLang.ts";
 
 /**
@@ -29,15 +29,14 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
   const t = useT();
   const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
   const kind = kindOf(card);
-  const accent = cardAccent(card);
   const { primary, others } = useCardName(card);
 
   return (
     <div
       role="group"
       aria-label={t("visual.aria", { name: primary })}
-      style={{ borderLeftColor: accent, borderLeftWidth: "4px" }}
-      className="rounded-card border hairline bg-receipt p-4 text-sm shadow-receipt"
+      style={{ ...cardSurface(card), borderLeftWidth: "4px" }}
+      className="rounded-card border p-4 text-sm shadow-receipt"
     >
       {/* Header: kind · name (primary large + other languages small) · HP · types */}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

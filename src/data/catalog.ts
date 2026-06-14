@@ -648,6 +648,14 @@ export const FN_SUB_ORDER = [
   "heal.full",
   "recover.hand",
   "recover.deck",
+  "ability.draw",
+  "ability.search",
+  "ability.accel",
+  "ability.gust",
+  "ability.damage",
+  "ability.heal",
+  "ability.disrupt",
+  "ability.protect",
 ] as const;
 
 const FN_SUB_KEYS: Record<string, string> = {
@@ -665,6 +673,14 @@ const FN_SUB_KEYS: Record<string, string> = {
   "heal.full": "catalog.fnsub.healFull",
   "recover.hand": "catalog.fnsub.recoverHand",
   "recover.deck": "catalog.fnsub.recoverDeck",
+  "ability.draw": "catalog.fnsub.abilityDraw",
+  "ability.search": "catalog.fnsub.abilitySearch",
+  "ability.accel": "catalog.fnsub.abilityAccel",
+  "ability.gust": "catalog.fnsub.abilityGust",
+  "ability.damage": "catalog.fnsub.abilityDamage",
+  "ability.heal": "catalog.fnsub.abilityHeal",
+  "ability.disrupt": "catalog.fnsub.abilityDisrupt",
+  "ability.protect": "catalog.fnsub.abilityProtect",
 };
 export function fnSubKey(sub: string): string | null {
   return FN_SUB_KEYS[sub] ?? null;

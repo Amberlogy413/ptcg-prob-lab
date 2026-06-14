@@ -47,6 +47,20 @@ export const SUB_RULES = [
   ["recover.deck", "recover", /棄牌區[^。]{0,30}(放回牌庫|加入牌庫)/],
 ];
 
+// [subKey, regex] — what an ABILITY does, matched over the ABILITY text ONLY
+// (owner request 2026-06-15: 特性系之下都要有子分類). Kept off the attack text so
+// an attack's wording never mis-tags the ability. Parent fn is always "ability".
+export const ABILITY_SUB_RULES = [
+  ["ability.draw", /抽(出)?\s*\d*\s*張|抽一張/],
+  ["ability.search", /(從|在)(自己的)?牌庫[^。]{0,16}(選擇|搜尋)|搜尋(自己的)?牌庫/],
+  ["ability.accel", /能量[^。]{0,15}附(加)?(到|於|在)|從[^。]{0,15}能量[^。]{0,12}附/],
+  ["ability.gust", /備戰寶可夢[^。]{0,15}(互換|替換)|改為對手的備戰寶可夢/],
+  ["ability.damage", /放置[^。]{0,10}傷害指示物|傷害指示物[^。]{0,10}放置|(造成|給予)[^。]{0,6}\d+\s*點?傷害/],
+  ["ability.heal", /恢復[^。]{0,8}HP/],
+  ["ability.disrupt", /對手的(手牌|牌庫)/],
+  ["ability.protect", /不會受到[^。]{0,15}(傷害|效果)|防止[^。]{0,10}傷害/],
+];
+
 /** Set card.fn (coarse) and card.fnSub (fine) from the card's own text. */
 export function classify(card) {
   const texts = [
@@ -76,6 +90,14 @@ export function classify(card) {
   const fnSub = [];
   for (const [sub, parent, re] of SUB_RULES) {
     if (fnSet.has(parent) && re.test(texts) && !fnSub.includes(sub)) fnSub.push(sub);
+  }
+  // Ability sub-categories — over the ability text only, so attack wording
+  // never leaks in. Only when this Pokémon actually has an ability.
+  if (fnSet.has("ability")) {
+    const abilityText = (card.abilities ?? []).map((a) => a.effect ?? "").join("\n");
+    for (const [sub, re] of ABILITY_SUB_RULES) {
+      if (re.test(abilityText) && !fnSub.includes(sub)) fnSub.push(sub);
+    }
   }
 
   if (fn.length > 0) card.fn = fn;

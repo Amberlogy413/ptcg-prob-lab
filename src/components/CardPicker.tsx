@@ -125,7 +125,10 @@ export function CardPicker({ deckId }: { deckId: string }) {
                 const open = detailId === rep.name;
                 return (
                   <li key={rep.name} className="border-b hairline last:border-b-0">
-                    <div className="flex items-center gap-2 py-1.5">
+                    <div
+                      className="flex items-center gap-2 rounded-ctl py-1.5"
+                      style={{ backgroundColor: `${cardAccent(card)}0D` }}
+                    >
                       <button
                         type="button"
                         aria-label={

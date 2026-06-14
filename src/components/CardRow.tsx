@@ -37,7 +37,11 @@ export function CardRow({
   const localized = displayName !== undefined && displayName !== card.name;
   return (
     <li
-      style={accent !== undefined ? { borderLeftColor: accent, borderLeftWidth: "3px" } : undefined}
+      style={
+        accent !== undefined
+          ? { borderLeftColor: accent, borderLeftWidth: "3px", backgroundColor: `${accent}0D` }
+          : undefined
+      }
       className={
         "flex items-center gap-2 border-b hairline py-1.5 pl-1 last:border-b-0" +
         (rotatingOut ? " opacity-40 line-through" : "")
