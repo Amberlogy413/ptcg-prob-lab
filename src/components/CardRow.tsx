@@ -1,6 +1,8 @@
 import { useT } from "../i18n/index.ts";
 import type { DeckCard } from "../state/deckStore.ts";
 import { IconRotate } from "./icons.tsx";
+import { TypeIcon } from "./TypeChip.tsx";
+import { TYPE_COLORS } from "../data/typeColors.ts";
 
 /** Regulation letters offered by the mark select (current era ± buffer). */
 export const REGULATION_MARKS = ["D", "E", "F", "G", "H", "I", "J"] as const;
@@ -18,6 +20,11 @@ interface CardRowProps {
   displayName?: string;
   /** Type-color accent for the row's left edge (resolved rows). */
   accent?: string;
+  /** Precise kind of a resolved card (基礎/一階進化/支援者/特殊能量…); when set,
+   *  replaces the binary 基礎 toggle with an accurate read-only badge. */
+  kindLabel?: string;
+  /** Pokémon/Energy type of a resolved card → shows an explicit type icon. */
+  typeName?: string;
 }
 
 /** One editor row: count stepper + name + Basic toggle + mark + delete (docs/04 §6). */
@@ -29,6 +36,8 @@ export function CardRow({
   onShowVisual,
   displayName,
   accent,
+  kindLabel,
+  typeName,
 }: CardRowProps) {
   const t = useT();
   const stepBtn =
@@ -78,6 +87,11 @@ export function CardRow({
           ＋
         </button>
       </div>
+      {typeName !== undefined && (
+        <span className="shrink-0" style={{ color: TYPE_COLORS[typeName] ?? "#8A9298" }}>
+          <TypeIcon type={typeName} />
+        </span>
+      )}
       {localized ? (
         <span
           title={card.name}
@@ -95,22 +109,33 @@ export function CardRow({
           className="h-9 min-w-0 flex-1 rounded-ctl border hairline bg-surface px-2 text-base"
         />
       )}
-      <button
-        type="button"
-        role="switch"
-        aria-checked={card.isBasic}
-        aria-label={t("deck.card.basicAria", { name: card.name || t("deck.card.name") })}
-        title={t("deck.card.basicFull")}
-        onClick={() => onUpdate({ isBasic: !card.isBasic })}
-        className={
-          "h-9 shrink-0 rounded-ctl border px-2.5 text-sm transition-colors duration-fast " +
-          (card.isBasic
-            ? "border-blue bg-blue text-white"
-            : "hairline bg-surface text-ink2 hover:text-ink")
-        }
-      >
-        {t("deck.card.basic")}
-      </button>
+      {kindLabel !== undefined ? (
+        // Resolved card: show its PRECISE kind (stage / trainer type / energy
+        // type), read-only — far more accurate than a binary 基礎 toggle.
+        <span
+          title={card.isBasic ? t("deck.card.basicFull") : kindLabel}
+          className="flex h-9 shrink-0 items-center rounded-ctl border hairline bg-surface px-2.5 text-sm text-ink2"
+        >
+          {kindLabel}
+        </span>
+      ) : (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={card.isBasic}
+          aria-label={t("deck.card.basicAria", { name: card.name || t("deck.card.name") })}
+          title={t("deck.card.basicFull")}
+          onClick={() => onUpdate({ isBasic: !card.isBasic })}
+          className={
+            "h-9 shrink-0 rounded-ctl border px-2.5 text-sm transition-colors duration-fast " +
+            (card.isBasic
+              ? "border-blue bg-blue text-white"
+              : "hairline bg-surface text-ink2 hover:text-ink")
+          }
+        >
+          {t("deck.card.basic")}
+        </button>
+      )}
       <select
         value={card.mark ?? ""}
         aria-label={t("deck.card.mark", { name: card.name || t("deck.card.name") })}

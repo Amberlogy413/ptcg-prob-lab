@@ -7,6 +7,7 @@ import {
   groupByName,
   toNewCardInput,
   kindOf,
+  typeKey,
   isFormatLegal,
   type Catalog,
   type CatalogCard,
@@ -14,8 +15,9 @@ import {
 import { CardVisual } from "./CardVisual.tsx";
 import { CardName } from "./CardName.tsx";
 import { FnChip } from "./FnChip.tsx";
+import { TypeIcon } from "./TypeChip.tsx";
 import { IconFlame, IconHP, IconLegal, IconIllegal } from "./icons.tsx";
-import { cardAccent } from "../data/typeColors.ts";
+import { cardAccent, cardType } from "../data/typeColors.ts";
 
 type Status = "idle" | "loading" | "ready" | "error";
 
@@ -140,11 +142,21 @@ export function CardPicker({ deckId }: { deckId: string }) {
                         onClick={() => add(card)}
                         className="flex min-w-0 flex-1 items-center gap-2 rounded-ctl px-1 py-1 text-left hover:bg-surface"
                       >
-                        <span
-                          aria-hidden
-                          className="h-4 w-1 shrink-0 rounded-full"
-                          style={{ backgroundColor: cardAccent(card) }}
-                        />
+                        {cardType(card) !== null ? (
+                          <span
+                            className="shrink-0"
+                            title={t(typeKey(cardType(card) as string) ?? "")}
+                            style={{ color: cardAccent(card) }}
+                          >
+                            <TypeIcon type={cardType(card) as string} />
+                          </span>
+                        ) : (
+                          <span
+                            aria-hidden
+                            className="h-4 w-1 shrink-0 rounded-full"
+                            style={{ backgroundColor: cardAccent(card) }}
+                          />
+                        )}
                         <CardName card={card} className="min-w-0 flex-1 truncate text-base" />
                         {(card.fn ?? []).slice(0, 3).map((k) => (
                           <FnChip key={k} tag={k} compact />

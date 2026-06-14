@@ -22,10 +22,11 @@ import {
   cardName,
   resolveDeckRow,
   localizeDeckRow,
+  kindOf,
   type Catalog,
 } from "../data/catalog.ts";
 import { useCardLang } from "../state/cardLang.ts";
-import { cardAccent } from "../data/typeColors.ts";
+import { cardAccent, cardType } from "../data/typeColors.ts";
 import { IconWarn } from "./icons.tsx";
 
 const SECTION_ORDER: DeckSection[] = ["pokemon", "trainer", "energy", "unknown"];
@@ -160,8 +161,14 @@ export function DeckEditor({ deck }: { deck: Deck }) {
               <ul aria-label={t("deck.rows.aria")}>
                 {cards.map((card) => {
                   const loc = catalog !== null ? localizeDeckRow(catalog, card, lang) : null;
+                  const resolved = loc !== null ? loc.card : null;
                   const displayName = loc !== null ? loc.name : undefined;
-                  const accent = loc !== null && loc.card !== null ? cardAccent(loc.card) : undefined;
+                  const accent = resolved !== null ? cardAccent(resolved) : undefined;
+                  const kind = resolved !== null ? kindOf(resolved) : null;
+                  const kindLabel =
+                    kind !== null ? (kind.key !== null ? t(kind.key) : kind.raw) : undefined;
+                  const typeName =
+                    resolved !== null ? (cardType(resolved) ?? undefined) : undefined;
                   return (
                     <CardRow
                       key={card.id}
@@ -172,6 +179,8 @@ export function DeckEditor({ deck }: { deck: Deck }) {
                       onShowVisual={showVisualFor(card)}
                       displayName={displayName}
                       accent={accent}
+                      kindLabel={kindLabel}
+                      typeName={typeName}
                     />
                   );
                 })}

@@ -26,7 +26,7 @@ import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
 import { FnIcon } from "./FnChip.tsx";
 import { CardName } from "./CardName.tsx";
-import { cardSurface } from "../data/typeColors.ts";
+import { cardSurface, cardType } from "../data/typeColors.ts";
 import { fnColor } from "../data/fnColors.ts";
 
 type Category = "Pokemon" | "Trainer" | "Energy";
@@ -239,6 +239,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
             <span className="rounded-ctl border hairline px-1 py-0.5">{label(kind.key, kind.raw)}</span>
+            {cardType(card) !== null && <TypeChip type={cardType(card) as string} />}
             {card.usage !== undefined && (
               <span className="rounded-full border border-pink px-1.5 py-0.5 font-mono text-pink">
                 {t("catalog.usage", { p: card.usage })}

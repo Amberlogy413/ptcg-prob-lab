@@ -61,6 +61,24 @@ export function cardAccent(card: {
 }
 
 /**
+ * The Pokémon type that drives a card's color/icon: a Pokémon's primary type,
+ * an Energy's elemental type (from its zh name), else null (Trainers / typeless).
+ * Used to show an explicit type ICON on cards (owner request 2026-06-15:
+ * 「快速加入卡片…應明顯地顯示出其相關屬性的 icon」).
+ */
+export function cardType(card: {
+  types?: string[];
+  category?: string;
+  name?: string;
+  nameZh?: string;
+}): string | null {
+  const ty = card.types?.[0];
+  if (ty !== undefined && TYPE_COLORS[ty] !== undefined) return ty;
+  if (card.category === "Energy") return energyType(card.nameZh ?? card.name ?? "");
+  return null;
+}
+
+/**
  * Whole-card SURFACE styling (owner request 2026-06-15: 「寶可夢卡成張連底色都係
  *跟返屬性顏色」). The card's type color tints the entire surface — a soft fill +
  * a matching border + a stronger left edge — not just an edge accent. Tints are
