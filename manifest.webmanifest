@@ -1,0 +1,24 @@
+{
+  "name": "PTCG 概率實驗室 · PTCG Probability Lab",
+  "short_name": "概率實驗室",
+  "description": "60 張牌組的精確抽牌與獎賞卡概率計算(BigInt 精確分數,非模擬)。",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#FAF8F3",
+  "theme_color": "#2B59C3",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
