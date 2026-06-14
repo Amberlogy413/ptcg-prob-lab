@@ -12,6 +12,7 @@ import { viewReady } from "./helpers.ts";
 import { useDeckStore, type NewCardInput } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
 import { setCatalogForTests } from "../src/data/catalog.ts";
+import type { CatalogCard } from "../src/data/catalog.ts";
 import { makeCatalogFixture } from "./catalogFixture.ts";
 
 const FIXTURE = makeCatalogFixture();
@@ -49,7 +50,7 @@ describe("layered deck builder", () => {
     const user = await openBuilder();
 
     // Layer 1 counts: std-only pool = 5 of the 6 fixture cards.
-    const pokeChip = await screen.findByRole("button", { name: /^寶可夢 3$/ });
+    const pokeChip = await screen.findByRole("button", { name: /^全部精靈 3$/ });
     expect(screen.getByRole("button", { name: /^訓練家 1$/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^能量 1$/ })).toBeInTheDocument();
 
@@ -69,7 +70,7 @@ describe("layered deck builder", () => {
     useDeckStore.getState().importDeck("錨點", anchorDeckRows());
     const user = await openBuilder();
     await user.click(screen.getByRole("checkbox", { name: "只看標準賽制" }));
-    await user.click(await screen.findByRole("button", { name: /^寶可夢 5$/ }));
+    await user.click(await screen.findByRole("button", { name: /^全部精靈 5$/ }));
     await user.click(await screen.findByRole("button", { name: /^基礎 3$/ }));
     await user.click(await screen.findByRole("button", { name: /^草 2$/ }));
     // 綠毛蟲 has two prints but ONE tile; the rotated S11 print lives in the
@@ -87,7 +88,7 @@ describe("layered deck builder", () => {
     const user = await openBuilder();
     const stdToggle = screen.getByRole("checkbox", { name: "只看標準賽制" });
     await user.click(stdToggle); // off
-    await user.click(await screen.findByRole("button", { name: /^寶可夢 5$/ }));
+    await user.click(await screen.findByRole("button", { name: /^全部精靈 5$/ }));
     await user.click(await screen.findByRole("button", { name: /^VMAX 1$/ }));
     expect(screen.getByText("1 張符合")).toBeInTheDocument();
     await user.click(stdToggle); // back on — VMAX has no std prints
@@ -143,7 +144,7 @@ describe("layered deck builder", () => {
     expect(screen.getByText("2 張符合")).toBeInTheDocument();
 
     // Narrowing to Pokémon recomputes the tag pool — only 水水獺 remains.
-    await user.click(screen.getByRole("button", { name: /^寶可夢 3$/ }));
+    await user.click(screen.getByRole("button", { name: /^全部精靈 3$/ }));
     expect(await screen.findByText("1 張符合")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^加入 水水獺\(SV9-050\)/ })).toBeInTheDocument();
   });
@@ -168,5 +169,61 @@ describe("layered deck builder", () => {
     const dialog = screen.getByRole("dialog", { name: "調換票" });
     expect(dialog).toHaveTextContent("數過自己的獎賞卡張數後");
     expect(dialog).toHaveTextContent("物品");
+  });
+});
+
+describe("evolution line collapse (owner request 2026-06-15)", () => {
+  function lineFixture() {
+    const f = makeCatalogFixture();
+    // Link 綠毛蟲(10) → 鐵甲蛹(11) so the two form one evolution line. (The shared
+    // fixture's 鐵甲蛹 omits dexId; the real catalog always carries it.)
+    f.cards.find((c) => c.id === "SV9-002")!.dexId = [11];
+    f.dexEvolvesFrom = { 11: 10 };
+    return f;
+  }
+
+  it("a line shows as ONE collapsed card; expanding reveals the member picks", async () => {
+    setCatalogForTests(lineFixture());
+    useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    const user = await openBuilder();
+
+    // Collapsed: the line's 主軸 is an EXPAND control, not an add button, and
+    // the evolved member is not directly addable yet.
+    const open = await screen.findByRole("button", { name: /展開 綠毛蟲 進化系列/ });
+    expect(screen.queryByRole("button", { name: /^加入 鐵甲蛹/ })).toBeNull();
+
+    await user.click(open);
+    // Now the user can choose the specific card in the line.
+    expect(await screen.findByRole("button", { name: /^加入 綠毛蟲\(SV9-001\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^加入 鐵甲蛹\(SV9-002\)/ })).toBeInTheDocument();
+  });
+});
+
+describe("trainer-owned Pokémon category (owner request 2026-06-15)", () => {
+  function ownerFixture() {
+    const f = makeCatalogFixture();
+    const owned: CatalogCard[] = [
+      { id: "SV9a-004", localId: "004", name: "竹蘭的毒薔薇", nameZh: "竹蘭的毒薔薇", category: "Pokemon", stage: "Basic", types: ["Grass"], dexId: [315], owner: "竹蘭", std: true, set: "SV9a" },
+      { id: "SV9a-005", localId: "005", name: "竹蘭的羅絲雷朵", nameZh: "竹蘭的羅絲雷朵", category: "Pokemon", stage: "Stage1", types: ["Grass"], dexId: [407], owner: "竹蘭", std: true, set: "SV9a" },
+    ];
+    f.cards.push(...owned);
+    f.dexEvolvesFrom = { 407: 315 };
+    f.sets["SV9a"] = { name: "測試", serie: null, date: "2025-06-01", official: 100 };
+    return f;
+  }
+
+  it("trainer-owned Pokémon get their own 大類, filterable by owner", async () => {
+    setCatalogForTests(ownerFixture());
+    useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    const user = await openBuilder();
+
+    // The new 大類 appears with its own count (the two 竹蘭 cards).
+    await user.click(await screen.findByRole("button", { name: /^訓練家的寶可夢 2$/ }));
+    // 細分 layer offers the trainer as the owner chip.
+    await user.click(await screen.findByRole("button", { name: /^竹蘭 2$/ }));
+    // 竹蘭's line is one collapsed card; expand → choose the specific card.
+    await user.click(await screen.findByRole("button", { name: /展開 .*進化系列/ }));
+    expect(await screen.findByRole("button", { name: /^加入 竹蘭的毒薔薇/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^加入 竹蘭的羅絲雷朵/ })).toBeInTheDocument();
   });
 });

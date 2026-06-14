@@ -39,6 +39,10 @@ export interface CatalogCard {
   stage?: string;
   suffix?: string;
   evolveFrom?: string;
+  /** Trainer-owner name for a "Trainer's Pokémon" (e.g. 竹蘭, 火箭隊, N), derived
+   *  purely from the catalog by tagOwners() during normalization — undefined for
+   *  ordinary Pokémon. Lets the builder give them their own 大類. */
+  owner?: string;
   hp?: number;
   types?: string[];
   attacks?: CatalogAttack[];
@@ -133,13 +137,75 @@ export function cleanName(name: string | undefined): string | undefined {
   return name.includes("<") || name.includes("＜") ? name.replace(/[<>＜＞]/g, "") : name;
 }
 
-/** Normalize a freshly-loaded catalog in place: strip bracket markup from names. */
+/** Suffixes that sit AFTER the species name (so 竹蘭的烈咬陸鯊ex still parses to
+ *  species 烈咬陸鯊). Longest first so "VSTAR" wins over "V". */
+const POKEMON_SUFFIXES = ["V-UNION", "VMAX", "VSTAR", "ex", "V"];
+function stripPokemonSuffix(name: string): string {
+  for (const suf of POKEMON_SUFFIXES) {
+    if (name.endsWith(suf)) return name.slice(0, name.length - suf.length).trimEnd();
+  }
+  return name;
+}
+
+/**
+ * Stamp `owner` on every "Trainer's Pokémon" (e.g. 竹蘭的毒薔薇 → owner "竹蘭"),
+ * owner request 2026-06-15: give them their own 大類 in the builder. Derived
+ * PURELY from the catalog — no hardcoded trainer list:
+ *   1. A name reads `<prefix>的<species>` where `<species>` (suffix-stripped) is
+ *      a real Pokémon name that also appears un-prefixed in the pool.
+ *   2. `<prefix>` only counts as a trainer when it owns ≥2 DISTINCT species, so
+ *      place/promo one-offs (e.g. 臺北的皮卡丘) never become a fake category.
+ * New sets self-register their trainers; ja-only newest cards (which use の, not
+ * 的) simply stay ordinary until their zh release — an honest, graceful gap.
+ */
+export function tagOwners(catalog: Catalog): void {
+  const pokemon = catalog.cards.filter((c) => c.category === "Pokemon");
+  const plain = new Set<string>();
+  for (const c of pokemon) {
+    const n = c.nameZh ?? c.name;
+    if (!n.includes("的")) {
+      plain.add(n);
+      plain.add(stripPokemonSuffix(n));
+    }
+  }
+  const candidates: Array<{ card: CatalogCard; prefix: string }> = [];
+  const speciesByPrefix = new Map<string, Set<string>>();
+  for (const c of pokemon) {
+    const n = c.nameZh ?? c.name;
+    if (!n.includes("的")) continue;
+    const base = stripPokemonSuffix(n);
+    const i = base.indexOf("的");
+    const species = base.slice(i + 1);
+    if (!plain.has(species)) continue;
+    const prefix = base.slice(0, i); // trainer name, without the 的
+    if (prefix === "") continue;
+    candidates.push({ card: c, prefix });
+    let set = speciesByPrefix.get(prefix);
+    if (set === undefined) {
+      set = new Set();
+      speciesByPrefix.set(prefix, set);
+    }
+    set.add(species);
+  }
+  for (const { card, prefix } of candidates) {
+    if ((speciesByPrefix.get(prefix)?.size ?? 0) >= 2) card.owner = prefix;
+  }
+}
+
+/** Normalize a freshly-loaded catalog in place: strip bracket markup from names,
+ *  then tag trainer-owned Pokémon (both pure data passes, safe to re-run). */
 export function normalizeCatalog(catalog: Catalog): Catalog {
   for (const c of catalog.cards) {
     c.name = cleanName(c.name) ?? c.name;
     if (c.nameZh !== undefined) c.nameZh = cleanName(c.nameZh);
   }
+  tagOwners(catalog);
   return catalog;
+}
+
+/** A "Trainer's Pokémon" (竹蘭的/火箭隊的…) — tagged by tagOwners(). */
+export function isOwnedPokemon(card: CatalogCard): boolean {
+  return card.category === "Pokemon" && card.owner !== undefined;
 }
 
 export function loadCatalog(): Promise<Catalog> {
@@ -296,8 +362,8 @@ export function sortPrints(catalog: Catalog, cards: CatalogCard[]): CatalogCard[
     const aStd = a.std === true ? 0 : 1;
     const bStd = b.std === true ? 0 : 1;
     if (aStd !== bStd) return aStd - bStd;
-    const da = catalog.sets[a.set ?? ""]?.date ?? "";
-    const db = catalog.sets[b.set ?? ""]?.date ?? "";
+    const da = catalog.sets?.[a.set ?? ""]?.date ?? "";
+    const db = catalog.sets?.[b.set ?? ""]?.date ?? "";
     if (da !== db) return da < db ? 1 : -1;
     return a.id < b.id ? -1 : 1;
   });
@@ -345,17 +411,25 @@ const STAGE_RANK: Record<string, number> = {
 };
 
 export interface EvolutionFamily {
+  /** Stable grouping key (dex root, optionally owner-scoped) — used for UI
+   *  expand/collapse state. */
+  key: string;
   /** Root (basic) dexId, or null for non-dex / non-Pokémon singletons. */
   rootDex: number | null;
   /** Member print-groups, ordered Basic → Stage 1 → Stage 2. */
   members: PrintGroup[];
+  /** The line's 主軸 — its most-played member (popular → std → newest); shown as
+   *  the face of the collapsed series card. */
+  rep: PrintGroup;
 }
 
 /**
  * Group print-groups into EVOLUTION FAMILIES (owner request 2026-06-14 — same
  * evolution line shows as one combo in the deck workshop). Walks each card's
  * dexId up through catalog.dexEvolvesFrom to its basic; non-Pokémon and
- * dex-less cards become singletons. Family order follows first appearance, so a
+ * dex-less cards become singletons. A Trainer's Pokémon (card.owner) is keyed
+ * per-owner so 竹蘭's line never merges with the ordinary line of the same dex
+ * (owner request 2026-06-15). Family order follows first appearance, so a
  * popularity/relevance-sorted input stays sorted.
  */
 export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): EvolutionFamily[] {
@@ -373,7 +447,8 @@ export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): Evolu
   const byKey = new Map<string, PrintGroup[]>();
   for (const g of groups) {
     const dex = g.rep.category === "Pokemon" ? g.rep.dexId?.[0] : undefined;
-    const key = dex !== undefined ? `d${rootOf(dex)}` : `n${g.rep.name}`;
+    const ownerTag = g.rep.owner !== undefined ? `o${g.rep.owner}:` : "";
+    const key = dex !== undefined ? `${ownerTag}d${rootOf(dex)}` : `n${g.rep.name}`;
     let fam = byKey.get(key);
     if (fam === undefined) {
       fam = [];
@@ -383,10 +458,21 @@ export function evolutionFamilies(catalog: Catalog, groups: PrintGroup[]): Evolu
     fam.push(g);
   }
   return order.map((key) => {
-    const members = (byKey.get(key) as PrintGroup[])
+    const raw = byKey.get(key) as PrintGroup[];
+    const members = raw
       .slice()
       .sort((a, b) => (STAGE_RANK[a.rep.stage ?? "Basic"] ?? 9) - (STAGE_RANK[b.rep.stage ?? "Basic"] ?? 9));
-    return { rootDex: key.startsWith("d") ? Number(key.slice(1)) : null, members };
+    // 主軸 = most-played member (input is already popularity-sorted, so the
+    // earliest-appearing member in the raw order is the representative).
+    const bestId = sortPrints(catalog, raw.map((g) => g.rep))[0]?.id;
+    const rep = members.find((m) => m.rep.id === bestId) ?? members[0]!;
+    const dexPart = key.includes("d") ? key.slice(key.indexOf("d") + 1) : "";
+    return {
+      key,
+      rootDex: /^\d+$/.test(dexPart) ? Number(dexPart) : null,
+      members,
+      rep,
+    };
   });
 }
 

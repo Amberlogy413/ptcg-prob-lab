@@ -20,6 +20,7 @@ import {
   type Catalog,
   type CatalogCard,
   type PrintGroup,
+  type EvolutionFamily,
 } from "../data/catalog.ts";
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
@@ -29,11 +30,15 @@ import { CardName } from "./CardName.tsx";
 import { cardSurface, cardType } from "../data/typeColors.ts";
 import { fnColor } from "../data/fnColors.ts";
 
-type Category = "Pokemon" | "Trainer" | "Energy";
+// "OwnedPokemon" is a builder-only pseudo-category: the trainer-owned subset of
+// Pokémon (card.owner), given its own 大類 per owner request 2026-06-15. The
+// plain "Pokemon" entry is the all-inclusive 全部精靈.
+type Category = "Pokemon" | "OwnedPokemon" | "Trainer" | "Energy";
 
-const CATEGORY_ORDER: Category[] = ["Pokemon", "Trainer", "Energy"];
+const CATEGORY_ORDER: Category[] = ["Pokemon", "OwnedPokemon", "Trainer", "Energy"];
 const CATEGORY_KEY: Record<Category, string> = {
-  Pokemon: "catalog.cat.pokemon",
+  Pokemon: "catalog.cat.allPokemon",
+  OwnedPokemon: "catalog.cat.ownedPokemon",
   Trainer: "catalog.cat.trainer",
   Energy: "catalog.cat.energy",
 };
@@ -57,17 +62,27 @@ const TYPE_ORDER = [
 ];
 const GRID_CAP = 48;
 
-/** Sub-facet of a card inside its category (stage / trainer type / energy type). */
-function subOf(card: CatalogCard): string | undefined {
+/** Sub-facet of a card inside the active category: owner for the trainer-owned
+ *  bucket, otherwise stage / trainer type / energy type. */
+function subOf(card: CatalogCard, category: Category | null): string | undefined {
+  if (category === "OwnedPokemon") return card.owner;
   if (card.category === "Pokemon") return card.stage;
   if (card.category === "Trainer") return card.trainerType;
   return card.energyType;
 }
 
 function subLabelKey(category: Category, sub: string): string | null {
+  if (category === "OwnedPokemon") return null; // owner names are raw real data
   if (category === "Pokemon") return stageKey(sub);
   if (category === "Trainer") return trainerTypeKey(sub);
   return energyTypeKey(sub);
+}
+
+/** Card pool for a 大類: the trainer-owned bucket is the Pokémon-with-owner
+ *  subset; every other bucket maps straight to card.category. */
+function inCategory(card: CatalogCard, category: Category): boolean {
+  if (category === "OwnedPokemon") return card.category === "Pokemon" && card.owner !== undefined;
+  return card.category === category;
 }
 
 /**
@@ -89,6 +104,9 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   const [stdOnly, setStdOnly] = useState(true);
   const [search, setSearch] = useState("");
   const [detail, setDetail] = useState<CatalogCard | null>(null);
+  // Which evolution lines are expanded to their member chooser (owner request
+  // 2026-06-15: a line is one collapsed card; tap to enlarge and pick a card).
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     let alive = true;
@@ -113,12 +131,12 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     [catalog, stdOnly],
   );
   const pool1 = useMemo(
-    () => (category === null ? pool0 : pool0.filter((c) => c.category === category)),
+    () => (category === null ? pool0 : pool0.filter((c) => inCategory(c, category))),
     [pool0, category],
   );
   const pool2 = useMemo(
-    () => (sub === null ? pool1 : pool1.filter((c) => subOf(c) === sub)),
-    [pool1, sub],
+    () => (sub === null ? pool1 : pool1.filter((c) => subOf(c, category) === sub)),
+    [pool1, sub, category],
   );
   const pool3 = useMemo(
     () => (type === null ? pool2 : pool2.filter((c) => (c.types ?? []).includes(type))),
@@ -154,11 +172,20 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     }
     return m;
   };
-  const catCounts = useMemo(() => countBy(pool0, (c) => c.category), [pool0]);
-  const subCounts = useMemo(() => countBy(pool1, subOf), [pool1]);
+  const catCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of pool0) {
+      m.set(c.category, (m.get(c.category) ?? 0) + 1);
+      if (c.category === "Pokemon" && c.owner !== undefined) {
+        m.set("OwnedPokemon", (m.get("OwnedPokemon") ?? 0) + 1);
+      }
+    }
+    return m;
+  }, [pool0]);
+  const subCounts = useMemo(() => countBy(pool1, (c) => subOf(c, category)), [pool1, category]);
   const typeCounts = useMemo(() => {
     const m = new Map<string, number>();
-    if (category === "Pokemon") {
+    if (category === "Pokemon" || category === "OwnedPokemon") {
       for (const c of pool2) for (const ty of c.types ?? []) m.set(ty, (m.get(ty) ?? 0) + 1);
     }
     return m;
@@ -179,7 +206,13 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   const mulligan = summary.mulligan ?? null;
 
   const subOrder =
-    category === "Pokemon" ? STAGE_ORDER : category === "Trainer" ? TRAINER_ORDER : ENERGY_ORDER;
+    category === "Pokemon"
+      ? STAGE_ORDER
+      : category === "OwnedPokemon"
+        ? [...subCounts.keys()].sort() // trainer owners, alphabetical by zh name
+        : category === "Trainer"
+          ? TRAINER_ORDER
+          : ENERGY_ORDER;
 
   const chip = (selected: boolean) =>
     "rounded-ctl px-3 py-1.5 text-sm transition-colors duration-fast " +
@@ -191,14 +224,14 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     setStdOnly(on);
     if (catalog === null || category === null) return;
     const p0 = on ? catalog.cards.filter((c) => c.std === true) : catalog.cards;
-    const p1 = p0.filter((c) => c.category === category);
-    if (sub !== null && !p1.some((c) => subOf(c) === sub)) {
+    const p1 = p0.filter((c) => inCategory(c, category));
+    if (sub !== null && !p1.some((c) => subOf(c, category) === sub)) {
       setSub(null);
       setType(null);
       return;
     }
     if (type !== null) {
-      const p2 = sub === null ? p1 : p1.filter((c) => subOf(c) === sub);
+      const p2 = sub === null ? p1 : p1.filter((c) => subOf(c, category) === sub);
       if (!p2.some((c) => (c.types ?? []).includes(type))) setType(null);
     }
   }
@@ -282,6 +315,55 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     );
   };
 
+  // A whole evolution line collapsed onto ONE tile (owner request 2026-06-15):
+  // shows the 主軸 (most-played member) as the face; tapping it expands the line
+  // so the user picks the specific card. Occupies a single grid slot like any
+  // other tile, so the line reads as one combo, not a sprawling row.
+  const renderFamilyCollapsed = (fam: EvolutionFamily) => {
+    const face = fam.rep.rep;
+    const owned = fam.members.reduce((s, m) => s + (nameTotals.get(m.rep.name) ?? 0), 0);
+    const stages = fam.members.map((m) => {
+      const k = stageKey(m.rep.stage ?? "Basic");
+      return k !== null ? t(k) : (m.rep.stage ?? "");
+    });
+    const faceType = cardType(face);
+    return (
+      <li
+        key={`fam-${fam.key}`}
+        style={{ ...cardSurface(face), borderLeftWidth: "3px" }}
+        className="rounded-ctl border p-2"
+      >
+        <button
+          type="button"
+          aria-label={t("builder.seriesOpen", { name: cardName(face, lang), n: fam.members.length })}
+          aria-expanded={false}
+          onClick={() => setExpanded((s) => new Set(s).add(fam.key))}
+          className="block w-full rounded-ctl text-left transition-colors hover:bg-white/40"
+        >
+          <span className="flex items-baseline gap-1">
+            <CardName card={face} className="min-w-0 flex-1 truncate text-sm font-medium" />
+            {owned > 0 && (
+              <span
+                className="shrink-0 rounded-full bg-pink px-1.5 font-mono text-xs text-white"
+                title={t("builder.copies", { n: owned })}
+              >
+                ×{owned}
+              </span>
+            )}
+          </span>
+          <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
+            <span className="rounded-ctl border border-blue/40 bg-accent-50 px-1.5 py-0.5 font-medium text-blue">
+              {t("builder.seriesTag", { n: fam.members.length })}
+            </span>
+            {faceType !== null && <TypeChip type={faceType} />}
+            <span className="min-w-0 truncate">{stages.join(" › ")}</span>
+          </span>
+          <span className="mt-1 block text-xs text-blue">▾ {t("builder.seriesHint")}</span>
+        </button>
+      </li>
+    );
+  };
+
   // Evolution lines ALWAYS group into one series (owner request 2026-06-15: 多龍
   // 系列要以系列形式顯示),even in the mixed/default view — not only when the
   // 寶可夢 category is picked. Non-Pokémon become singletons (packed into a
@@ -341,7 +423,9 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           {/* Layer 1: 大類 */}
           <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={t("builder.layer.category")}>
             <span className="text-xs text-ink2">{t("builder.layer.category")}</span>
-            {CATEGORY_ORDER.map((cat) => (
+            {CATEGORY_ORDER.filter(
+              (cat) => (catCounts.get(cat) ?? 0) > 0 || category === cat,
+            ).map((cat) => (
               <button
                 key={cat}
                 type="button"
@@ -383,8 +467,8 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
             </div>
           )}
 
-          {/* Layer 3: 屬性 (Pokémon only) */}
-          {category === "Pokemon" && sub !== null && (
+          {/* Layer 3: 屬性 (Pokémon / trainer-owned Pokémon) */}
+          {(category === "Pokemon" || category === "OwnedPokemon") && sub !== null && (
             <div className="mt-2 flex flex-wrap items-center gap-2" role="group" aria-label={t("builder.layer.type")}>
               <span className="text-xs text-ink2">{t("builder.layer.type")}</span>
               {TYPE_ORDER.filter((ty) => (typeCounts.get(ty) ?? 0) > 0).map((ty) => (
@@ -447,39 +531,56 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
               className="mt-2 max-h-96 space-y-2 overflow-y-auto"
             >
               {(() => {
-                // Walk families in order: a multi-member line renders as a series
-                // box; runs of singletons pack into a shared grid (so trainers/
-                // energy don't each take a full row).
+                // Walk families in order. Each tile (a singleton, or a whole
+                // line COLLAPSED to one card) packs into a shared grid; only a
+                // line the user has EXPANDED breaks out into a full series-box
+                // chooser. So lines read as one combo until tapped open.
                 const blocks: JSX.Element[] = [];
-                let run: PrintGroup[] = [];
+                let run: JSX.Element[] = [];
                 const flush = (key: string) => {
                   if (run.length === 0) return;
                   const tiles = run;
                   run = [];
                   blocks.push(
                     <ul key={key} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                      {tiles.map(renderTile)}
+                      {tiles}
                     </ul>,
                   );
                 };
                 families.forEach((fam, i) => {
-                  if (fam.members.length > 1) {
+                  const isLine = fam.members.length > 1;
+                  if (isLine && expanded.has(fam.key)) {
                     flush(`run-${i}`);
                     blocks.push(
-                      <div
-                        key={`fam-${fam.rootDex ?? fam.members[0]!.rep.name}`}
-                        className="rounded-ctl border hairline bg-paper p-2"
-                      >
-                        <p className="mb-1 text-xs font-medium text-ink2">
-                          {t("builder.family", { name: cardName(fam.members[0]!.rep, lang) })}
-                        </p>
+                      <div key={`fam-${fam.key}`} className="rounded-ctl border hairline bg-paper p-2">
+                        <div className="mb-1 flex items-center gap-2">
+                          <p className="min-w-0 flex-1 truncate text-xs font-medium text-ink2">
+                            {t("builder.family", { name: cardName(fam.rep.rep, lang) })}
+                          </p>
+                          <button
+                            type="button"
+                            aria-label={t("builder.seriesCollapse")}
+                            onClick={() =>
+                              setExpanded((s) => {
+                                const next = new Set(s);
+                                next.delete(fam.key);
+                                return next;
+                              })
+                            }
+                            className="shrink-0 rounded-ctl border hairline bg-surface px-2 py-0.5 text-xs text-ink2 hover:text-ink"
+                          >
+                            ▴ {t("builder.seriesCollapse")}
+                          </button>
+                        </div>
                         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                           {fam.members.map(renderTile)}
                         </ul>
                       </div>,
                     );
+                  } else if (isLine) {
+                    run.push(renderFamilyCollapsed(fam));
                   } else {
-                    run.push(fam.members[0]!);
+                    run.push(renderTile(fam.members[0]!));
                   }
                 });
                 flush("run-final");
