@@ -5,6 +5,7 @@
  */
 
 import type { NewCardInput } from "../state/deckStore.ts";
+import { resolveDeckRow, type Catalog } from "./catalog.ts";
 
 export interface DeckCardLine {
   count: number;
@@ -86,4 +87,107 @@ export function tierKey(players: number): string {
   if (players >= 64) return "decks.tier.mid";
   if (players >= 32) return "decks.tier.small";
   return "decks.tier.local";
+}
+
+// ---------------------------------------------------------------------------
+// Archetype name localization (owner request 2026-06-14: 牌組推薦 titles must be
+// zh in the zh UI). Limitless archetype names are space-separated English
+// Pokémon (+ Mega / possessive prefixes / a few descriptors). Pokémon map via
+// the official dex (catalog.dexEnZh); unknown tokens stay English (no guessing).
+
+const ARCH_POSSESSIVE: Record<string, string> = {
+  "n's": "N之",
+  "rocket's": "火箭隊的",
+  "team rocket's": "火箭隊的",
+  "cynthia's": "竹蘭的",
+  "hop's": "赫普的",
+  "lillie's": "莉莉艾的",
+  "misty's": "小霞的",
+  "marnie's": "瑪俐的",
+  "iono's": "奇樹的",
+  "ethan's": "阿正的",
+};
+const ARCH_WORD: Record<string, string> = {
+  box: "盒組",
+  toolbox: "百寶箱",
+  lead: "先手",
+  basic: "基礎",
+  control: "控場",
+  mill: "磨牌",
+  turbo: "渦輪",
+  stall: "拖延",
+};
+
+/** Localize a Limitless archetype name to zh (Pokémon via the official dex). */
+export function localizeArchetype(name: string, catalog: Catalog | null): string {
+  const dex = catalog?.dexEnZh;
+  if (dex === undefined) return name;
+  const words = name.trim().split(/\s+/);
+  const parts: string[] = [];
+  let prefix = ""; // Mega / possessive that attaches to the next Pokémon
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i] as string;
+    const lw = w.toLowerCase();
+    if (lw === "mega") {
+      prefix += "超級";
+      continue;
+    }
+    if (ARCH_POSSESSIVE[lw] !== undefined) {
+      prefix += ARCH_POSSESSIVE[lw];
+      continue;
+    }
+    // Try a two-word Pokémon (e.g. Raging Bolt, Iron Hands) then one word.
+    const two = i + 1 < words.length ? `${lw} ${(words[i + 1] as string).toLowerCase()}` : "";
+    if (two !== "" && dex[two] !== undefined) {
+      parts.push(prefix + dex[two]);
+      prefix = "";
+      i += 1;
+      continue;
+    }
+    if (dex[lw] !== undefined) {
+      parts.push(prefix + dex[lw]);
+      prefix = "";
+      continue;
+    }
+    // Descriptor or unknown.
+    parts.push(prefix + (ARCH_WORD[lw] ?? w));
+    prefix = "";
+  }
+  if (prefix !== "") parts.push(prefix); // dangling Mega with no match
+  return parts.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Humanized playstyle / selling-point tags, computed from the deck's REAL card
+// functions (the classify() fn tags) — data-driven, not editorial.
+
+export interface DeckTag {
+  key: string; // i18n key
+  weight: number;
+}
+
+/** Up to 3 playstyle tags for a build, from the aggregate function profile. */
+export function deckTags(cards: DeckCardLine[], catalog: Catalog | null): string[] {
+  if (catalog === null) return [];
+  const fnCount: Record<string, number> = {};
+  for (const c of cards) {
+    const card = resolveDeckRow(catalog, { name: c.name });
+    for (const f of card?.fn ?? []) fnCount[f] = (fnCount[f] ?? 0) + c.count;
+  }
+  const g = (k: string) => fnCount[k] ?? 0;
+  // Note: gust (老大的指令) is near-universal, so it's not a distinguishing
+  // selling-point — deliberately excluded from auto-tags.
+  const candidates: DeckTag[] = [
+    { key: "decks.tag.engine", weight: g("draw") + g("search") >= 6 ? g("draw") + g("search") : 0 },
+    { key: "decks.tag.aggro", weight: g("attacker") + g("boost") >= 3 ? g("attacker") + g("boost") : 0 },
+    { key: "decks.tag.accel", weight: g("accel") >= 3 ? g("accel") + 1 : 0 },
+    { key: "decks.tag.disrupt", weight: g("disrupt") >= 2 ? g("disrupt") + 1 : 0 },
+    { key: "decks.tag.durable", weight: g("heal") + g("protect") >= 3 ? g("heal") + g("protect") : 0 },
+    { key: "decks.tag.recover", weight: g("recover") >= 2 ? g("recover") + 1 : 0 },
+  ];
+  return candidates
+    .filter((c) => c.weight > 0)
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 3)
+    .map((c) => c.key);
 }

@@ -7,10 +7,14 @@ import {
   loadDecks,
   buildToInputs,
   tierKey,
+  localizeArchetype,
+  deckTags,
   type DeckData,
   type Archetype,
   type DeckBuild,
 } from "../data/decks.ts";
+import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
+import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 
 type Status = "loading" | "ready" | "error";
@@ -24,6 +28,7 @@ export function DecksView() {
   const t = useT();
   const [status, setStatus] = useState<Status>("loading");
   const [data, setData] = useState<DeckData | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [openArch, setOpenArch] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +41,11 @@ export function DecksView() {
         setOpenArch(d.archetypes[0]?.id ?? null);
       },
       () => alive && setStatus("error"),
+    );
+    // Catalog (for archetype/card localization + playstyle tags); non-blocking.
+    loadCatalog().then(
+      (c) => alive && setCatalog(c),
+      () => undefined,
     );
     return () => {
       alive = false;
@@ -85,6 +95,7 @@ export function DecksView() {
           <ArchetypeCard
             key={a.id}
             arch={a}
+            catalog={catalog}
             open={openArch === a.id}
             onToggle={() => setOpenArch(openArch === a.id ? null : a.id)}
           />
@@ -96,34 +107,54 @@ export function DecksView() {
 
 function ArchetypeCard({
   arch,
+  catalog,
   open,
   onToggle,
 }: {
   arch: Archetype;
+  catalog: Catalog | null;
   open: boolean;
   onToggle: () => void;
 }) {
   const t = useT();
+  const title = useMemo(() => localizeArchetype(arch.name, catalog), [arch.name, catalog]);
+  const tags = useMemo(() => deckTags(arch.builds[0]?.cards ?? [], catalog), [arch, catalog]);
   return (
     <li className="rounded-ctl border hairline bg-paper">
       <button
         type="button"
         aria-expanded={open}
         onClick={onToggle}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-left"
       >
-        <span className="min-w-0 flex-1 truncate font-medium">{arch.name}</span>
+        <span className="min-w-0 flex-1 truncate font-medium" title={arch.name}>
+          {title}
+        </span>
         <span className="shrink-0 rounded-full border border-pink px-2 py-0.5 font-mono text-xs text-pink">
           {t("decks.deckCount", { n: arch.deckCount })}
         </span>
         <span className="shrink-0 text-ink2">{open ? "▾" : "▸"}</span>
+        {tags.length > 0 && (
+          <span className="flex w-full flex-wrap gap-1">
+            {tags.map((k) => (
+              <span key={k} className="rounded-full border hairline bg-surface px-1.5 py-0.5 text-[11px] text-ink2">
+                {t(k)}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
       {open && (
         <div className="border-t hairline p-2">
           <p className="mb-2 px-1 text-xs text-ink2">{t("decks.buildsHint")}</p>
           <ul className="flex flex-col gap-2">
             {arch.builds.map((b, i) => (
-              <BuildRow key={`${b.event}-${b.date}-${i}`} build={b} archName={arch.name} />
+              <BuildRow
+                key={`${b.event}-${b.date}-${i}`}
+                build={b}
+                archName={title}
+                catalog={catalog}
+              />
             ))}
           </ul>
         </div>
@@ -140,8 +171,17 @@ const SECTION_KEY: Record<string, string> = {
   unknown: "deck.section.unknown",
 };
 
-function BuildRow({ build, archName }: { build: DeckBuild; archName: string }) {
+function BuildRow({
+  build,
+  archName,
+  catalog,
+}: {
+  build: DeckBuild;
+  archName: string;
+  catalog: Catalog | null;
+}) {
   const t = useT();
+  const { lang } = useCardLang();
   const importDeck = useDeckStore((s) => s.importDeck);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const [show, setShow] = useState(false);
@@ -230,7 +270,9 @@ function BuildRow({ build, archName }: { build: DeckBuild; archName: string }) {
                 {g.cards.map((c, i) => (
                   <li key={`${c.name}-${i}`} className="flex gap-2 font-mono text-xs">
                     <span className="w-5 shrink-0 text-right">{c.count}</span>
-                    <span className="min-w-0 truncate">{c.name}</span>
+                    <span className="min-w-0 truncate">
+                      {catalog !== null ? localizeDeckRow(catalog, { name: c.name }, lang).name : c.name}
+                    </span>
                   </li>
                 ))}
               </ul>
