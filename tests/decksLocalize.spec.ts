@@ -29,8 +29,12 @@ describe("localizeArchetype", () => {
     expect(localizeArchetype("Mega Greninja", catalog)).toBe("超級甲賀忍蛙");
     expect(localizeArchetype("N's Zoroark", catalog)).toBe("N之索羅亞克");
   });
-  it("keeps unknown words, maps known descriptors", () => {
-    expect(localizeArchetype("Basic Box", catalog)).toBe("基礎 盒組");
+  it("maps descriptor words and applies curated overrides", () => {
+    // Word-mapping path: Pokémon via dex + descriptor via ARCH_WORD.
+    expect(localizeArchetype("Zoroark Control", catalog)).toBe("索羅亞克 控場");
+    // Curated override for ability/mechanic-named archetypes (owner 2026-06-15).
+    expect(localizeArchetype("Basic Box", catalog)).toBe("太晶Box");
+    expect(localizeArchetype("Festival Lead", catalog)).toBe("祭典樂舞");
     expect(localizeArchetype("Dragapult", null)).toBe("Dragapult"); // no catalog → unchanged
   });
 });

@@ -389,3 +389,32 @@
 - **新套更新管線次序**(更新):fetch_catalog → fetch_names → fill_zh_names →
   fetch_dex_names → embed_en_zh → **fill_extra_zh** → reclassify → restamp_meta。
   (restamp 保留所有 nameZh embed。)
+
+## 2026-06-15 — 牌組推薦零殘留 + 角括號清理 + 原型名 override
+
+- **擁有者**:牌組推薦見到「Festival 先手」「基礎 盒組」等怪名,指出「有時主題唔單
+  指係寶可夢或其組合,可以係以寶可夢特性嚟組既牌組命名」;並要求繼續還清所有債、
+  逐步完成。(亦提供 GS 球戰車隊 facebook 作牌名參考 —— 需登入,Claude **不會代登入**;
+  改用可驗證來源:catalog/52poke/Bulbapedia/官方圖鑑。)
+- **根因**:(1)牌組推薦 JSON 由 `fetch_decks.mjs` 生成,英文源 + 舊版 resolver
+  缺口 → 牌表殘留 179 個日/英卡名;(2)`<火箭隊的>黑暗鴉` 嘅角括號係 **TCGdex
+  zh-tw 上游 markup**(name/nameZh 兩欄都有,88 張)→ 全 app 中招;(3)原型大標題
+  per-word 翻譯對「以特性命名」嘅牌組讀唔通。
+- **落地**:
+  - **角括號**:runtime `catalog.ts` `normalizeCatalog()` 載入即 strip(再 fetch
+    都唔怕)+ 一次性 `scripts/strip_brackets.mjs` 清 served JSON(88→0)。
+  - **牌表本地化** `scripts/relocalize_decks.mjs`(冪等,資料層重寫,**零靠估**):
+    寶可夢 → `dex_names.json` 解析(日/英 species + 詞綴重組,**species-first** 避免
+    メガニウム 被當 Mega);訓練家/能量 → ① catalog ja→zh(ja/zh 共用 id,官方);
+    ② `scripts/trainer_en_ja.json`(en→ja→catalog,**繁中名 100% 嚟自 catalog 真實
+    數據**,自動校正:Carmine→阿楓、Lana's Aid→水蓮的照顧、Cyrano→席藍、Eri→枇琶);
+    ③ 仍未有 zh-tw 發行嘅最新卡 → `scripts/trainer_en_zh.json` 忠實翻譯(**暫譯**,
+    參考 52poke,auto-update 出官方名即覆蓋)。結果:**3533 牌表卡名 0 殘留**,
+    247/294 distinct 名由 catalog 官方印證。
+  - **原型 override**:`src/data/decks.ts` `ARCH_OVERRIDE`(以特性/機制/社群慣稱命名
+    嘅牌組;擁有者為 zh 賽制慣稱權威):Festival Lead→祭典樂舞、Basic Box→太晶Box。
+- **誠實位**:約 28 張最新 ME/SV10.5/SV11 卡未有官方繁中 → 暫譯(已 flag),清單交
+  擁有者校對;角色名一律用官方遊戲繁中(席藍/枇琶/可怕的哥哥…),唔自創。
+- **新套更新管線次序**(更新):fetch_catalog → fetch_names → fill_zh_names →
+  fetch_dex_names → embed_en_zh → fill_extra_zh → reclassify → **strip_brackets** →
+  restamp_meta →(fetch_decks 後必跑)**relocalize_decks**。

@@ -118,8 +118,20 @@ const ARCH_WORD: Record<string, string> = {
   stall: "拖延",
 };
 
+// Curated overrides for archetypes that aren't simply "Pokémon (+Pokémon)":
+// names built on an ability / mechanic / community handle, where a per-word
+// translation reads wrong (owner feedback 2026-06-15: 「有時主題…可以係以寶可夢
+// 特性嚟組既牌組命名」). Keyed by the lowercased Limitless archetype name; the
+// owner is the authority on the zh competitive handle. Extend as the meta moves.
+const ARCH_OVERRIDE: Record<string, string> = {
+  "festival lead": "祭典樂舞",
+  "basic box": "太晶Box",
+};
+
 /** Localize a Limitless archetype name to zh (Pokémon via the official dex). */
 export function localizeArchetype(name: string, catalog: Catalog | null): string {
+  const override = ARCH_OVERRIDE[name.trim().toLowerCase()];
+  if (override !== undefined) return override;
   const dex = catalog?.dexEnZh;
   if (dex === undefined) return name;
   const words = name.trim().split(/\s+/);

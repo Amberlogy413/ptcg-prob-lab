@@ -124,6 +124,24 @@ export interface Catalog {
 
 let catalogPromise: Promise<Catalog> | null = null;
 
+/** TCGdex marks trainer-owner Pokémon with `<...>` (e.g. "<火箭隊的>黑暗鴉"); the
+ *  real card name has no brackets. Strip it once on load so every consumer —
+ *  search keys, grouping, display, type color — sees the clean official name,
+ *  no matter how the upstream snapshot was fetched. */
+export function cleanName(name: string | undefined): string | undefined {
+  if (name === undefined) return undefined;
+  return name.includes("<") || name.includes("＜") ? name.replace(/[<>＜＞]/g, "") : name;
+}
+
+/** Normalize a freshly-loaded catalog in place: strip bracket markup from names. */
+export function normalizeCatalog(catalog: Catalog): Catalog {
+  for (const c of catalog.cards) {
+    c.name = cleanName(c.name) ?? c.name;
+    if (c.nameZh !== undefined) c.nameZh = cleanName(c.nameZh);
+  }
+  return catalog;
+}
+
 export function loadCatalog(): Promise<Catalog> {
   if (catalogPromise === null) {
     catalogPromise = fetch(`${import.meta.env.BASE_URL}catalog/cards-zh-Hant.json`)
@@ -131,6 +149,7 @@ export function loadCatalog(): Promise<Catalog> {
         if (!res.ok) throw new Error(`catalog HTTP ${res.status}`);
         return res.json() as Promise<Catalog>;
       })
+      .then(normalizeCatalog)
       .catch((err: unknown) => {
         catalogPromise = null; // allow retry after a failed load
         throw err;
