@@ -151,7 +151,9 @@ describe("row folding (review findings)", () => {
       const deck = useDeckStore.getState().decks.find((d) => d.id === deckId)!;
       const prints = deck.cards.filter((c) => c.name === "綠毛蟲");
       expect(prints).toHaveLength(1);
-      expect(prints[0]?.count).toBe(6);
+      // The split (2 + 4 = 6) was already over the legal 4-copy limit; merging
+      // consolidates AND legalizes it to 4 (owner mandate 2026-06-15).
+      expect(prints[0]?.count).toBe(4);
       expect(prints[0]?.catalogId).toBe("SV9-001");
     });
   });

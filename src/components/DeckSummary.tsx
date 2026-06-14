@@ -6,6 +6,7 @@ import { PrecisionRuler } from "./PrecisionRuler.tsx";
 import { ProofNumber, type Proof } from "./ProofNumber.tsx";
 import { IconWarn, IconRotate, IconLegal } from "./icons.tsx";
 import { DECK_SIZE } from "../constants.ts";
+import { deckLegality } from "../utils/deckRules.ts";
 
 /**
  * Left-column deck summary (docs/04 §3): 60-count check, Basic Pokémon
@@ -18,6 +19,7 @@ export function DeckSummary() {
   const activeDeckId = useDeckStore((s) => s.activeDeckId);
   const deck = decks.find((d) => d.id === activeDeckId) ?? null;
   const summary = useMemo(() => (deck ? computeDeckSummary(deck) : null), [deck]);
+  const legal = useMemo(() => (deck ? deckLegality(deck.cards) : null), [deck]);
 
   return (
     <aside className="rounded-card border hairline bg-surface p-4 lg:sticky lg:top-4">
@@ -41,11 +43,51 @@ export function DeckSummary() {
             </div>
           </dl>
 
-          {summary.total !== DECK_SIZE && summary.total > 0 && (
-            <p className="flex items-center gap-1 text-xs text-warn">
-              <IconWarn size="sm" />
-              {t("error.deckCount", { n: summary.total })}
-            </p>
+          {/* Real PTCG legality (owner mandate 2026-06-15) — display only,
+              never gates the math. */}
+          {legal && (
+            <div className="space-y-1 text-xs">
+              {legal.legal ? (
+                <p className="flex items-center gap-1 text-good">
+                  <IconLegal size="sm" />
+                  {t("deck.legal.ok")}
+                </p>
+              ) : (
+                <>
+                  {legal.overSize && (
+                    <p className="flex items-center gap-1 text-warn">
+                      <IconWarn size="sm" />
+                      {t("deck.legal.over", { n: legal.total - DECK_SIZE })}
+                    </p>
+                  )}
+                  {!legal.overSize && legal.total > 0 && legal.total < DECK_SIZE && (
+                    <p className="flex items-center gap-1 text-warn">
+                      <IconWarn size="sm" />
+                      {t("deck.legal.under", { n: DECK_SIZE - legal.total })}
+                    </p>
+                  )}
+                  {legal.copyViolations.map((v) => (
+                    <p key={v.name} className="flex items-center gap-1 text-warn">
+                      <IconWarn size="sm" />
+                      {t("deck.legal.copies", { name: v.name, n: v.count })}
+                    </p>
+                  ))}
+                  {!legal.radiantOk && (
+                    <p className="flex items-center gap-1 text-warn">
+                      <IconWarn size="sm" />
+                      {t("deck.legal.radiant", { n: legal.radiantCount })}
+                    </p>
+                  )}
+                  {legal.total > 0 && !legal.hasBasicPokemon && (
+                    <p className="flex items-center gap-1 text-warn">
+                      <IconWarn size="sm" />
+                      {t("deck.legal.noBasic")}
+                    </p>
+                  )}
+                </>
+              )}
+              <p className="text-ink2 opacity-70">{t("deck.legal.aceNote")}</p>
+            </div>
           )}
 
           <div className="border-t hairline pt-3">

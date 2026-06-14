@@ -24,6 +24,15 @@ function anchorDeckRows(): NewCardInput[] {
   ];
 }
 
+/** A deck with headroom (58/60, B=10) so the 60-card hard cap (owner mandate
+ *  2026-06-15) still allows a couple of legal adds in the add-path tests. */
+function roomyDeckRows(): NewCardInput[] {
+  return [
+    { name: "基礎手", count: 10, isBasic: true, section: "pokemon" },
+    { name: "填充", count: 48, section: "trainer" },
+  ];
+}
+
 beforeEach(() => {
   localStorage.clear();
   useDeckStore.setState({ decks: [], activeDeckId: null, basicTags: {}, aliases: {} });
@@ -98,7 +107,7 @@ describe("layered deck builder", () => {
   });
 
   it("tap adds the card with every tag, and the name-total badge tracks it", async () => {
-    const deckId = useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    const deckId = useDeckStore.getState().importDeck("錨點", roomyDeckRows());
     const user = await openBuilder();
 
     const add = await screen.findByRole("button", { name: "加入 水水獺(SV9-050)" });
@@ -120,19 +129,18 @@ describe("layered deck builder", () => {
   });
 
   it("shows the live EXACT mulligan and updates as Basics land", async () => {
-    useDeckStore.getState().importDeck("錨點", anchorDeckRows());
+    // Anchor (60/B10 = 25.862923%) is pinned in templates/golden; here we verify
+    // the builder's LIVE readout moves when a legal Basic (≤60) is added.
+    useDeckStore.getState().importDeck("錨點", roomyDeckRows()); // 58/60, B=10
     const user = await openBuilder();
-
-    // B=10 / N=60 anchor.
     const dialog = screen.getByRole("dialog", { name: /組牌工坊/ });
-    expect(within(dialog).getByText("25.862923%")).toBeInTheDocument();
+    const before = within(dialog).getByText(/^[0-9]{1,2}\.[0-9]{6}%$/).textContent;
 
-    // Adding one Basic (B=11/N=61) moves the exact number.
     await user.click(await screen.findByRole("button", { name: "加入 水水獺(SV9-050)" }));
     await waitFor(() => {
-      expect(within(dialog).queryByText("25.862923%")).toBeNull();
+      expect(within(dialog).queryByText(before!)).toBeNull();
     });
-    expect(within(dialog).getByText(/^2[0-9]\.[0-9]{6}%$/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/^[0-9]{1,2}\.[0-9]{6}%$/)).toBeInTheDocument();
   });
 
   it("功能 layer filters by what the card actually does", async () => {

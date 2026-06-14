@@ -25,6 +25,11 @@ interface CardRowProps {
   kindLabel?: string;
   /** Pokémon/Energy type of a resolved card → shows an explicit type icon. */
   typeName?: string;
+  /** Legal upper bound for this row's count (per-name 4 / Basic Energy unlimited
+   *  / Radiant 1 / deck total 60) — the + button and input cap to it. */
+  maxCount?: number;
+  /** Why the count is capped (shown on the + button when at the cap). */
+  capHint?: string;
 }
 
 /** One editor row: count stepper + name + Basic toggle + mark + delete (docs/04 §6). */
@@ -38,8 +43,11 @@ export function CardRow({
   accent,
   kindLabel,
   typeName,
+  maxCount = 60,
+  capHint,
 }: CardRowProps) {
   const t = useT();
+  const atCap = card.count >= maxCount;
   const stepBtn =
     "h-9 w-9 rounded-ctl border hairline bg-surface font-mono text-base leading-none " +
     "text-ink2 hover:text-ink disabled:opacity-40";
@@ -71,7 +79,7 @@ export function CardRow({
           type="number"
           inputMode="numeric"
           min={0}
-          max={60}
+          max={maxCount}
           value={card.count}
           aria-label={t("deck.card.count")}
           onChange={(e) => onUpdate({ count: Number(e.target.value) })}
@@ -81,7 +89,8 @@ export function CardRow({
           type="button"
           className={stepBtn}
           aria-label={t("deck.card.inc")}
-          disabled={card.count >= 60}
+          title={atCap ? capHint : undefined}
+          disabled={atCap}
           onClick={() => onUpdate({ count: card.count + 1 })}
         >
           ＋

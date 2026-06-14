@@ -48,25 +48,25 @@ describe("template bank data integrity", () => {
 });
 
 describe("template bank UI", () => {
-  it("loads the teaching anchor; the sidebar shows the exact mulligan rate", async () => {
+  it("loads a real legal deck; the sidebar shows the exact mulligan rate", async () => {
     const user = userEvent.setup();
     render(<App />);
     await viewReady();
 
     await user.click(screen.getByRole("button", { name: "範本牌組庫" }));
     const dialog = screen.getByRole("dialog");
-    // The badge itself already shows the exact value before loading.
-    expect(within(dialog).getAllByText(/25\.862923%/).length).toBeGreaterThanOrEqual(1);
+    // The badge itself already shows the exact value before loading. The Greninja
+    // deck is a real legal list (B=11): Radiant Greninja is 1-of and IS a Basic.
+    expect(within(dialog).getAllByText(/22\.242114%/).length).toBeGreaterThanOrEqual(1);
 
-    // The 25.86% teaching anchor is now the 10-Basic real deck (Mega Greninja).
-    await user.click(within(dialog).getByRole("button", { name: "載入:超級甲賀忍蛙" }));
+    await user.click(within(dialog).getByRole("button", { name: "載入:甲賀忍蛙" }));
 
     const s = useDeckStore.getState();
     expect(s.decks).toHaveLength(1);
     expect(s.decks[0]?.cards.reduce((a, c) => a + c.count, 0)).toBe(60);
     expect(s.activeDeckId).toBe(s.decks[0]?.id);
-    // DeckSummary gauge: B=10 anchor appears without any further clicks.
-    expect(screen.getAllByText(/25\.862923%/).length).toBeGreaterThanOrEqual(1);
+    // DeckSummary gauge: the exact mulligan appears without any further clicks.
+    expect(screen.getAllByText(/22\.242114%/).length).toBeGreaterThanOrEqual(1);
   });
 });
 

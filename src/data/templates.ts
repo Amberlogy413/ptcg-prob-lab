@@ -66,8 +66,9 @@ export const DECK_TEMPLATES: DeckTemplate[] = [
     cards: [
       { name: "呱呱泡蛙", count: 4, isBasic: true, section: P },
       { name: "呱頭蛙", count: 3, isBasic: false, section: P },
-      { name: "光輝甲賀忍蛙", count: 3, isBasic: false, section: P },
-      { name: "光輝甲賀忍蛙", count: 1, isBasic: false, section: P },
+      { name: "甲賀忍蛙", count: 3, isBasic: false, section: P },
+      // 光輝寶可夢每副牌組最多 1 張;光輝甲賀忍蛙係基礎寶可夢(計入重抽)。
+      { name: "光輝甲賀忍蛙", count: 1, isBasic: true, section: P },
       { name: "敲音猴", count: 3, isBasic: true, section: P },
       { name: "啪咚猴", count: 3, isBasic: false, section: P },
       { name: "角金魚", count: 2, isBasic: true, section: P },

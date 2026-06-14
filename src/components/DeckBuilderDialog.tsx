@@ -339,7 +339,10 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   // other tile, so the line reads as one combo, not a sprawling row.
   const renderFamilyCollapsed = (fam: EvolutionFamily) => {
     const face = fam.rep.rep;
-    const owned = fam.members.reduce((s, m) => s + (nameTotals.get(m.rep.name) ?? 0), 0);
+    // Show the 主軸's OWN deck count (≤4, legal), never the line sum — a summed
+    // ×8 on a single card-looking tile misreads as a rule violation (owner
+    // request 2026-06-15). Per-member counts are visible once expanded.
+    const owned = nameTotals.get(face.name) ?? 0;
     const stages = fam.members.map((m) => {
       const k = stageKey(m.rep.stage ?? "Basic");
       return k !== null ? t(k) : (m.rep.stage ?? "");

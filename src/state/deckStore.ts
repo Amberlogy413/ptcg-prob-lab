@@ -10,6 +10,8 @@ import { create } from "zustand";
 import { persist, type PersistStorage } from "zustand/middleware";
 import { STORAGE_KEYS, readJSON, writeJSON, removeKey } from "../utils/storage.ts";
 import { uid } from "../utils/uid.ts";
+import { capRowCount } from "../utils/deckRules.ts";
+import { DECK_SIZE } from "../constants.ts";
 
 export type DeckSection = "pokemon" | "trainer" | "energy" | "unknown";
 
@@ -194,6 +196,11 @@ export const useDeckStore = create<DeckState>()(
         const id = uid();
         const now = Date.now();
         const { basicTags, aliases } = get();
+        // Imports load FAITHFULLY (real lists are already legal; a malformed
+        // bulk paste/share is surfaced by the legality readout rather than
+        // silently truncated — owner mandate: never self-deceive about the data).
+        // Interactive building (addCardFrom/updateCard) is where the hard caps
+        // live, so you can never BUILD an illegal deck.
         const deck: Deck = {
           id,
           name,
@@ -217,17 +224,16 @@ export const useDeckStore = create<DeckState>()(
 
       addCard: (deckId) => {
         set((s) => ({
-          decks: s.decks.map((d) =>
-            d.id === deckId
-              ? touch({
-                  ...d,
-                  cards: [
-                    ...d.cards,
-                    { id: uid(), name: "", count: 1, isBasic: false, section: "unknown" },
-                  ],
-                })
-              : d,
-          ),
+          decks: s.decks.map((d) => {
+            if (d.id !== deckId) return d;
+            // A fresh blank row starts at 1, but never pushes the deck past 60.
+            const headroom = DECK_SIZE - d.cards.reduce((t, c) => t + c.count, 0);
+            const count = headroom > 0 ? 1 : 0;
+            return touch({
+              ...d,
+              cards: [...d.cards, { id: uid(), name: "", count, isBasic: false, section: "unknown" }],
+            });
+          }),
         }));
       },
 
@@ -247,11 +253,10 @@ export const useDeckStore = create<DeckState>()(
                 (c.name === input.name && c.set === input.set && c.number === input.number),
             );
             if (existing) {
+              const capped = capRowCount(d.cards, existing.id, existing.name, existing.count + input.count);
               return touch({
                 ...d,
-                cards: d.cards.map((c) =>
-                  c.id === existing.id ? { ...c, count: clampCount(c.count + input.count) } : c,
-                ),
+                cards: d.cards.map((c) => (c.id === existing.id ? { ...c, count: capped } : c)),
               });
             }
             // A manually-typed row of the same name (no print identity yet)
@@ -264,13 +269,14 @@ export const useDeckStore = create<DeckState>()(
                 c.number === undefined,
             );
             if (manual) {
+              const capped = capRowCount(d.cards, manual.id, manual.name, manual.count + input.count);
               return touch({
                 ...d,
                 cards: d.cards.map((c) =>
                   c.id === manual.id
                     ? {
                         ...c,
-                        count: clampCount(c.count + input.count),
+                        count: capped,
                         isBasic: input.isBasic ?? c.isBasic,
                         section: input.section ?? c.section,
                         ...(input.set !== undefined ? { set: input.set } : {}),
@@ -282,10 +288,12 @@ export const useDeckStore = create<DeckState>()(
                 ),
               });
             }
+            const count = capRowCount(d.cards, null, input.name, input.count);
+            if (count <= 0) return d; // already at a legal cap — nothing to add
             const card: DeckCard = {
               id: uid(),
               name: input.name,
-              count: clampCount(input.count),
+              count,
               isBasic: input.isBasic ?? resolveBasicTag(s.basicTags, s.aliases, input.name) ?? false,
               section: input.section ?? "unknown",
               ...(input.set !== undefined ? { set: input.set } : {}),
@@ -309,7 +317,9 @@ export const useDeckStore = create<DeckState>()(
               cards: d.cards.map((card) => {
                 if (card.id !== cardId) return card;
                 const next: DeckCard = { ...card, ...patch };
-                next.count = clampCount(next.count);
+                // Cap against the real rules (per-name ≤4 / Basic Energy exempt,
+                // Radiant ≤1, deck total ≤60), using the post-patch name.
+                next.count = capRowCount(d.cards, card.id, next.name, next.count);
                 // Renaming to a known name auto-fills the remembered tag —
                 // unless this very patch also sets isBasic explicitly.
                 if (patch.name !== undefined && patch.isBasic === undefined) {

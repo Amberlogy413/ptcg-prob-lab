@@ -28,6 +28,7 @@ import {
 import { useCardLang } from "../state/cardLang.ts";
 import { cardAccent, cardType } from "../data/typeColors.ts";
 import { IconWarn } from "./icons.tsx";
+import { capRowCount, isBasicEnergyName, isRadiantName } from "../utils/deckRules.ts";
 
 const SECTION_ORDER: DeckSection[] = ["pokemon", "trainer", "energy", "unknown"];
 const SECTION_KEY: Record<DeckSection, string> = {
@@ -83,8 +84,11 @@ export function DeckEditor({ deck }: { deck: Deck }) {
         const live = useDeckStore.getState().decks.find((d) => d.id === deck.id);
         const twin = live?.cards.find((c) => c.id !== row.id && c.catalogId === match.id);
         if (twin !== undefined) {
-          updateCard(deck.id, twin.id, { count: twin.count + row.count });
+          // Remove the duplicate row FIRST so the legality cap in updateCard does
+          // not count it against the merged total (else the sum gets clamped).
+          const merged = twin.count + row.count;
           removeCard(deck.id, row.id);
+          updateCard(deck.id, twin.id, { count: merged });
         } else {
           updateCard(deck.id, row.id, enrichPatch(match));
         }
@@ -169,6 +173,16 @@ export function DeckEditor({ deck }: { deck: Deck }) {
                     kind !== null ? (kind.key !== null ? t(kind.key) : kind.raw) : undefined;
                   const typeName =
                     resolved !== null ? (cardType(resolved) ?? undefined) : undefined;
+                  // Legal ceiling for this row + the reason, so the + button
+                  // caps to the real rule (per-name 4 / Basic Energy ∞ / 60 total).
+                  const maxCount = capRowCount(deck.cards, card.id, card.name, DECK_SIZE);
+                  const capHint = isBasicEnergyName(card.name)
+                    ? t("deck.cap.deckFull")
+                    : isRadiantName(card.name)
+                      ? t("deck.cap.radiant")
+                      : maxCount <= 4
+                        ? t("deck.cap.name")
+                        : t("deck.cap.deckFull");
                   return (
                     <CardRow
                       key={card.id}
@@ -181,6 +195,8 @@ export function DeckEditor({ deck }: { deck: Deck }) {
                       accent={accent}
                       kindLabel={kindLabel}
                       typeName={typeName}
+                      maxCount={maxCount}
+                      capHint={capHint}
                     />
                   );
                 })}
