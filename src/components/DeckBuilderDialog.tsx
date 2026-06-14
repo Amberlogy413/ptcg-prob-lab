@@ -282,12 +282,12 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     );
   };
 
-  // Pokémon results group into evolution families (owner request: same line =
-  // one combo); capped to keep the grid light.
+  // Evolution lines ALWAYS group into one series (owner request 2026-06-15: 多龍
+  // 系列要以系列形式顯示),even in the mixed/default view — not only when the
+  // 寶可夢 category is picked. Non-Pokémon become singletons (packed into a
+  // shared grid at render). Capped to keep the grid light.
   const families =
-    catalog !== null && category === "Pokemon"
-      ? evolutionFamilies(catalog, results).slice(0, GRID_CAP)
-      : null;
+    catalog !== null ? evolutionFamilies(catalog, results).slice(0, GRID_CAP) : null;
 
   return (
     <Modal wide title={t("builder.title")} onClose={onClose}>
@@ -438,38 +438,56 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           />
 
           <p className="mt-2 text-xs text-ink2">{t("builder.results", { n: results.length })}</p>
-          {results.length === 0 ? (
+          {results.length === 0 || families === null ? (
             <p className="mt-2 text-sm text-ink2">{t("builder.empty")}</p>
-          ) : families !== null ? (
-            <div className="mt-2 max-h-96 space-y-2 overflow-y-auto" aria-label={t("catalog.results.aria")}>
-              {families.map((fam) => {
-                const multi = fam.members.length > 1;
-                return (
-                  <div
-                    key={fam.rootDex ?? fam.members[0]!.rep.name}
-                    className={multi ? "rounded-ctl border hairline bg-paper p-2" : ""}
-                  >
-                    {multi && (
-                      <p className="mb-1 text-xs font-medium text-ink2">
-                        {t("builder.family", { name: cardName(fam.members[0]!.rep, lang) })}
-                      </p>
-                    )}
-                    <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                      {fam.members.map(renderTile)}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
           ) : (
-            <ul
+            <div
+              role="list"
               aria-label={t("catalog.results.aria")}
-              className="mt-2 grid max-h-96 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4"
+              className="mt-2 max-h-96 space-y-2 overflow-y-auto"
             >
-              {results.slice(0, GRID_CAP).map(renderTile)}
-            </ul>
+              {(() => {
+                // Walk families in order: a multi-member line renders as a series
+                // box; runs of singletons pack into a shared grid (so trainers/
+                // energy don't each take a full row).
+                const blocks: JSX.Element[] = [];
+                let run: PrintGroup[] = [];
+                const flush = (key: string) => {
+                  if (run.length === 0) return;
+                  const tiles = run;
+                  run = [];
+                  blocks.push(
+                    <ul key={key} className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                      {tiles.map(renderTile)}
+                    </ul>,
+                  );
+                };
+                families.forEach((fam, i) => {
+                  if (fam.members.length > 1) {
+                    flush(`run-${i}`);
+                    blocks.push(
+                      <div
+                        key={`fam-${fam.rootDex ?? fam.members[0]!.rep.name}`}
+                        className="rounded-ctl border hairline bg-paper p-2"
+                      >
+                        <p className="mb-1 text-xs font-medium text-ink2">
+                          {t("builder.family", { name: cardName(fam.members[0]!.rep, lang) })}
+                        </p>
+                        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                          {fam.members.map(renderTile)}
+                        </ul>
+                      </div>,
+                    );
+                  } else {
+                    run.push(fam.members[0]!);
+                  }
+                });
+                flush("run-final");
+                return blocks;
+              })()}
+            </div>
           )}
-          {families === null && results.length > GRID_CAP && (
+          {results.length > GRID_CAP && (
             <p className="mt-2 text-xs text-ink2">
               {t("builder.more", { n: results.length - GRID_CAP })}
             </p>

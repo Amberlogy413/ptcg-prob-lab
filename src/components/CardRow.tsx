@@ -118,6 +118,12 @@ export function CardRow({
         >
           {kindLabel}
         </span>
+      ) : card.section === "trainer" || card.section === "energy" ? (
+        // Unresolved Trainer/Energy: a 基礎 toggle is meaningless (only 基礎
+        // 寶可夢 count for the mulligan). Show the coarse section kind instead.
+        <span className="flex h-9 shrink-0 items-center rounded-ctl border hairline bg-surface px-2.5 text-sm text-ink2">
+          {t(card.section === "trainer" ? "deck.section.trainer" : "deck.section.energy")}
+        </span>
       ) : (
         <button
           type="button"

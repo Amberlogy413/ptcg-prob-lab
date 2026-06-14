@@ -58,9 +58,8 @@ describe("template bank UI", () => {
     // The badge itself already shows the exact value before loading.
     expect(within(dialog).getAllByText(/25\.862923%/).length).toBeGreaterThanOrEqual(1);
 
-    await user.click(
-      within(dialog).getByRole("button", { name: "載入:雙軸混合(教學錨點)" }),
-    );
+    // The 25.86% teaching anchor is now the 10-Basic real deck (Mega Greninja).
+    await user.click(within(dialog).getByRole("button", { name: "載入:超級甲賀忍蛙" }));
 
     const s = useDeckStore.getState();
     expect(s.decks).toHaveLength(1);
