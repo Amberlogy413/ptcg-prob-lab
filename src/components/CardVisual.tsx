@@ -6,7 +6,7 @@ import {
   type CatalogSet,
 } from "../data/catalog.ts";
 import { TypeChip } from "./TypeChip.tsx";
-import { FnChip } from "./FnChip.tsx";
+import { FnChip, FnSubChip } from "./FnChip.tsx";
 import {
   IconHP,
   IconWeakness,
@@ -79,6 +79,14 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         <p className="mt-1.5 flex flex-wrap gap-1">
           {card.fn.map((k) => (
             <FnChip key={k} tag={k} />
+          ))}
+        </p>
+      )}
+      {/* 功能子分類 (2026-06-14) — the precise breakdown of each function. */}
+      {card.fnSub !== undefined && card.fnSub.length > 0 && (
+        <p className="mt-1 flex flex-wrap gap-1">
+          {card.fnSub.map((s) => (
+            <FnSubChip key={s} sub={s} />
           ))}
         </p>
       )}

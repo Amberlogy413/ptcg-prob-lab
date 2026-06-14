@@ -64,6 +64,9 @@ export interface CatalogCard {
    *  (pipeline classify(); keys: search/draw/accel/heal/disrupt/gust/recover/
    *  protect/boost/attacker/ability). */
   fn?: string[];
+  /** Finer function sub-categories (e.g. search.pokemon, draw.refill,
+   *  accel.discard) — scripts/classify.mjs SUB_RULES. Each is "<parent>.<x>". */
+  fnSub?: string[];
   /** 熱門排名 (1 = hottest) from REAL tournament inclusion rate (Limitless,
    *  scripts/fetch_meta.mjs); lower sorts first, absent sorts last. */
   pop?: number;
@@ -547,6 +550,49 @@ const FN_KEYS: Record<string, string> = {
 };
 export function fnKey(tag: string): string | null {
   return FN_KEYS[tag] ?? null;
+}
+
+/** Function sub-categories (scripts/classify.mjs SUB_RULES), display order. */
+export const FN_SUB_ORDER = [
+  "search.pokemon",
+  "search.energy",
+  "search.trainer",
+  "draw.refill",
+  "draw.until",
+  "draw.fixed",
+  "accel.discard",
+  "accel.deck",
+  "accel.hand",
+  "disrupt.hand",
+  "disrupt.deck",
+  "heal.full",
+  "recover.hand",
+  "recover.deck",
+] as const;
+
+const FN_SUB_KEYS: Record<string, string> = {
+  "search.pokemon": "catalog.fnsub.searchPokemon",
+  "search.energy": "catalog.fnsub.searchEnergy",
+  "search.trainer": "catalog.fnsub.searchTrainer",
+  "draw.refill": "catalog.fnsub.drawRefill",
+  "draw.until": "catalog.fnsub.drawUntil",
+  "draw.fixed": "catalog.fnsub.drawFixed",
+  "accel.discard": "catalog.fnsub.accelDiscard",
+  "accel.deck": "catalog.fnsub.accelDeck",
+  "accel.hand": "catalog.fnsub.accelHand",
+  "disrupt.hand": "catalog.fnsub.disruptHand",
+  "disrupt.deck": "catalog.fnsub.disruptDeck",
+  "heal.full": "catalog.fnsub.healFull",
+  "recover.hand": "catalog.fnsub.recoverHand",
+  "recover.deck": "catalog.fnsub.recoverDeck",
+};
+export function fnSubKey(sub: string): string | null {
+  return FN_SUB_KEYS[sub] ?? null;
+}
+/** The coarse parent fn of a sub-tag ("search.pokemon" → "search"), for color. */
+export function fnSubParent(sub: string): string {
+  const dot = sub.indexOf(".");
+  return dot === -1 ? sub : sub.slice(0, dot);
 }
 
 const TYPE_KEYS: Record<string, string> = {

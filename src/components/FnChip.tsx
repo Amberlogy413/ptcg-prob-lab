@@ -7,7 +7,7 @@
 
 import type { ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
-import { fnKey } from "../data/catalog.ts";
+import { fnKey, fnSubKey, fnSubParent } from "../data/catalog.ts";
 import { fnColor } from "../data/fnColors.ts";
 
 function glyph(tag: string): ReactNode {
@@ -124,6 +124,23 @@ export function FnChip({ tag, solid, compact }: FnChipProps) {
     >
       <FnIcon tag={tag} />
       {!compact && label}
+    </span>
+  );
+}
+
+/** A finer sub-category chip (e.g. 抽固定數 / 從棄牌區充能), tinted with its
+ *  parent function's color — an outline pill so it reads as a refinement. */
+export function FnSubChip({ sub }: { sub: string }) {
+  const t = useT();
+  const key = fnSubKey(sub);
+  const label = key !== null ? t(key) : sub;
+  const color = fnColor(fnSubParent(sub));
+  return (
+    <span
+      className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[11px]"
+      style={{ borderColor: `${color}55`, color }}
+    >
+      {label}
     </span>
   );
 }
