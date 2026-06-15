@@ -743,3 +743,21 @@
   「水/格」嘅格(格鬥)唔喺呢份 scrape 牌表嘅能量度 → 照真實顯示,唔老作。
 - `energyType` 升級認英文能量名並 export。`deckEnergyTypes` 入 decks.ts(+測試)。
 - **質量**:tsc 乾淨 · 341 測試(+2)· 黃金 27/507 · 數學零改動 · 0 console error(fresh load)。
+
+## 2026-06-16 — 牌組推薦英文殘留:合併 trainer_en_zh 入 catalog embed(修 stale embed)
+
+- **問題(產品負責人:點解咁多英文)**:牌組卡表大量英文訓練家(Lillie's Determination /
+  Night Stretcher / Poké Pad / Buddy-Buddy Poffin / Special Red Card…)。
+- **根因**:catalog.trainerEnZh(runtime localizeDeckRow 用)只得 34,但 embed 只讀
+  name_bridge.json(26);更齊嘅 trainer_en_zh.json(86,已核實/owner authorized)從未
+  embed 入 catalog,只用喺 relocalize(deck-build 時)。即 stale/漏 embed。
+- **修正**:embed_en_zh.mjs 同時讀 name_bridge.json + trainer_en_zh.json 合併(name_bridge
+  衝突優先),re-embed → catalog.trainerEnZh 34→111。即時修好最高頻嗰批(127×
+  Lillie's Determination、118× Night Stretcher、111× Poké Pad… 全部變返繁中)。零猜度
+  (全部兩個已核實表)。
+- **仲餘(誠實,下一批 web-search)**:約 57 個最新套角色卡仍英文(Team Rocket's 系列 /
+  Crispin / Cyrano / Colress's Tenacity / Hop's / N's / 各 possessive Pokémon 等)——
+  要逐個 google「英文名 繁中」實證先入,唔老作。possessive 前綴寶可夢(N's Zoroark ex /
+  Hop's Trevenant)需 enNameToZh 加 possessive 橋(同 ARCH_POSSESSIVE)。
+- **質量**:tsc 乾淨 · 341 測試 · 黃金 27/507 · 數學零改動。CI restamp 保留 embed;
+  embed 已改為讀兩表,將來 re-embed 自動合併。

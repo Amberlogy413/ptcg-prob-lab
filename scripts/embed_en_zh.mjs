@@ -15,6 +15,7 @@ const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const CATALOG = path.join(ROOT, "public", "catalog", "cards-zh-Hant.json");
 const DEX = path.join(ROOT, "scripts", "dex_names.json");
 const BRIDGE = path.join(ROOT, "scripts", "name_bridge.json");
+const TRAINER_EN_ZH = path.join(ROOT, "scripts", "trainer_en_zh.json");
 
 async function main() {
   const catalog = JSON.parse(await readFile(CATALOG, "utf8"));
@@ -25,11 +26,14 @@ async function main() {
   }
   catalog.dexEnZh = map;
 
-  // Verified Trainer/Energy staple translations (unambiguous only). Decklists
-  // call basic energies "Fire Energy" (no "Basic"), so alias that form too.
+  // Verified Trainer/Energy translations. Two sources, both verified/owner-
+  // authorized: name_bridge.json (the core staple table) + trainer_en_zh.json
+  // (the larger deck-recommendation table). name_bridge wins on any conflict.
+  // Decklists call basic energies "Fire Energy" (no "Basic"), so alias that form.
   const bridge = JSON.parse(await readFile(BRIDGE, "utf8")).map ?? {};
+  const trainerZh = JSON.parse(await readFile(TRAINER_EN_ZH, "utf8")).map ?? {};
   const tr = {};
-  for (const [en, zh] of Object.entries(bridge)) {
+  for (const [en, zh] of Object.entries({ ...trainerZh, ...bridge })) {
     tr[en.toLowerCase()] = zh;
     const m = /^basic (.+ energy)$/i.exec(en);
     if (m) tr[m[1].toLowerCase()] = zh; // "Basic Fire Energy" -> also "fire energy"
