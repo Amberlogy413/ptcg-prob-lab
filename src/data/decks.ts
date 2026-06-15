@@ -270,23 +270,40 @@ export function localizeCarry(series: DeckSeries, catalog: Catalog | null): stri
 
 const TIER_SUFFIX = /(ex|VMAX|VSTAR|V)$/i;
 
+// Ogerpon mask forms (碧草/水井/火灶/礎石 面具) attach to the species after a
+// space; the real decklist carries the whole "厄鬼椪 碧草面具" string. Verified
+// against the catalog's printed card names (owner request 2026-06-16: the series
+// title must say which mask, like the deck list does). Never guessed.
+const FORM_SUFFIX = /\s+(?:碧草|水井|火灶|礎石)面具$/;
+
 /** Bare species: drop the 超級 prefix and the ex / V / VMAX / VSTAR suffix. */
 export function stripTier(name: string): string {
   return name.replace(/^超級/, "").replace(TIER_SUFFIX, "").trim();
 }
 
+/** Bare species ignoring tier AND form (厄鬼椪 碧草面具ex → 厄鬼椪). */
+function bareSpecies(name: string): string {
+  return stripTier(name).replace(FORM_SUFFIX, "").trim();
+}
+
 /**
  * Replace each localized Pokémon token in a (space-joined) title with the REAL
- * decklist card name carrying its tier, when a matching card exists among
- * `cardNames` (the build's zh-localized Pokémon names; prefers a tiered match).
- * Descriptors with no matching card pass through unchanged.
+ * decklist card name carrying its tier (and form), when a matching card exists
+ * among `cardNames` (the build's zh-localized Pokémon names). Prefers an exact
+ * tier match (多龍巴魯托 → 多龍巴魯托ex); otherwise a form match surfaces the mask
+ * the deck actually runs (厄鬼椪 → 厄鬼椪 碧草面具). Unmatched tokens pass through.
  */
 export function tierizeName(localized: string, cardNames: string[]): string {
   return localized
     .split(" ")
     .map((tok) => {
-      const matches = cardNames.filter((n) => stripTier(n) === tok);
-      return (matches.find((n) => n !== tok) ?? matches[0]) ?? tok;
+      // Exact tier match first, so plain (non-form) species keep their behavior.
+      const exact = cardNames.filter((n) => stripTier(n) === tok);
+      if (exact.length > 0) return exact.find((n) => n !== tok) ?? (exact[0] as string);
+      // Then a form match: the token is the species and the decklist card carries
+      // a mask/form suffix. Prefer a real (≠ token) name; honest first-found.
+      const formed = cardNames.filter((n) => n !== tok && bareSpecies(n) === tok);
+      return formed[0] ?? tok;
     })
     .join(" ");
 }

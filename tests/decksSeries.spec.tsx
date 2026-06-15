@@ -102,6 +102,16 @@ describe("stripTier / tierizeName (#ex-suffix from the real decklist)", () => {
     expect(tierizeName("甲賀忍蛙", ["超級甲賀忍蛙ex"])).toBe("超級甲賀忍蛙ex");
   });
 
+  it("surfaces the Ogerpon mask the deck actually runs (form match, not just tier)", () => {
+    // Carry token 厄鬼椪 → the real decklist card 厄鬼椪 碧草面具 (non-ex, the
+    // Teal-Mask energy accelerator this deck runs). Honest, from the deck.
+    expect(tierizeName("厄鬼椪 蜜集大蛇", ["厄鬼椪 碧草面具", "蜜集大蛇"])).toBe(
+      "厄鬼椪 碧草面具 蜜集大蛇",
+    );
+    // A masked-ex card keeps both the mask and the tier.
+    expect(tierizeName("厄鬼椪", ["厄鬼椪 火灶面具ex"])).toBe("厄鬼椪 火灶面具ex");
+  });
+
   it("leaves descriptors and unmatched tokens untouched, and is a no-op without names", () => {
     expect(tierizeName("太晶Box", ["厄鬼椪ex"])).toBe("太晶Box");
     expect(tierizeName("多龍巴魯托", [])).toBe("多龍巴魯托");
