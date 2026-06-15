@@ -6,6 +6,7 @@
 
 import type { NewCardInput } from "../state/deckStore.ts";
 import { resolveDeckRow, type Catalog } from "./catalog.ts";
+import { energyType } from "./typeColors.ts";
 
 export interface DeckCardLine {
   count: number;
@@ -285,6 +286,23 @@ export function tierizeName(localized: string, cardNames: string[]): string {
       return (matches.find((n) => n !== tok) ?? matches[0]) ?? tok;
     })
     .join(" ");
+}
+
+/**
+ * The deck's real type identity (owner request 2026-06-16): the distinct basic-
+ * energy types it runs, most-used first. This is what drives the row colour and
+ * the energy-type icons — e.g. a Grass-Energy deck reads Grass even when the
+ * carry Pokémon (裹蜜蟲 / Dipplin) is Dragon. Special energies map to nothing.
+ */
+export function deckEnergyTypes(build: DeckBuild | undefined): string[] {
+  if (build === undefined) return [];
+  const count = new Map<string, number>();
+  for (const c of build.cards) {
+    if (c.section !== "energy") continue;
+    const ty = energyType(c.name);
+    if (ty !== null) count.set(ty, (count.get(ty) ?? 0) + c.count);
+  }
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([ty]) => ty);
 }
 
 // ---------------------------------------------------------------------------

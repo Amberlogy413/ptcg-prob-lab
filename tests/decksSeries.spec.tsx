@@ -17,8 +17,10 @@ import {
   localizeCarry,
   stripTier,
   tierizeName,
+  deckEnergyTypes,
   setDecksForTests,
   type Archetype,
+  type DeckBuild,
   type DeckData,
 } from "../src/data/decks.ts";
 import type { Catalog } from "../src/data/catalog.ts";
@@ -103,6 +105,38 @@ describe("stripTier / tierizeName (#ex-suffix from the real decklist)", () => {
   it("leaves descriptors and unmatched tokens untouched, and is a no-op without names", () => {
     expect(tierizeName("太晶Box", ["厄鬼椪ex"])).toBe("太晶Box");
     expect(tierizeName("多龍巴魯托", [])).toBe("多龍巴魯托");
+  });
+});
+
+describe("deckEnergyTypes (#colour & icons by real energy, en + zh)", () => {
+  const build = (energy: Array<[string, number]>): DeckBuild => ({
+    event: "e",
+    date: "d",
+    players: 1,
+    online: false,
+    placing: null,
+    total: 60,
+    cards: energy.map(([name, count]) => ({ name, count, isBasic: false, section: "energy" as const })),
+  });
+
+  it("reads English AND zh basic-energy names, ordered by count, skipping specials", () => {
+    // Grass deck (Festival Lead-style) — Grass even though the carry is Dragon.
+    expect(deckEnergyTypes(build([["Grass Energy", 14]]))).toEqual(["Grass"]);
+    // Multi-type (Dragapult): fire > psychic > dark by count.
+    expect(deckEnergyTypes(build([["基本超能量", 3], ["基本火能量", 4], ["基本惡能量", 2]]))).toEqual([
+      "Fire",
+      "Psychic",
+      "Darkness",
+    ]);
+    // Special / non-elemental energies contribute nothing.
+    expect(deckEnergyTypes(build([["Water Energy", 6], ["Neo Upper Energy", 1], ["能量回收", 1]]))).toEqual([
+      "Water",
+    ]);
+  });
+
+  it("is empty for a build with no typed energy", () => {
+    expect(deckEnergyTypes(build([["Neo Upper Energy", 2]]))).toEqual([]);
+    expect(deckEnergyTypes(undefined)).toEqual([]);
   });
 });
 

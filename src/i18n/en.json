@@ -817,6 +817,7 @@
   "decks.tierNote": "Ranked by: field size → recency → placing (official tiers — Worlds/Regional/League/store — are not in the open API, so we grade honestly by field size, not official titles).",
   "decks.deckCount": "{n} listed",
   "decks.seriesBadge": "Series · {n} lines",
+  "decks.energyTypes": "Energy types the deck runs",
   "decks.variantHint": "Same carry Pokémon, different pairings — tap to switch:",
   "decks.buildsHint": "Distinct builds of this archetype (deduplicated), biggest & most recent first:",
   "decks.tag.engine": "Consistent engine",

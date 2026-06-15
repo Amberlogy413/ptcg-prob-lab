@@ -817,6 +817,7 @@
   "decks.tierNote": "排序依據:賽事規模 → 近期 → 名次(官方等級「世界賽/地區/道館/店賽」未開放 API,故以客觀規模誠實分級,非官方頭銜)。",
   "decks.deckCount": "{n} 套上榜",
   "decks.seriesBadge": "系列 · {n} 路線",
+  "decks.energyTypes": "牌組使用嘅能量屬性",
   "decks.variantHint": "同一主軸寶可夢的不同搭配,點選切換:",
   "decks.buildsHint": "同一原型的不同組合(已去重),由大型近期賽事排起:",
   "decks.tag.engine": "穩定引擎",

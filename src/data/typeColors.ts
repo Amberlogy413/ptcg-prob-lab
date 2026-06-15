@@ -35,8 +35,24 @@ const ENERGY_CHAR_TYPE: Array<[string, string]> = [
   ["妖精", "Fairy"],
 ];
 
-function energyType(name: string): string | null {
+// English basic-energy names ("Water Energy" / "Basic Fire Energy"). Special
+// energies (Neo Upper / Reversal …) have no element word → stay null.
+const ENERGY_EN_TYPE: Array<[RegExp, string]> = [
+  [/grass/i, "Grass"],
+  [/fire/i, "Fire"],
+  [/water/i, "Water"],
+  [/lightning/i, "Lightning"],
+  [/psychic/i, "Psychic"],
+  [/fighting/i, "Fighting"],
+  [/dark(ness)?/i, "Darkness"],
+  [/metal/i, "Metal"],
+];
+
+/** Elemental type of an Energy card from its zh OR English name; null if none
+ *  (special energies, trainers mis-filed under energy). Deterministic. */
+export function energyType(name: string): string | null {
   for (const [ch, ty] of ENERGY_CHAR_TYPE) if (name.includes(ch)) return ty;
+  if (/energy/i.test(name)) for (const [re, ty] of ENERGY_EN_TYPE) if (re.test(name)) return ty;
   return null;
 }
 

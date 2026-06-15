@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import { useUiStore } from "../state/uiStore.ts";
@@ -11,13 +11,15 @@ import {
   localizeCarry,
   groupSeries,
   tierizeName,
+  deckEnergyTypes,
   deckTags,
   type DeckData,
   type DeckSeries,
   type DeckBuild,
 } from "../data/decks.ts";
-import { loadCatalog, localizeDeckRow, resolveDeckRow, type Catalog } from "../data/catalog.ts";
-import { cardSurface } from "../data/typeColors.ts";
+import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
+import { TYPE_COLORS, NEUTRAL_ACCENT } from "../data/typeColors.ts";
+import { TypeIcon } from "../components/TypeChip.tsx";
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 
@@ -111,6 +113,33 @@ export function DecksView() {
   );
 }
 
+/** Row tint from the deck's basic-energy types (owner 2026-06-16): one type → a
+ *  soft wash; multiple → hard-split bands (e.g. fire ｜ psychic ｜ dark), with a
+ *  left edge in the dominant type's colour. */
+function energyTint(types: string[]): CSSProperties | undefined {
+  if (types.length === 0) return undefined;
+  const cols = types.map((ty) => TYPE_COLORS[ty] ?? NEUTRAL_ACCENT);
+  const fill = "1F"; // ~12% alpha
+  if (cols.length === 1) {
+    return {
+      backgroundColor: cols[0] + fill,
+      borderColor: cols[0] + "40",
+      borderLeftColor: cols[0],
+      borderLeftWidth: "3px",
+    };
+  }
+  const n = cols.length;
+  const bands = cols
+    .map((c, i) => `${c}${fill} ${(i * 100) / n}% ${((i + 1) * 100) / n}%`)
+    .join(", ");
+  return {
+    backgroundImage: `linear-gradient(100deg, ${bands})`,
+    borderColor: cols[0] + "40",
+    borderLeftColor: cols[0],
+    borderLeftWidth: "3px",
+  };
+}
+
 /** A build's Pokémon names localized to zh (so tier matching sees 多龍巴魯托ex,
  *  not the raw mixed-language decklist name "Dragapult ex" / "ニャースex"). */
 function zhPokeNames(catalog: Catalog | null, build: DeckBuild | undefined): string[] {
@@ -153,15 +182,11 @@ function SeriesCard({
   );
   const tags = useMemo(() => deckTags(selected.builds[0]?.cards ?? [], catalog), [selected, catalog]);
 
-  // Type-combination tint (owner request 2026-06-16): the whole series card is
-  // washed in the carry Pokémon's type colour, like a small card surface. The
-  // carry card is resolved from its real (tiered) zh name.
-  const surface = useMemo(() => {
-    if (catalog === null) return undefined;
-    const carryName = tierizeName(localizeCarry(series, catalog), zhPokeNames(catalog, rep.builds[0]));
-    const card = resolveDeckRow(catalog, { name: carryName });
-    return card ? cardSurface(card, "row") : undefined;
-  }, [series, rep, catalog]);
+  // Type identity (owner request 2026-06-16): colour the row + show icons by the
+  // deck's REAL basic-energy types — a Grass-Energy deck reads Grass even when
+  // its carry (Dipplin) is Dragon. Follows the selected variant.
+  const energyTypes = useMemo(() => deckEnergyTypes(selected.builds[0]), [selected.builds]);
+  const surface = useMemo(() => energyTint(energyTypes), [energyTypes]);
 
   return (
     <li
@@ -177,6 +202,15 @@ function SeriesCard({
         <span className="min-w-0 flex-1 truncate font-medium" title={series.members.map((m) => m.name).join(" / ")}>
           {title}
         </span>
+        {energyTypes.length > 0 && (
+          <span className="flex shrink-0 items-center gap-0.5" title={t("decks.energyTypes")}>
+            {energyTypes.map((ty) => (
+              <span key={ty} style={{ color: TYPE_COLORS[ty] ?? NEUTRAL_ACCENT }}>
+                <TypeIcon type={ty} />
+              </span>
+            ))}
+          </span>
+        )}
         {multi && (
           <span className="shrink-0 rounded-full border hairline bg-surface px-2 py-0.5 text-xs text-ink2">
             {t("decks.seriesBadge", { n: series.members.length })}
