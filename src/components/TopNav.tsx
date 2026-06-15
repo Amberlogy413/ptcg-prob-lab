@@ -1,10 +1,7 @@
-import { useMemo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
 import { useUiStore, type WorkspaceView } from "../state/uiStore.ts";
 import { useSettingsStore, type AppLanguage } from "../state/settingsStore.ts";
-import { useDeckStore } from "../state/deckStore.ts";
-import { computeDeckSummary } from "../state/selectors.ts";
-import { APP_VERSION } from "../constants.ts";
 import {
   IconDeck,
   IconDecks,
@@ -39,26 +36,13 @@ export function TopNav() {
   const setActiveView = useUiStore((s) => s.setActiveView);
   const language = useSettingsStore((s) => s.language);
   const setLanguage = useSettingsStore((s) => s.setLanguage);
-  const decks = useDeckStore((s) => s.decks);
-  const activeDeckId = useDeckStore((s) => s.activeDeckId);
-
-  // Mobile live chip (docs/07 §3): the active deck's headline reading stays
-  // visible even when the desktop summary aside is hidden (< lg).
-  const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
-  const headline = useMemo(
-    () => (activeDeck ? (computeDeckSummary(activeDeck).mulligan?.percent ?? null) : null),
-    [activeDeck],
-  );
 
   return (
     <header className="border-b hairline bg-paper">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
         <div className="mr-2">
           <h1 className="text-lg font-medium leading-tight">{t("app.title")}</h1>
-          <p className="text-xs text-ink2">
-            {t("app.tagline")}
-            <span className="ml-1.5 font-mono text-[11px] opacity-70">· V{APP_VERSION}</span>
-          </p>
+          <p className="text-xs text-ink2">{t("app.tagline")}</p>
         </div>
         <nav aria-label={t("nav.aria")} className="flex flex-wrap items-end gap-1">
           {WORKSPACES.map(({ id, labelKey, icon }) => {
@@ -83,17 +67,6 @@ export function TopNav() {
           })}
         </nav>
         <div className="ml-auto flex flex-wrap items-center gap-3">
-          {headline !== null && (
-            <span
-              title={t("nav.liveChip.title")}
-              className="inline-flex items-center gap-1.5 rounded-full border border-blue/40 bg-accent-50 px-2.5 py-0.5 lg:hidden"
-            >
-              <span className="text-[10px] uppercase tracking-wider text-ink2">
-                {t("nav.liveChip.label")}
-              </span>
-              <span className="font-mono text-xs font-medium tabular-nums text-blue">{headline}</span>
-            </span>
-          )}
           <label className="flex items-center gap-2 text-xs text-ink2">
             <span>{t("locale.label")}</span>
             <select

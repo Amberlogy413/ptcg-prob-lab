@@ -639,24 +639,3 @@
   i18n 加 `decks.seriesBadge`/`decks.variantHint`,subtitle 改為「歸納為系列」。
 - **質量**:tsc 乾淨 · 329 測試(+9,`tests/decksSeries.spec.tsx`)· 黃金 27/507 ·
   0 console error · 數學零改動。預覽實測:多龍巴魯托 4 路線切換正常、太晶Box 保持獨立。
-
-## 2026-06-15 (五) — 介面大改革 Phase 2(批次 A:旗艦入口 + 全域讀數)(#39)
-
-- **範圍**:Phase 2 較大,分批 ship。批次 A 落地兩個自足、高可見、低風險嘅 Phase 2
-  項目:① 牌組 empty-state 4 個入口 → `OptionGrid`(旗艦 `OptionCard` pattern,#39
-  owner 親自要嘅編號 icon-tile 卡);② TopNav 版本標籤 + 手機 live chip。Q2 Stepper
-  wizard 同組牌工坊 chip 對齊較大,留批次 B。
-- **empty-state**:4 張 `OptionCard`(01 組牌工坊 / 02 匯入牌表 / 03 範本牌組庫 /
-  04 從第一張卡開始),每張 icon tile + `0X` mono 徽章 + ｜ 分隔副標,整張卡係點擊
-  目標。主調石墨灰單一 accent,零新增色相。
-- **TopNav**:tagline 旁加 `· V{APP_VERSION}`(`src/constants.ts` 新增 APP_VERSION,
-  `tests/version.spec.ts` pin 死同 package.json 一致,杜絕漂移——同黃金 footer 守則同
-  源)。右上加 `lg:hidden` live chip:當有 active deck 即顯示其精確重抽概率(由
-  `computeDeckSummary` 衍生),令手機收起 aside 時讀數仍在線。
-- **測試契約變更(誠實記錄)**:OptionCard 嘅可及名稱由純標題變成「徽章+標題+副標」,
-  故 builder/templates/importFlow 嘅 empty-state 點擊由精確字串改正則(`/組牌工坊/`
-  等),反映 UI 真實變化。live chip 令重抽 % 喺 sidebar 同 TopNav 各出一次,importFlow
-  嗰句改 `getAllByText(...).length>=1`。
-- **質量**:tsc 乾淨 · 334 測試(+5:uiPhase2 ×4、version ×1)· 黃金 27/507 ·
-  0 console error · 數學零改動 · chrome 零新增綠/黃/藍。預覽實測:empty-state 4 卡、
-  版本標籤、live chip(544px 顯示「重抽 19.064669%」對齊 sidebar)。

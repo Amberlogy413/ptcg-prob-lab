@@ -48,7 +48,7 @@ async function openBuilder() {
   const user = userEvent.setup();
   render(<App />);
   await viewReady();
-  await user.click(screen.getByRole("button", { name: /組牌工坊/ }));
+  await user.click(screen.getByRole("button", { name: "組牌工坊" }));
   await screen.findByRole("dialog", { name: /組牌工坊/ });
   return user;
 }
