@@ -22,11 +22,12 @@ function glyph(type: string): ReactNode {
       return <path d="M9.5 2 4 9h3.2L6.5 14 12 7H8.8L9.5 2Z" />;
     case "Psychic": // spiral
       return <path d="M8 8c0-1 .9-1.8 2-1.8S12 7.2 12 8.6 10.6 11.4 8 11.4 3 9.6 3 7.2 5.2 3 8 3c2.4 0 4.4 1.4 5 3.4" />;
-    case "Fighting": // fist (rounded square + knuckle lines)
+    case "Fighting": // clenched fist: folded-finger block + knuckles + thumb
       return (
         <>
-          <rect x="3.5" y="5" width="9" height="7.5" rx="2" />
-          <path d="M6.2 5v2.4M8.5 5v2.4M10.8 5v2.4" />
+          <rect x="4" y="7.6" width="8" height="5" rx="1.7" />
+          <path d="M5.4 7.6V6.4M7.1 7.6V6.4M8.8 7.6V6.4M10.5 7.6V6.4" />
+          <path d="M4 9.4C3 9.4 2.4 8.9 2.4 8.2 2.4 7.5 3 7.1 4 7.3" />
         </>
       );
     case "Darkness": // crescent
