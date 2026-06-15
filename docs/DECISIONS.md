@@ -709,3 +709,21 @@
   「點解信得過」段直接點出本工具核心賣點(負責任、不自欺嘅精確計算)。
 - **質量**:tsc 乾淨 · 336 測試(+3 explain)· 黃金 27/507 · 0 console error · 主調石墨灰。
   預覽實測:Q1 「?」開到五段詳解 + 收據(opening_basics_B12 黃金核對)。
+
+## 2026-06-16 — 牌組推薦:系列/路線名寫返 ex + 按主軸屬性上色
+
+- **需求**:產品負責人要(1)係 ex 嘅就寫返 ex(系列名、路線名、寶可夢名);(2)系列/牌組
+  名按其屬性配搭上色,小卡底色顯示。
+- **ex 後綴(只用真實數據)**:Limitless 原型名係淨種名(Dragapult),但真實 decklist 卡名
+  已帶 tier(多龍巴魯托ex / 超級…ex)。新增 `stripTier()` + `tierizeName(localized,
+  cardNames[])`:將標題每個寶可夢 token,對照該牌嘅 zh 卡名(經 localizeDeckRow 由
+  en/ja 橋到 zh)還原帶 tier 嘅真實名。**絕不估**——decklist 有先寫。
+- **上色**:`cardSurface(carryCard, "row")` tint 成個系列 li(soft fill + 屬性色左邊),
+  主軸卡由 resolveDeckRow 解出屬性。查唔到(最新套 / 帶屬格前綴如 N之/火箭隊的 未橋到
+  zh)→ 誠實中性 fallback,唔老作。
+- **誠實缺口**:(a) Mega Greninja 嗰份 scrape decklist 本身冇 Mega 卡(得光輝甲賀忍蛙)
+  → 顯「甲賀忍蛙」無 ex,係資料缺口非 bug;(b) 帶屬格前綴卡(N's Zoroark ex)decklist 英
+  文名未橋到 zh → 暫無 ex/tint(同 #31 名稱本地化債)。多數系列正常(多龍巴魯托ex、超級
+  路卡利歐ex、超級大竺葵ex…)。
+- **質量**:tsc 乾淨 · 339 測試(+3 stripTier/tierizeName)· 黃金 27/507 · 數學零改動。
+  預覽實測:21 系列正常 render、標題帶 ex、按屬性 tint。

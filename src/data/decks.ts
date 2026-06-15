@@ -259,6 +259,35 @@ export function localizeCarry(series: DeckSeries, catalog: Catalog | null): stri
 }
 
 // ---------------------------------------------------------------------------
+// Tier affixes on series / variant titles (owner request 2026-06-16: 「係 ex 既
+//就應該寫返 ex」). The Limitless archetype name is the bare species; the REAL
+// decklist card already carries the tier (多龍巴魯托ex / 超級甲賀忍蛙ex / …), so
+// we read the tier straight off the deck — never guessed.
+
+const TIER_SUFFIX = /(ex|VMAX|VSTAR|V)$/i;
+
+/** Bare species: drop the 超級 prefix and the ex / V / VMAX / VSTAR suffix. */
+export function stripTier(name: string): string {
+  return name.replace(/^超級/, "").replace(TIER_SUFFIX, "").trim();
+}
+
+/**
+ * Replace each localized Pokémon token in a (space-joined) title with the REAL
+ * decklist card name carrying its tier, when a matching card exists among
+ * `cardNames` (the build's zh-localized Pokémon names; prefers a tiered match).
+ * Descriptors with no matching card pass through unchanged.
+ */
+export function tierizeName(localized: string, cardNames: string[]): string {
+  return localized
+    .split(" ")
+    .map((tok) => {
+      const matches = cardNames.filter((n) => stripTier(n) === tok);
+      return (matches.find((n) => n !== tok) ?? matches[0]) ?? tok;
+    })
+    .join(" ");
+}
+
+// ---------------------------------------------------------------------------
 // Humanized playstyle / selling-point tags, computed from the deck's REAL card
 // functions (the classify() fn tags) — data-driven, not editorial.
 

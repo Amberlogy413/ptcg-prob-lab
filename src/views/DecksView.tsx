@@ -10,12 +10,14 @@ import {
   localizeArchetype,
   localizeCarry,
   groupSeries,
+  tierizeName,
   deckTags,
   type DeckData,
   type DeckSeries,
   type DeckBuild,
 } from "../data/decks.ts";
-import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
+import { loadCatalog, localizeDeckRow, resolveDeckRow, type Catalog } from "../data/catalog.ts";
+import { cardSurface } from "../data/typeColors.ts";
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 
@@ -109,6 +111,15 @@ export function DecksView() {
   );
 }
 
+/** A build's Pokémon names localized to zh (so tier matching sees 多龍巴魯托ex,
+ *  not the raw mixed-language decklist name "Dragapult ex" / "ニャースex"). */
+function zhPokeNames(catalog: Catalog | null, build: DeckBuild | undefined): string[] {
+  if (catalog === null || build === undefined) return [];
+  return build.cards
+    .filter((c) => c.section === "pokemon")
+    .map((c) => localizeDeckRow(catalog, { name: c.name }, "zh").name);
+}
+
 function SeriesCard({
   series,
   catalog,
@@ -124,22 +135,39 @@ function SeriesCard({
   const multi = series.members.length > 1;
   const [variant, setVariant] = useState(0);
   const selected = series.members[Math.min(variant, series.members.length - 1)] ?? series.members[0]!;
+  const rep = series.members[0]!;
 
-  // A multi-variant series is titled by its carry Pokémon; a single-variant one
-  // keeps the full archetype name so possessive / Mega / descriptor context is
-  // never lost (behaviour identical to the pre-#40 archetype card).
+  // Titles carry the real tier (ex / 超級 / V …) read straight off the decklist
+  // (owner request 2026-06-16). A multi-variant series is titled by its carry
+  // Pokémon; a single-variant one keeps the full archetype name.
   const title = useMemo(
-    () => (multi ? localizeCarry(series, catalog) : localizeArchetype(selected.name, catalog)),
-    [multi, series, selected.name, catalog],
+    () =>
+      multi
+        ? tierizeName(localizeCarry(series, catalog), zhPokeNames(catalog, rep.builds[0]))
+        : tierizeName(localizeArchetype(selected.name, catalog), zhPokeNames(catalog, selected.builds[0])),
+    [multi, series, rep, selected.name, selected.builds, catalog],
   );
   const variantName = useMemo(
-    () => localizeArchetype(selected.name, catalog),
-    [selected.name, catalog],
+    () => tierizeName(localizeArchetype(selected.name, catalog), zhPokeNames(catalog, selected.builds[0])),
+    [selected.name, selected.builds, catalog],
   );
   const tags = useMemo(() => deckTags(selected.builds[0]?.cards ?? [], catalog), [selected, catalog]);
 
+  // Type-combination tint (owner request 2026-06-16): the whole series card is
+  // washed in the carry Pokémon's type colour, like a small card surface. The
+  // carry card is resolved from its real (tiered) zh name.
+  const surface = useMemo(() => {
+    if (catalog === null) return undefined;
+    const carryName = tierizeName(localizeCarry(series, catalog), zhPokeNames(catalog, rep.builds[0]));
+    const card = resolveDeckRow(catalog, { name: carryName });
+    return card ? cardSurface(card, "row") : undefined;
+  }, [series, rep, catalog]);
+
   return (
-    <li className="rounded-ctl border hairline bg-paper">
+    <li
+      className={"rounded-ctl border " + (surface ? "" : "hairline bg-paper")}
+      style={surface ? { ...surface, borderLeftWidth: "3px" } : undefined}
+    >
       <button
         type="button"
         aria-expanded={open}
@@ -188,7 +216,7 @@ function SeriesCard({
                           : "rounded-full border hairline bg-surface px-2.5 py-1 text-xs text-ink2 hover:text-ink"
                       }
                     >
-                      {localizeArchetype(m.name, catalog)}
+                      {tierizeName(localizeArchetype(m.name, catalog), zhPokeNames(catalog, m.builds[0]))}
                       <span className="ml-1 font-mono opacity-70">{m.deckCount}</span>
                     </button>
                   );

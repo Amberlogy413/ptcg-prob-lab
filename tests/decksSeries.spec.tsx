@@ -15,6 +15,8 @@ import { useUiStore } from "../src/state/uiStore.ts";
 import {
   groupSeries,
   localizeCarry,
+  stripTier,
+  tierizeName,
   setDecksForTests,
   type Archetype,
   type DeckData,
@@ -79,6 +81,28 @@ describe("groupSeries", () => {
     expect(carry?.members).toHaveLength(1);
     expect(box?.isCarry).toBe(false);
     expect(box?.members).toHaveLength(1);
+  });
+});
+
+describe("stripTier / tierizeName (#ex-suffix from the real decklist)", () => {
+  it("strips 超級 prefix and ex / V / VMAX / VSTAR suffix to the bare species", () => {
+    expect(stripTier("多龍巴魯托ex")).toBe("多龍巴魯托");
+    expect(stripTier("超級甲賀忍蛙ex")).toBe("甲賀忍蛙");
+    expect(stripTier("彥羅龍VSTAR")).toBe("彥羅龍");
+    expect(stripTier("夜巨人")).toBe("夜巨人");
+  });
+
+  it("re-applies the real tier (from the zh-localized decklist names) onto a title", () => {
+    const names = ["多龍巴魯托ex", "夜巨人"];
+    expect(tierizeName("多龍巴魯托", names)).toBe("多龍巴魯托ex");
+    expect(tierizeName("多龍巴魯托 夜巨人", names)).toBe("多龍巴魯托ex 夜巨人");
+    // Mega carry: the decklist holds the 超級…ex card.
+    expect(tierizeName("甲賀忍蛙", ["超級甲賀忍蛙ex"])).toBe("超級甲賀忍蛙ex");
+  });
+
+  it("leaves descriptors and unmatched tokens untouched, and is a no-op without names", () => {
+    expect(tierizeName("太晶Box", ["厄鬼椪ex"])).toBe("太晶Box");
+    expect(tierizeName("多龍巴魯托", [])).toBe("多龍巴魯托");
   });
 });
 
