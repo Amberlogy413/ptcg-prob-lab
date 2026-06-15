@@ -435,6 +435,11 @@ function Q3JointResult({ data }: { data: Q3JointData }) {
         className="font-mono text-2xl"
         title={t("q3.joint.headline")}
         value={data.headline.percent}
+        explain={buildExplain(t, "jointPrize", {
+          pct: data.headline.percent,
+          frac: data.headline.fraction,
+          oneIn: data.headline.oneIn,
+        })}
         proof={{ receipt: lines }}
       />
       <p className="mt-1 font-mono text-sm text-ink2">

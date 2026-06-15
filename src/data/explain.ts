@@ -16,7 +16,7 @@ export interface ExplainSection {
   body: string;
 }
 
-export type ExplainKind = "mulligan" | "combo" | "prize" | "midgame" | "draw";
+export type ExplainKind = "mulligan" | "combo" | "prize" | "jointPrize" | "midgame" | "draw";
 
 type T = (key: string, params?: Record<string, string | number>) => string;
 

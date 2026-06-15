@@ -20,7 +20,7 @@ const t = (k: string, p?: Record<string, string | number>) => translate("zh-Hant
 
 describe("buildExplain", () => {
   it("produces five plain-language sections for every kind, with real zh text", () => {
-    const kinds: ExplainKind[] = ["mulligan", "combo", "prize", "midgame", "draw"];
+    const kinds: ExplainKind[] = ["mulligan", "combo", "prize", "jointPrize", "midgame", "draw"];
     for (const kind of kinds) {
       const secs = buildExplain(t, kind, { pct: "25.0%", frac: "1/4", oneIn: "1 in 4" });
       expect(secs, kind).toHaveLength(5);
