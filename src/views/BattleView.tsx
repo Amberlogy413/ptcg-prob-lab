@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import {
@@ -9,6 +9,13 @@ import {
   type CardSpec,
 } from "../state/battleStore.ts";
 import { computeDrawOdds } from "../state/battle.ts";
+import {
+  loadDecks,
+  localizeArchetype,
+  tierizeName,
+  type DeckData,
+  type DeckBuild,
+} from "../data/decks.ts";
 import {
   loadCatalog,
   localizeDeckRow,
@@ -24,13 +31,45 @@ import { Modal } from "../components/Modal.tsx";
 // Zones offered as move targets (stadium/lost-zone kept simple for v1).
 const MOVE_ZONES: Zone[] = ["hand", "active", "bench", "discard", "deck", "prizes", "lostzone"];
 
+/** A pickable deck for the sandbox: a real meta archetype or a saved deck. */
+interface DeckOption {
+  id: string;
+  label: string;
+  /** "popular" = real Limitless data, "saved" = the player's own deck. */
+  group: "popular" | "saved";
+  total: number;
+  specs: CardSpec[];
+}
+
+/** A build's 60 lines as battle specs (math reads only count + isBasic). */
+function buildSpecs(build: DeckBuild | undefined): CardSpec[] {
+  if (build === undefined) return [];
+  return build.cards.map((c) => ({
+    name: c.name,
+    count: c.count,
+    isBasic: c.isBasic,
+    section: c.section,
+  }));
+}
+
+/** zh title for a meta archetype, with the real tier read off its top build
+ *  (多龍巴魯托ex / 超級甲賀忍蛙ex …) — same logic as the 牌組推薦 list. */
+function archLabel(name: string, build: DeckBuild | undefined, catalog: Catalog | null): string {
+  const cardNames =
+    catalog === null
+      ? []
+      : (build?.cards ?? [])
+          .filter((c) => c.section === "pokemon")
+          .map((c) => localizeDeckRow(catalog, { name: c.name }, "zh").name);
+  return tierizeName(localizeArchetype(name, catalog), cardNames);
+}
+
 /** Faithful local two-player sandbox + live exact draw odds (owner 2026-06-14). */
 export function BattleView() {
   const t = useT();
   const { lang } = useCardLang();
   const decks = useDeckStore((s) => s.decks);
   const activeDeckId = useDeckStore((s) => s.activeDeckId);
-  const activeDeck = decks.find((d) => d.id === activeDeckId) ?? null;
 
   const started = useBattleStore((s) => s.started);
   const turn = useBattleStore((s) => s.turn);
@@ -44,10 +83,17 @@ export function BattleView() {
   const shuffleDeck = useBattleStore((s) => s.shuffleDeck);
   const mulligan = useBattleStore((s) => s.mulligan);
   const endTurn = useBattleStore((s) => s.endTurn);
+  const reset = useBattleStore((s) => s.reset);
 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [data, setData] = useState<DeckData | null>(null);
+  const [decksError, setDecksError] = useState(false);
   const [selected, setSelected] = useState<{ player: PlayerId; iid: string } | null>(null);
   const [visual, setVisual] = useState<BattleCard | null>(null);
+  // Matchup selection (option ids) + reproducible seed.
+  const [p1Opt, setP1Opt] = useState<string>("");
+  const [p2Opt, setP2Opt] = useState<string>("");
+  const [seed, setSeed] = useState<number>(1);
 
   useEffect(() => {
     let alive = true;
@@ -55,49 +101,156 @@ export function BattleView() {
       (c) => alive && setCatalog(c),
       () => undefined,
     );
+    loadDecks().then(
+      (d) => alive && setData(d),
+      () => alive && setDecksError(true),
+    );
     return () => {
       alive = false;
     };
   }, []);
 
-  // Resolve a battle card to its localized name + type accent.
-  function resolve(card: BattleCard): { name: string; accent: string } {
-    if (catalog === null) return { name: card.name, accent: NEUTRAL_ACCENT };
-    const loc = localizeDeckRow(catalog, { name: card.name, catalogId: card.catalogId }, lang);
-    return { name: loc.name, accent: loc.card !== null ? cardAccent(loc.card) : NEUTRAL_ACCENT };
-  }
-
-  function start() {
-    if (activeDeck === null) return;
-    const specs: CardSpec[] = activeDeck.cards.map((c) => ({
-      name: c.name,
-      count: c.count,
-      isBasic: c.isBasic,
-      section: c.section === "unknown" ? "unknown" : c.section,
-      ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}),
+  // Pickable decks: real meta archetypes (popular) + the player's saved decks.
+  const options = useMemo<DeckOption[]>(() => {
+    const popular: DeckOption[] =
+      data === null
+        ? []
+        : data.archetypes.map((a) => {
+            const build = a.builds[0];
+            return {
+              id: `pop:${a.id}`,
+              label: archLabel(a.name, build, catalog),
+              group: "popular" as const,
+              // Honest size: never assume 60 for a build-less archetype.
+              total: build === undefined ? 0 : build.total,
+              specs: buildSpecs(build),
+            };
+          });
+    const saved: DeckOption[] = decks.map((d) => ({
+      id: `deck:${d.id}`,
+      label: d.name || t("deck.untitled"),
+      group: "saved" as const,
+      total: d.cards.reduce((s, c) => s + c.count, 0),
+      specs: d.cards.map((c) => ({
+        name: c.name,
+        count: c.count,
+        isBasic: c.isBasic,
+        section: c.section === "unknown" ? "unknown" : c.section,
+        ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}),
+      })),
     }));
-    // v1: both players play the active deck (a mirror sandbox); per-player decks
-    // come next. Seed from the deck size + time-free counter for reproducibility.
-    const seed = (specs.reduce((s, c) => s + c.count, 0) * 2654435761) >>> 0;
-    newGame({ p1: specs, p2: specs, seed, names: { p1: t("battle.you"), p2: t("battle.opp") } });
+    return [...popular, ...saved];
+  }, [data, catalog, decks, t]);
+
+  const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
+
+  // Sensible defaults once options exist: you = your active deck (else top meta),
+  // opponent = the most-played meta deck distinct from yours.
+  useEffect(() => {
+    if (options.length === 0) return;
+    setP1Opt((cur) => {
+      if (cur !== "" && byId.has(cur)) return cur;
+      const mine = activeDeckId !== null ? `deck:${activeDeckId}` : "";
+      return byId.has(mine) ? mine : (options[0]?.id ?? "");
+    });
+    setP2Opt((cur) => {
+      if (cur !== "" && byId.has(cur)) return cur;
+      const firstPopular = options.find((o) => o.group === "popular");
+      return firstPopular?.id ?? options[0]?.id ?? "";
+    });
+  }, [options, byId, activeDeckId]);
+
+  // Resolve a battle card to its localized name + type accent. Stable identity
+  // (deps: catalog, lang) so the HUD's grouping useMemo keys off real changes.
+  const resolve = useCallback(
+    (card: BattleCard): { name: string; accent: string } => {
+      if (catalog === null) return { name: card.name, accent: NEUTRAL_ACCENT };
+      const loc = localizeDeckRow(catalog, { name: card.name, catalogId: card.catalogId }, lang);
+      return { name: loc.name, accent: loc.card !== null ? cardAccent(loc.card) : NEUTRAL_ACCENT };
+    },
+    [catalog, lang],
+  );
+
+  // v2 (owner 2026-06-16): each side picks its OWN deck — straight from the real
+  // 牌組推薦 meta or a saved deck. Seeded shuffle keeps every deal reproducible.
+  function begin(useSeed: number) {
+    const o1 = byId.get(p1Opt);
+    const o2 = byId.get(p2Opt);
+    if (o1 === undefined || o2 === undefined) return;
+    newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label } });
     setSelected(null);
   }
+  const start = () => begin(seed);
+  // "重新開局": same matchup, fresh deal — advance the seed deterministically (an
+  // LCG step, no hidden randomness) so the new shuffle differs yet stays inspectable.
+  function restart() {
+    const ns = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+    setSeed(ns);
+    begin(ns);
+  }
+
+  // A faithful opening needs at least 7 (hand) + 6 (prizes) = 13 cards. Real meta
+  // decks are always 60; this only guards a half-built saved deck (honesty: never
+  // deal a broken opening while the sandbox promises a faithful one).
+  const MIN_DEAL = 13;
+  const sel1 = byId.get(p1Opt);
+  const sel2 = byId.get(p2Opt);
+  const undealable =
+    (sel1 !== undefined && sel1.total < MIN_DEAL) || (sel2 !== undefined && sel2.total < MIN_DEAL);
 
   if (!started) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
         <h2 className="text-xl font-medium">{t("battle.title")}</h2>
         <p className="mt-2 max-w-2xl text-sm text-ink2">{t("battle.intro")}</p>
-        {activeDeck === null ? (
-          <p className="mt-4 text-sm text-warn">{t("battle.needDeck")}</p>
+        {options.length === 0 ? (
+          <p className="mt-4 text-sm" role={decksError ? "alert" : "status"}>
+            <span className={decksError ? "text-warn" : "text-ink2"}>
+              {decksError ? t("battle.decksError") : t("battle.loadingDecks")}
+            </span>
+          </p>
         ) : (
-          <button
-            type="button"
-            onClick={start}
-            className="mt-4 rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white"
-          >
-            {t("battle.start", { name: activeDeck.name || t("deck.untitled") })}
-          </button>
+          <>
+            {decksError && (
+              <p className="mt-3 text-xs text-warn" role="alert">{t("battle.decksPartial")}</p>
+            )}
+            <p className="mt-4 text-sm">{t("battle.setupHint")}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <DeckSelect label={t("battle.deckYou")} value={p1Opt} onChange={setP1Opt} options={options} t={t} />
+              <DeckSelect label={t("battle.deckOpp")} value={p2Opt} onChange={setP2Opt} options={options} t={t} />
+            </div>
+            {undealable && (
+              <p className="mt-2 text-xs text-warn" role="alert">{t("battle.deckTooSmall")}</p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-1.5 text-sm text-ink2">
+                {t("battle.seedLabel")}
+                <input
+                  type="number"
+                  min={0}
+                  value={seed}
+                  onChange={(e) => setSeed(Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+                  className="h-9 w-24 rounded-ctl border hairline bg-surface px-2 text-center font-mono text-sm"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setSeed((s) => (Math.imul(s, 1103515245) + 12345) >>> 0)}
+                title={t("battle.reseed")}
+                className="rounded-ctl border hairline px-2 py-1.5 text-sm text-ink2 hover:text-ink"
+              >
+                🎲
+              </button>
+              <button
+                type="button"
+                onClick={start}
+                disabled={p1Opt === "" || p2Opt === "" || undealable}
+                className="ml-auto rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {t("battle.startBattle")}
+              </button>
+            </div>
+          </>
         )}
         <p className="mt-4 max-w-2xl text-xs text-ink2">{t("battle.note")}</p>
       </section>
@@ -109,14 +262,18 @@ export function BattleView() {
       {/* Control bar */}
       <div className="flex flex-wrap items-center gap-2 rounded-ctl border hairline bg-paper p-3 text-sm">
         <span className="font-mono">
-          {t("battle.turn", { n: turn })} · {current === "p1" ? names.p1 : names.p2}
+          {t("battle.turn", { n: turn })} · {current === "p1" ? t("battle.you") : t("battle.opp")} ·{" "}
+          {current === "p1" ? names.p1 : names.p2}
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
           <button type="button" onClick={() => endTurn()} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
             {t("battle.endTurn")}
           </button>
-          <button type="button" onClick={start} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
+          <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
             {t("battle.newGame")}
+          </button>
+          <button type="button" onClick={() => reset()} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
+            {t("battle.pickAgain")}
           </button>
         </div>
       </div>
@@ -165,6 +322,41 @@ export function BattleView() {
 
 // ---------------------------------------------------------------------------
 
+/** Deck picker for one side — real meta decks + the player's saved decks. */
+function DeckSelect({
+  label, value, onChange, options, t,
+}: {
+  label: string;
+  value: string;
+  onChange: (id: string) => void;
+  options: DeckOption[];
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const popular = options.filter((o) => o.group === "popular");
+  const saved = options.filter((o) => o.group === "saved");
+  const opt = (o: DeckOption) => (
+    <option key={o.id} value={o.id}>
+      {o.label}
+      {o.total !== 60 ? ` (${o.total})` : ""}
+    </option>
+  );
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-ink2">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 rounded-ctl border hairline bg-surface px-2 text-sm"
+      >
+        {popular.length > 0 && <optgroup label={t("battle.optPopular")}>{popular.map(opt)}</optgroup>}
+        {saved.length > 0 && <optgroup label={t("battle.optSaved")}>{saved.map(opt)}</optgroup>}
+      </select>
+    </label>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
 interface StripProps {
   player: PlayerId;
   board: import("../state/battleStore.ts").PlayerBoard;
@@ -200,7 +392,9 @@ function PlayerStrip({
   return (
     <section className="rounded-card border hairline bg-surface p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-medium">{name}</h3>
+        <h3 className="text-sm font-medium">
+          <span className="text-ink2">{opponent ? t("battle.opp") : t("battle.you")}</span> · {name}
+        </h3>
         <span className="font-mono text-xs text-ink2">
           {t("battle.zone.deck")} {board.deck.length} · {t("battle.zone.prizes")} {board.prizes.length} · {t("battle.zone.hand")} {board.hand.length}
         </span>
@@ -304,6 +498,12 @@ function DrawHud({
     }
     return [...m.entries()].sort((a, b) => b[1].count - a[1].count);
   }, [board.deck, resolve]);
+
+  // If the chosen target card is fully drawn/moved out of the deck, fall back to
+  // "any Basic" so the select and the headline number never disagree (honesty).
+  useEffect(() => {
+    if (target !== "__basic__" && !groups.some((g) => g[0] === target)) setTarget("__basic__");
+  }, [groups, target]);
 
   const deckSize = board.deck.length;
   const basics = board.deck.filter((c) => c.isBasic).length;
