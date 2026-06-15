@@ -22,11 +22,17 @@ async function main() {
   const usageByName = new Map();
   meta.cards.forEach((c, i) => usageByName.set(c.zh, { rank: i + 1, pct: c.pct }));
 
+  // Match by the zh DISPLAY name (nameZh) as well as the canonical name, so the
+  // usage lands on every print sharing that name — including the std-legal rep
+  // shown in the builder even when its canonical `name` is the ja form (e.g.
+  // 火焰鳥 M2-014 name=ファイヤー / nameZh=火焰鳥). Critically, an ex card's name
+  // (拉帝亞斯ex) is distinct from the non-ex (拉帝亞斯), so usage never bleeds
+  // across the ex/non-ex boundary again (data-integrity fix 2026-06-15).
   let stamped = 0;
   for (const c of catalog.cards) {
     delete c.pop;
     delete c.usage;
-    const u = usageByName.get(c.name);
+    const u = usageByName.get(c.nameZh ?? c.name) ?? usageByName.get(c.name);
     if (u !== undefined) {
       c.pop = u.rank;
       c.usage = u.pct;

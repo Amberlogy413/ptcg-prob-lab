@@ -208,6 +208,22 @@ export function isOwnedPokemon(card: CatalogCard): boolean {
   return card.category === "Pokemon" && card.owner !== undefined;
 }
 
+/** Special rule-box tier of a Pokémon card (owner request 2026-06-15: "分清楚咩
+ *  係ex"), derived from the real card name: Mega (超級…ex) / ex / V / VMAX /
+ *  VSTAR. These cards give up extra Prize cards and matter for deck identity, so
+ *  they must read unmistakably distinct from their plain same-species namesake
+ *  (拉帝亞斯 vs 拉帝亞斯ex vs 超級拉帝亞斯ex). null = a normal Pokémon. */
+export function cardTier(card: CatalogCard): "MEGA" | "ex" | "VMAX" | "VSTAR" | "V" | null {
+  if (card.category !== "Pokemon") return null;
+  const n = (card.nameZh ?? card.name).trim();
+  if (n.startsWith("超級") && /ex$/i.test(n)) return "MEGA";
+  if (/VMAX$/.test(n)) return "VMAX";
+  if (/VSTAR$/.test(n)) return "VSTAR";
+  if (/ex$/i.test(n)) return "ex";
+  if (/V$/.test(n)) return "V";
+  return null;
+}
+
 export function loadCatalog(): Promise<Catalog> {
   if (catalogPromise === null) {
     catalogPromise = fetch(`${import.meta.env.BASE_URL}catalog/cards-zh-Hant.json`)

@@ -148,6 +148,14 @@ async function main() {
   // Verified Trainer/Energy translation table (existence-checked below).
   const bridge = JSON.parse(await readFile(path.join(ROOT, "scripts", "name_bridge.json"), "utf8")).map;
   const zhNameSet = new Set(zhByName.keys());
+  // Official EN-species → zh map + the set of real Pokémon zh display names, for
+  // the suffix/Mega-aware name-construction matcher (resolves ex/Mega cards that
+  // carry no dexId — the root cause of the usage mis-attribution, 2026-06-15).
+  const dexEnZh = catalog.dexEnZh ?? {};
+  const pokeZhNames = new Set();
+  for (const c of catalog.cards) {
+    if (c.category === "Pokemon") pokeZhNames.add(c.nameZh ?? c.name);
+  }
 
   const CAT_EN = { Pokemon: "pokemon", Trainer: "trainer", Energy: "energy" };
   const out = [];
@@ -168,6 +176,19 @@ async function main() {
         console.log(`  ! table entry not in catalog, dropped: ${enName} → ${mapped}`);
         dropped += 1;
       }
+      return;
+    }
+
+    // 1.5) Name-construction match (suffix/Mega/region-aware) via the official
+    // dex map. This is the AUTHORITATIVE Pokémon resolver: it lands "Latias ex"
+    // on 拉帝亞斯ex and "Mega Latias ex" on 超級拉帝亞斯ex even though those ex
+    // cards have NO dexId for the illustrator bridge to use. Exact card-name
+    // identity = no guessing.
+    const constructed = enToZhName(enName, dexEnZh);
+    if (constructed !== null && pokeZhNames.has(constructed)) {
+      row.zh = constructed;
+      matchedDex += 1;
+      out.push(row);
       return;
     }
 
@@ -265,14 +286,55 @@ async function main() {
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
-/** ex / V / VMAX / VSTAR / MEGA class shared by EN and zh/ja card names. */
+/** ex / V / VMAX / VSTAR / MEGA class shared by EN and zh/ja card names. The zh
+ *  Mega prefix is 超級 (NOT メガ), so it MUST be recognized or "Mega Latias ex"
+ *  scores as plain ex and lands on the wrong print (data-integrity fix 2026-06-15). */
 function suffixClass(name) {
   if (/VMAX$/i.test(name)) return "VMAX";
   if (/VSTAR$/i.test(name)) return "VSTAR";
-  if (/^Mega |^メガ/i.test(name)) return "MEGA";
+  if (/^Mega |^メガ|^超級/i.test(name)) return "MEGA";
   if (/ex$/i.test(name)) return "ex";
   if (/\bV$/.test(name)) return "V";
   return "";
+}
+
+// Region / suffix affixes for constructing the zh card name from an EN name —
+// mirrors src/data/catalog.ts enNameToZh so the meta bridge resolves the EXACT
+// card (suffix/Mega/region-aware) even when an ex card carries NO dexId in the
+// catalog (which is why "Latias ex" used to fall onto the non-ex 拉帝亞斯).
+const EN_REGION = [
+  [/^alolan\s+/i, "阿羅拉"],
+  [/^galarian\s+/i, "伽勒爾"],
+  [/^hisuian\s+/i, "洗翠"],
+  [/^paldean\s+/i, "帕底亞"],
+];
+const EN_SUFFIX = ["ex", "VMAX", "VSTAR", "V-UNION", "V"];
+/** Construct the expected zh card name from an EN Pokémon name via the official
+ *  dex map (dexEnZh) + affix rules; null if the species is unknown. */
+function enToZhName(en, dexEnZh) {
+  let s = en.trim();
+  let prefix = "";
+  let suffix = "";
+  const mega = /^mega\s+/i.test(s);
+  if (mega) s = s.replace(/^mega\s+/i, "");
+  for (const [re, zh] of EN_REGION) {
+    if (re.test(s)) {
+      prefix = zh;
+      s = s.replace(re, "");
+      break;
+    }
+  }
+  if (mega) prefix = "超級" + prefix;
+  for (const suf of EN_SUFFIX) {
+    const re = new RegExp(`\\s*${suf.replace(/-/g, "\\-")}$`, "i");
+    if (re.test(s)) {
+      suffix = suf === "ex" ? "ex" : suf.toUpperCase();
+      s = s.replace(re, "");
+      break;
+    }
+  }
+  const base = dexEnZh[s.trim().toLowerCase()];
+  return base === undefined ? null : `${prefix}${base}${suffix}`;
 }
 function round1(x) {
   return Math.round(x * 10) / 10;

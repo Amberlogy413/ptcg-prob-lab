@@ -25,6 +25,7 @@ import {
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 import { TypeChip } from "./TypeChip.tsx";
+import { TierBadge } from "./TierBadge.tsx";
 import { FnIcon } from "./FnChip.tsx";
 import { CardName } from "./CardName.tsx";
 import { cardSurface, cardType } from "../data/typeColors.ts";
@@ -294,6 +295,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
           </span>
           <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-ink2">
             <span className="rounded-ctl border hairline px-1 py-0.5">{label(kind.key, kind.raw)}</span>
+            <TierBadge card={card} />
             {cardType(card) !== null && <TypeChip type={cardType(card) as string} />}
             <UsageBadge usage={card.usage} />
             {card.hp !== undefined && <span className="font-mono">HP{card.hp}</span>}

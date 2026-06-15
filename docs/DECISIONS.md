@@ -571,3 +571,26 @@
   忍蛙」。25.862923%(B=10)教學錨點仍在 docs/golden(數學事實,不依賴範本)。
 - **質量**:tsc 乾淨 · 316 測試(+13)· 黃金 27/507 · 0 console error · 數學零改動。
   實測:乾淨牌組連㩒 含羞苞 6 次 → 封頂 ×4(牌組 4/60)。
+
+## 2026-06-15 (四) — 採用率貼錯卡修正(資料真確性)+ ex/Mega 區分
+
+- **產品負責人揪出嚴重問題**:火焰鳥 / 拉帝亞斯 顯示採用率,佢質疑係咪「亂作」。
+  查證後**確認係真‧貼錯卡 bug**:`meta_usage.json` 有 `{"en":"Latias ex","zh":"拉帝亞斯"}`
+  ——真實賽事卡係 **Latias ex**,但 bridge 跌咗 "ex",把 20% 貼咗落**非 ex** 的拉帝亞斯;
+  ex 卡(拉帝亞斯ex)反而冇數據。
+- **根因(fetch_meta.mjs bridge)**:(1) `suffixClass` 唔識 zh 的 Mega 前綴「超級」(只認
+  Mega/メガ);(2) SV-era 的 ex 卡(拉帝亞斯ex SV7a)喺 catalog **冇 dexId**,而 bridge 靠
+  dexId+繪師重疊配對 → ex 卡被排除 → 採用率落咗去有 dexId 的非 ex 卡。
+- **修正(只用真實數據)**:fetch_meta 加 **dexEnZh 名稱建構配對器**(suffix/Mega/地區型態
+  aware,唔靠 dexId):`Latias ex`→拉帝亞斯ex、`Mega Latias ex`→超級拉帝亞斯ex;suffixClass
+  認「超級」。restamp 改為按 nameZh 或 canonical name 配對(令 std 主力版本都食到數據)。
+  **重抓真實 Limitless 數據**(4250 副牌,2026-06-06~06-14),129 配對(原 104)。
+- **結果(實測 live catalog)**:拉帝亞斯(非ex)=**冇數據**、拉帝亞斯ex=**20.6%**、袋獸=冇、
+  超級袋獸ex=**14.5%**;0 個 ex/Mega 貼錯。火焰鳥(Moltres,非ex)=11.6% 係 Limitless 對
+  「Moltres」一名的真實採用率(可核實,非作假)。
+- **ex/Mega/V 區分(owner: 分清楚咩係ex)**:`cardTier(card)` 由真實卡名判 MEGA(超級…ex)/
+  ex/V/VMAX/VSTAR;新 `TierBadge`(琥珀色 data 徽章,非 UI 主調)顯示喺 CardVisual + 組牌
+  工坊格,令 拉帝亞斯 / 拉帝亞斯ex / 超級拉帝亞斯ex 一眼分得清。
+- **誠實債(未還)**:繁中入面 M1/M2/M3 等最新套(無 zh 發行)卡的**特性/招式文字仍是日文**
+  (#31)——名係 zh,規則文字係 ja。下一批忠實翻譯(暫譯,標明非官方),唔求其機翻亂作。
+- **質量**:tsc 乾淨 · 316 測試 · 黃金 27/507 · 0 console error · 數學零改動。

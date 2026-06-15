@@ -5,6 +5,7 @@ import {
   type CatalogCard,
   type CatalogSet,
 } from "../data/catalog.ts";
+import { TierBadge } from "./TierBadge.tsx";
 import { TypeChip } from "./TypeChip.tsx";
 import { FnChip, FnSubChip } from "./FnChip.tsx";
 import {
@@ -43,6 +44,7 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         <span className="rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
           {label(kind.key, kind.raw)}
         </span>
+        <TierBadge card={card} />
         <span className="text-lg font-medium">
           {primary}
           {others.map((n) => (
