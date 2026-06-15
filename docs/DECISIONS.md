@@ -639,3 +639,19 @@
   i18n 加 `decks.seriesBadge`/`decks.variantHint`,subtitle 改為「歸納為系列」。
 - **質量**:tsc 乾淨 · 329 測試(+9,`tests/decksSeries.spec.tsx`)· 黃金 27/507 ·
   0 console error · 數學零改動。預覽實測:多龍巴魯托 4 路線切換正常、太晶Box 保持獨立。
+
+## 2026-06-15 (五) — 介面大改革 Phase 2 批次 A 回退(產品負責人否決:卡太大)(#39)
+
+- **發生咩事**:批次 A(015f71c)將牌組空狀態 4 個入口改成大張編號 `OptionCard`,
+  產品負責人即時否決——「錯哂,本身果個仲好,而家啲字大到俾老人家睇咁」。即係 OptionCard
+  嗰種大 icon tile + `text-base` 標題 + 闊 padding,喺空狀態成版大卡,觀感似「老人版」,
+  唔似精密儀器;原本緊湊嘅 4 掣一行先啱佢。
+- **裁決**:`git revert`(f970a4b)整個批次 A——空狀態還原原本緊湊掣、TopNav 去返版本
+  標籤同 live chip、APP_VERSION/uiPhase2/version 測試一併移除。`#40` 系列功能(e66a380)
+  唔受影響。
+- **學到嘅(寫俾將來)**:① OptionCard 嘅「大卡」表達**唔啱呢位產品負責人**——佢要
+  **緊湊、精密、克制**,唔要大字大 padding。② 將來做 #39 前,任何「放大」嘅 pattern
+  要先細範圍試 + 俾佢睇,唔好一次過鋪。③ docs/07 嘅 OptionCard 規格(48px tile、
+  text-base、p-4)需要重新審視——可能要縮成更細嘅變體,或者根本唔用喺密集入口。
+  ④ 已上線嘅 prizes Q3 OptionCard 暫時保留(佢未投訴),但若再嫌大,連埋一齊縮。
+- **質量**:回退後 tsc 乾淨 · 測試全綠 · 黃金 27/507 · 數學零改動。
