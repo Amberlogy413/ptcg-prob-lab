@@ -51,19 +51,30 @@ interface BattleState {
   shuffleNonce: number;
   turn: number;
   current: PlayerId;
-  /** Going-first restrictions live in the UI; this just records who is first. */
+  /** Who took the first turn (turn 1) — drives the going-first restrictions. */
   firstPlayer: PlayerId;
+  /** Whether the current player has already played a Supporter this turn (1/turn). */
+  turnSupporterUsed: boolean;
   p1: PlayerBoard;
   p2: PlayerBoard;
   names: { p1: string; p2: string };
 
-  newGame: (input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; names?: { p1: string; p2: string } }) => void;
+  newGame: (input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; names?: { p1: string; p2: string }; first?: PlayerId }) => void;
   /** Shuffle deck, draw the opening 7, set 6 prizes from the top. */
   setup: (player: PlayerId) => void;
   draw: (player: PlayerId, n: number) => void;
   /** Move one instance to a zone (real-play manual operation). */
   moveCard: (player: PlayerId, iid: string, to: Zone) => void;
   shuffleDeck: (player: PlayerId) => void;
+  /** Move the whole hand to the discard pile (e.g. Professor's Research). */
+  discardHand: (player: PlayerId) => void;
+  /** Shuffle the whole hand back into the deck, fully reshuffled (e.g. Judge). */
+  shuffleHandIntoDeck: (player: PlayerId) => void;
+  /** Shuffle the hand among itself and place it UNDER the deck, preserving the
+   *  existing top order (e.g. Iono — 放回牌庫下方). */
+  shuffleHandUnderDeck: (player: PlayerId) => void;
+  /** Record that a Supporter was played this turn (enforces 1-per-turn). */
+  markSupporterUsed: () => void;
   /** Mulligan: hand → deck, reshuffle, redraw 7. */
   mulligan: (player: PlayerId) => void;
   endTurn: () => void;
@@ -111,18 +122,21 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   turn: 1,
   current: "p1",
   firstPlayer: "p1",
+  turnSupporterUsed: false,
   p1: emptyBoard(),
   p2: emptyBoard(),
   names: { p1: "P1", p2: "P2" },
 
-  newGame: ({ p1, p2, seed, names }) => {
+  newGame: ({ p1, p2, seed, names, first }) => {
+    const firstPlayer = first ?? "p1";
     set({
       started: true,
       seed,
       shuffleNonce: 0,
       turn: 1,
-      current: "p1",
-      firstPlayer: "p1",
+      current: firstPlayer,
+      firstPlayer,
+      turnSupporterUsed: false,
       p1: { ...emptyBoard(), deck: instantiate(p1) },
       p2: { ...emptyBoard(), deck: instantiate(p2) },
       names: names ?? { p1: "P1", p2: "P2" },
@@ -184,6 +198,44 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
     });
   },
 
+  discardHand: (player) => {
+    set((s) => {
+      const board = s[player];
+      if (board.hand.length === 0) return {} as Partial<BattleState>;
+      return {
+        [player]: { ...board, hand: [], discard: [...board.discard, ...board.hand] },
+      } as Partial<BattleState>;
+    });
+  },
+
+  shuffleHandIntoDeck: (player) => {
+    set((s) => {
+      const board = s[player];
+      if (board.hand.length === 0) return {} as Partial<BattleState>;
+      const deck = shuffle([...board.deck, ...board.hand], rngFor(s.seed, player, s.shuffleNonce + 1));
+      return {
+        shuffleNonce: s.shuffleNonce + 1,
+        [player]: { ...board, hand: [], deck },
+      } as Partial<BattleState>;
+    });
+  },
+
+  shuffleHandUnderDeck: (player) => {
+    set((s) => {
+      const board = s[player];
+      if (board.hand.length === 0) return {} as Partial<BattleState>;
+      // Shuffle ONLY the hand among itself, then place it under the existing
+      // deck (top order preserved, drawn off the top) — faithful to 放回牌庫下方.
+      const shuffledHand = shuffle(board.hand, rngFor(s.seed, player, s.shuffleNonce + 1));
+      return {
+        shuffleNonce: s.shuffleNonce + 1,
+        [player]: { ...board, hand: [], deck: [...board.deck, ...shuffledHand] },
+      } as Partial<BattleState>;
+    });
+  },
+
+  markSupporterUsed: () => set({ turnSupporterUsed: true }),
+
   mulligan: (player) => {
     set((s) => {
       const board = s[player];
@@ -197,10 +249,10 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   },
 
   endTurn: () => {
-    set((s) => ({ current: s.current === "p1" ? "p2" : "p1", turn: s.turn + 1 }));
+    set((s) => ({ current: s.current === "p1" ? "p2" : "p1", turn: s.turn + 1, turnSupporterUsed: false }));
   },
 
   reset: () => {
-    set({ started: false, p1: emptyBoard(), p2: emptyBoard(), turn: 1, current: "p1" });
+    set({ started: false, p1: emptyBoard(), p2: emptyBoard(), turn: 1, current: "p1", firstPlayer: "p1", turnSupporterUsed: false });
   },
 }));

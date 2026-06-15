@@ -9,6 +9,7 @@ import {
   type CardSpec,
 } from "../state/battleStore.ts";
 import { computeDrawOdds } from "../state/battle.ts";
+import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -74,6 +75,8 @@ export function BattleView() {
   const started = useBattleStore((s) => s.started);
   const turn = useBattleStore((s) => s.turn);
   const current = useBattleStore((s) => s.current);
+  const firstPlayer = useBattleStore((s) => s.firstPlayer);
+  const turnSupporterUsed = useBattleStore((s) => s.turnSupporterUsed);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
   const p2 = useBattleStore((s) => s.p2);
@@ -83,6 +86,7 @@ export function BattleView() {
   const shuffleDeck = useBattleStore((s) => s.shuffleDeck);
   const mulligan = useBattleStore((s) => s.mulligan);
   const endTurn = useBattleStore((s) => s.endTurn);
+  const markSupporterUsed = useBattleStore((s) => s.markSupporterUsed);
   const reset = useBattleStore((s) => s.reset);
 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -90,10 +94,13 @@ export function BattleView() {
   const [decksError, setDecksError] = useState(false);
   const [selected, setSelected] = useState<{ player: PlayerId; iid: string } | null>(null);
   const [visual, setVisual] = useState<BattleCard | null>(null);
-  // Matchup selection (option ids) + reproducible seed.
+  // Matchup selection (option ids) + reproducible seed + who takes the first turn.
   const [p1Opt, setP1Opt] = useState<string>("");
   const [p2Opt, setP2Opt] = useState<string>("");
   const [seed, setSeed] = useState<number>(1);
+  const [first, setFirst] = useState<PlayerId>("p1");
+  // Transient note when an auto-effect is blocked by a real rule (turn-1 / 1-per-turn).
+  const [effectMsg, setEffectMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -177,8 +184,9 @@ export function BattleView() {
     const o1 = byId.get(p1Opt);
     const o2 = byId.get(p2Opt);
     if (o1 === undefined || o2 === undefined) return;
-    newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label } });
+    newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label }, first });
     setSelected(null);
+    setEffectMsg(null);
   }
   const start = () => begin(seed);
   // "重新開局": same matchup, fresh deal — advance the seed deterministically (an
@@ -187,6 +195,33 @@ export function BattleView() {
     const ns = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     setSeed(ns);
     begin(ns);
+  }
+
+  // Auto-resolve a known, deterministic card effect — but only when the REAL
+  // rules allow it: a Supporter is once-per-turn and the going-first player may
+  // not play one on turn 1. Blocked attempts explain why (honest, faithful).
+  function handleEffect(player: PlayerId, card: BattleCard) {
+    const fx = AUTO_EFFECTS[card.name];
+    if (fx === undefined) return;
+    if (fx.supporter) {
+      if (player !== current) {
+        setEffectMsg(t("battle.fx.notYourTurn"));
+        return;
+      }
+      if (turn === 1 && player === firstPlayer) {
+        setEffectMsg(t("battle.fx.firstTurnNoSupporter"));
+        return;
+      }
+      if (turnSupporterUsed) {
+        setEffectMsg(t("battle.fx.supporterUsed"));
+        return;
+      }
+    }
+    const ok = applyAutoEffect(player, card.iid, card.name);
+    if (!ok) return; // unrecognised card → stay manual, don't consume the Supporter
+    if (fx.supporter) markSupporterUsed();
+    setSelected(null);
+    setEffectMsg(null);
   }
 
   // A faithful opening needs at least 7 (hand) + 6 (prizes) = 13 cards. Real meta
@@ -223,6 +258,24 @@ export function BattleView() {
               <p className="mt-2 text-xs text-warn" role="alert">{t("battle.deckTooSmall")}</p>
             )}
             <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-sm text-ink2">
+                <span>{t("battle.firstLabel")}</span>
+                {(["p1", "p2"] as const).map((pl) => (
+                  <button
+                    key={pl}
+                    type="button"
+                    aria-pressed={first === pl}
+                    onClick={() => setFirst(pl)}
+                    className={
+                      first === pl
+                        ? "rounded-ctl border border-blue bg-blue px-2.5 py-1 text-xs font-medium text-white"
+                        : "rounded-ctl border hairline bg-surface px-2.5 py-1 text-xs text-ink2 hover:text-ink"
+                    }
+                  >
+                    {pl === "p1" ? t("battle.you") : t("battle.opp")}
+                  </button>
+                ))}
+              </div>
               <label className="flex items-center gap-1.5 text-sm text-ink2">
                 {t("battle.seedLabel")}
                 <input
@@ -266,7 +319,7 @@ export function BattleView() {
           {current === "p1" ? names.p1 : names.p2}
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
-          <button type="button" onClick={() => endTurn()} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
+          <button type="button" onClick={() => { endTurn(); setEffectMsg(null); }} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
             {t("battle.endTurn")}
           </button>
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
@@ -276,6 +329,12 @@ export function BattleView() {
             {t("battle.pickAgain")}
           </button>
         </div>
+        {turn === 1 && (
+          <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
+        )}
+        {effectMsg !== null && (
+          <p className="w-full text-xs text-warn" role="alert">{effectMsg}</p>
+        )}
       </div>
 
       {/* Opponent (top) — hand face-down */}
@@ -292,6 +351,7 @@ export function BattleView() {
         onDraw={(n) => draw("p2", n)}
         onShuffle={() => shuffleDeck("p2")}
         onMulligan={() => mulligan("p2")}
+        onEffect={(card) => handleEffect("p2", card)}
         t={t}
       />
 
@@ -308,6 +368,7 @@ export function BattleView() {
         onDraw={(n) => draw("p1", n)}
         onShuffle={() => shuffleDeck("p1")}
         onMulligan={() => mulligan("p1")}
+        onEffect={(card) => handleEffect("p1", card)}
         t={t}
       />
 
@@ -370,6 +431,8 @@ interface StripProps {
   onDraw: (n: number) => void;
   onShuffle: () => void;
   onMulligan: () => void;
+  /** Auto-resolve a known card effect (hand cards only). */
+  onEffect: (c: BattleCard) => void;
   t: (k: string, p?: Record<string, string | number>) => string;
 }
 
@@ -384,7 +447,7 @@ const ZONE_KEYS: Record<Zone, string> = {
 };
 
 function PlayerStrip({
-  player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, t,
+  player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, onEffect, t,
 }: StripProps) {
   // Open zones (cards visible). Opponent's hand + both prizes + deck stay hidden (counts only).
   const visibleZones: Zone[] = ["active", "bench", "discard", "lostzone"];
@@ -412,7 +475,7 @@ function PlayerStrip({
       </div>
 
       {handVisible && (
-        <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} t={t} />
+        <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} onEffect={onEffect} t={t} />
       )}
       {visibleZones.map((z) => (
         <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} t={t} />
@@ -422,7 +485,7 @@ function PlayerStrip({
 }
 
 function ZoneRow({
-  label, cards, player, resolve, selected, onSelect, onMove, onVisual, t,
+  label, cards, player, resolve, selected, onSelect, onMove, onVisual, onEffect, t,
 }: {
   label: string;
   cards: BattleCard[];
@@ -432,6 +495,8 @@ function ZoneRow({
   onSelect: (iid: string) => void;
   onMove: (iid: string, to: Zone) => void;
   onVisual: (c: BattleCard) => void;
+  /** Present only on the hand row — auto-resolve a known card effect. */
+  onEffect?: (c: BattleCard) => void;
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   return (
@@ -460,6 +525,16 @@ function ZoneRow({
               {isSel && (
                 <span className="mt-1 flex flex-wrap gap-0.5">
                   <button type="button" onClick={() => onVisual(c)} className="rounded-ctl border hairline px-1 text-[11px] text-ink2 hover:text-ink">ⓘ</button>
+                  {onEffect !== undefined && AUTO_EFFECTS[c.name] !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() => onEffect(c)}
+                      title={t(AUTO_EFFECTS[c.name]!.summaryKey)}
+                      className="rounded-ctl border border-blue px-1 text-[11px] font-medium text-blue hover:bg-blue/10"
+                    >
+                      {t("battle.fx.resolve")}
+                    </button>
+                  )}
                   {MOVE_ZONES.map((z) => (
                     <button key={z} type="button" onClick={() => onMove(c.iid, z)} className="rounded-ctl border hairline px-1 text-[11px] text-ink2 hover:text-ink">
                       {t(ZONE_KEYS[z])}
