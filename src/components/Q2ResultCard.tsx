@@ -1,6 +1,7 @@
 import { useT } from "../i18n/index.ts";
 import { PrecisionRuler } from "./PrecisionRuler.tsx";
-import { MathReceipt, type ReceiptLine } from "./MathReceipt.tsx";
+import { type ReceiptLine } from "./MathReceipt.tsx";
+import { ProofNumber } from "./ProofNumber.tsx";
 import { JointTable } from "./JointTable.tsx";
 import type { ComboResultState } from "../state/useComboResult.ts";
 import type { Q2Data } from "../state/selectors.ts";
@@ -63,7 +64,19 @@ function Q2Ready({ data }: { data: Q2Data }) {
           {data.conditioned ? t("toggle.mulligan.on") : t("toggle.mulligan.off")}
         </span>
       </h3>
-      <p className="font-mono text-headline leading-none">{data.headline.percent}</p>
+      <ProofNumber
+        className="font-mono text-headline leading-none"
+        title={t("q2.headline.label")}
+        value={data.headline.percent}
+        proof={{
+          receipt: receiptLines,
+          interpret: data.headline.games
+            ? data.conditioned
+              ? t("q2.headline.interpret", { games: data.headline.games })
+              : t("q2.headline.interpretRaw", { games: data.headline.games })
+            : undefined,
+        }}
+      />
       <p className="mt-1 font-mono text-sm text-ink2">
         {data.headline.fraction} · {data.headline.oneIn}
       </p>
@@ -92,9 +105,6 @@ function Q2Ready({ data }: { data: Q2Data }) {
           {t("q2.pValid", { fraction: data.pValid.fraction, percent: data.pValid.percent })}
         </p>
       )}
-
-      {/* Layer 3 — receipt (signature element) */}
-      <MathReceipt lines={receiptLines} />
 
       {/* Layer 2 — full joint table */}
       <JointTable

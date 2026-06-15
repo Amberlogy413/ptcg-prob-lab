@@ -166,7 +166,7 @@ describe("Prizes view UI + 預設十問", () => {
     expect(screen.getAllByText("10.000000%").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("1/10 · 1 in 10.000")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "展開數學收據 ▾" }));
+    await user.click(screen.getByRole("button", { name: "顯示「至少 1 張被獎賞」的數學證明" }));
     expect(screen.getByText(/prize_uncond_x1/)).toBeInTheDocument();
   });
 

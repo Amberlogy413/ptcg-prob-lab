@@ -9,6 +9,7 @@ import { computeGrades, computeEnergyCurve } from "../state/q5.ts";
 import { computeQ3Single } from "../state/q3.ts";
 import { useComboResult } from "../state/useComboResult.ts";
 import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
+import { ProofNumber } from "../components/ProofNumber.tsx";
 import { IconLegal, IconWarn, IconIllegal } from "../components/icons.tsx";
 import { buildReportCardSvg, type ReportCardLine } from "../utils/reportCard.ts";
 import { downloadSvgPng } from "../utils/svgPng.ts";
@@ -191,14 +192,18 @@ export function ReportView() {
       </section>
 
       <Section title={t("report.mull")}>
-        <p className="font-mono text-2xl">{q1d.headline.percent}</p>
+        <ProofNumber
+          className="font-mono text-2xl"
+          title={t("proof.title.mulligan")}
+          value={q1d.headline.percent}
+          proof={{ receipt: q1Receipt }}
+        />
         <p className="mt-1 font-mono text-sm text-ink2">
           {q1d.headline.fraction} · {q1d.headline.oneIn}
         </p>
         <p className="mt-1 font-mono text-xs text-ink2">
           {t("report.valid")}: {q1d.validPercent}
         </p>
-        <MathReceipt lines={q1Receipt} />
       </Section>
 
       <Section title={t("report.grades")}>
@@ -259,20 +264,24 @@ export function ReportView() {
           />
         ) : combo.status === "ready" ? (
           <>
-            <p className="font-mono text-2xl">{combo.data.headline.percent}</p>
+            <ProofNumber
+              className="font-mono text-2xl"
+              title={t("report.combo")}
+              value={combo.data.headline.percent}
+              proof={{
+                receipt: [
+                  { label: t("receipt.label.formula"), text: combo.data.receipt.formula },
+                  { label: t("receipt.label.subst"), text: combo.data.receipt.substitution },
+                  { label: t("receipt.label.total"), text: t("receipt.q2.total", combo.data.receipt.total) },
+                  ...(combo.data.receipt.cond
+                    ? [{ label: t("receipt.label.cond"), text: t("receipt.q2.cond", combo.data.receipt.cond) }]
+                    : []),
+                ],
+              }}
+            />
             <p className="mt-1 font-mono text-sm text-ink2">
               {combo.data.headline.fraction} · {combo.data.headline.oneIn}
             </p>
-            <MathReceipt
-              lines={[
-                { label: t("receipt.label.formula"), text: combo.data.receipt.formula },
-                { label: t("receipt.label.subst"), text: combo.data.receipt.substitution },
-                { label: t("receipt.label.total"), text: t("receipt.q2.total", combo.data.receipt.total) },
-                ...(combo.data.receipt.cond
-                  ? [{ label: t("receipt.label.cond"), text: t("receipt.q2.cond", combo.data.receipt.cond) }]
-                  : []),
-              ]}
-            />
           </>
         ) : combo.status === "computing" ? (
           <p className="text-sm text-ink2" role="status">

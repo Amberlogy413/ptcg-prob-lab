@@ -3,7 +3,8 @@ import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import { computeQ1 } from "../state/selectors.ts";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
-import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
+import { type ReceiptLine } from "../components/MathReceipt.tsx";
+import { ProofNumber } from "../components/ProofNumber.tsx";
 import { MulliganDashboard } from "../components/MulliganDashboard.tsx";
 import { DistChart } from "../components/DistChart.tsx";
 import { DistTable } from "../components/DistTable.tsx";
@@ -77,7 +78,17 @@ export function Q1Section() {
           <h3 className="text-xs font-medium uppercase tracking-wide text-ink2">
             {t("q1.headline.label")}
           </h3>
-          <p className="font-mono text-headline leading-none">{data.headline.percent}</p>
+          <ProofNumber
+            className="font-mono text-headline leading-none"
+            title={t("proof.title.mulligan")}
+            value={data.headline.percent}
+            proof={{
+              receipt: receiptLines,
+              interpret: data.headline.games
+                ? t("q1.headline.interpret", { games: data.headline.games })
+                : t("q1.headline.neverMulligan"),
+            }}
+          />
           <p className="mt-1 font-mono text-sm text-ink2">
             {data.headline.fraction} · {data.headline.oneIn}
           </p>
@@ -95,8 +106,6 @@ export function Q1Section() {
               : t("q1.headline.neverMulligan")}
           </p>
         </div>
-
-        <MathReceipt lines={receiptLines} />
       </section>
 
       {/* Mulligan dashboard 三聯卡 */}

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "../src/App.tsx";
 import { viewReady } from "./helpers.ts";
@@ -70,7 +70,9 @@ describe("中局 view", () => {
     expect(await screen.findByText("30.000000%")).toBeInTheDocument();
     expect(screen.getByText(/3\/10 · 1 in 3\.333/)).toBeInTheDocument();
 
-    await user.click(screen.getAllByText("展開推導明細 ▾")[0]!);
+    // The √ proof sits beside this calculator's own headline (3 calcs share the title).
+    const pct = screen.getByText("30.000000%");
+    await user.click(within(pct.parentElement!).getByRole("button", { name: /數學證明/ }));
     expect(screen.getByText(/C\(25,2\) = 300/)).toBeInTheDocument();
     expect(screen.getByText(/P = 1 − 210\/300 = 3\/10/)).toBeInTheDocument();
 

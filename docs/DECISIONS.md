@@ -655,3 +655,22 @@
   text-base、p-4)需要重新審視——可能要縮成更細嘅變體,或者根本唔用喺密集入口。
   ④ 已上線嘅 prizes Q3 OptionCard 暫時保留(佢未投訴),但若再嫌大,連埋一齊縮。
 - **質量**:回退後 tsc 乾淨 · 測試全綠 · 黃金 27/507 · 數學零改動。
+
+## 2026-06-15 (五) — #34 ProofNumber √ 全面鋪開:統一數學證明 popover(取代展開收據)
+
+- **產品負責人決定**(經一個 pilot 確認):用 ProofNumber 嘅 √ popover(數字側一個細圈,
+  彈出完整證明 + 有意義解讀 + 複製)**取代**各頁原本嘅「展開數學收據」大塊收據——更簡潔、
+  更似精密儀器(對齊 [[ui-compact-not-big]]),並鋪去全部主要頭條數字。
+- **鋪開範圍**:Q1 起手(Q1Section)、Q2 組合(Q2ResultCard)、獎賞 Q3 單張+聯合
+  (PrizesView ×2)、中局 3 個計算器(MidgameView,derivation→receipt)、體檢 重抽+組合
+  (ReportView ×2)。追蹤器係表格(無單一頭條)故不加 √。原本嘅 `<MathReceipt>` /
+  `<details> 推導明細` 全部移除。
+- **標題唯一化(重要)**:DeckSummary 側欄喺每頁都顯示 mulligan √(title「重抽概率」),
+  喺 `<main>` 內,故 Q1/體檢 頭條(同係 mulligan,title 亦「重抽概率」)會撞名。解法:
+  新增 `proof.title.mulligan`=「起手重抽概率」俾 Q1 + 體檢 mull 用;`proof.title.derivation`
+  =「推導明細」俾中局 3 計算器用(同頁 3 個,測試用 headline 旁 within() 定位)。
+- **測試契約**:4 個原本撳「展開數學收據 ▾」嘅 test(q1/q2/q3/report)改撳對應 √ 嘅唯一
+  aria-label;midgame test 改用 headline 旁 within() 撳該計算器嘅 √。
+- **數學零改動**:√ popover 只係換個容器顯示同一個 exact receipt(BigInt 分數、黃金向量
+  cross-check 照舊)。質量:tsc 乾淨 · 329 測試 · 黃金 27/507 · 0 console error · 主調石墨灰。
+  預覽實測:Q1/中局/獎賞 √ 正常,舊收據已清。

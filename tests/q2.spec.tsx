@@ -230,7 +230,7 @@ describe("Q2 section UI", () => {
     expect(screen.getByText(/p_valid = 216911\/292581/)).toBeInTheDocument();
 
     // Receipt: five lines, 條件化 row included (docs/04 §5).
-    await user.click(screen.getByRole("button", { name: "展開數學收據 ▾" }));
+    await user.click(screen.getByRole("button", { name: "顯示「事件概率」的數學證明" }));
     expect(
       screen.getByText("P = Σ C(4,a)·C(3,b)·C(53,7−a−b) / C(60,7) (a≥1, b≥1)"),
     ).toBeInTheDocument();

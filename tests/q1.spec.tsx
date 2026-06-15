@@ -119,7 +119,7 @@ describe("AskView (Q1)", () => {
     render(<App />);
     await viewReady();
 
-    await user.click(screen.getByRole("button", { name: "展開數學收據 ▾" }));
+    await user.click(screen.getByRole("button", { name: "顯示「起手重抽概率」的數學證明" }));
     expect(screen.getByText("P(重抽) = C(50, 7) / C(60, 7)")).toBeInTheDocument();
     expect(screen.getByText("C(50, 7) = 99,884,400;C(60, 7) = 386,206,920")).toBeInTheDocument();
     expect(screen.getByText("99884400/386206920 → 既約 75670/292581 = 25.862923%")).toBeInTheDocument();

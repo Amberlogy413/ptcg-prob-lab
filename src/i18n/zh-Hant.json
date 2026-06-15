@@ -359,6 +359,8 @@
   "error.basicUnknown": "請先標記哪些是基礎寶可夢,重抽修正才能啟用。",
   "receipt.footer": "全程 BigInt 精確分數;小數為 round-half-up 顯示。",
   "proof.show": "顯示「{name}」的數學證明",
+  "proof.title.mulligan": "起手重抽概率",
+  "proof.title.derivation": "推導明細",
   "proof.formula": "公式",
   "proof.sub": "代入",
   "proof.frac": "分數",

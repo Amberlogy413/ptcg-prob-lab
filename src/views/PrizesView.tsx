@@ -5,7 +5,8 @@ import { useQ3Store } from "../state/q3Store.ts";
 import { computeQ3Single, computeQ3Joint, type Q3Mode, type Q3ReceiptData, type Q3SingleData, type Q3JointData } from "../state/q3.ts";
 import { PresetStrip } from "../components/PresetStrip.tsx";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
-import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
+import { type ReceiptLine } from "../components/MathReceipt.tsx";
+import { ProofNumber } from "../components/ProofNumber.tsx";
 import { DistTable } from "../components/DistTable.tsx";
 import { JointTable } from "../components/JointTable.tsx";
 import { OptionCard, OptionGrid } from "../components/ui/OptionCard.tsx";
@@ -266,7 +267,17 @@ function Q3SingleResult({ data }: { data: Q3SingleData }) {
         {t("q3.headline.label")}
         <span className="ml-2 normal-case">{t(`q3.mode.${data.mode}`)}</span>
       </h3>
-      <p className="font-mono text-headline leading-none">{data.headline.percent}</p>
+      <ProofNumber
+        className="font-mono text-headline leading-none"
+        title={t("q3.headline.label")}
+        value={data.headline.percent}
+        proof={{
+          receipt: lines,
+          interpret: data.headline.games
+            ? t("q3.headline.interpret", { games: data.headline.games })
+            : undefined,
+        }}
+      />
       <p className="mt-1 font-mono text-sm text-ink2">
         {data.headline.fraction} · {data.headline.oneIn}
       </p>
@@ -295,8 +306,6 @@ function Q3SingleResult({ data }: { data: Q3SingleData }) {
           {t("q2.pValid", { fraction: data.pValid.fraction, percent: data.pValid.percent })}
         </p>
       )}
-
-      <MathReceipt lines={lines} />
 
       <div className="mt-5">
         <DistTable
@@ -416,7 +425,12 @@ function Q3JointResult({ data }: { data: Q3JointData }) {
       <h4 className="text-xs font-medium uppercase tracking-wide text-ink2">
         {t("q3.joint.headline")}
       </h4>
-      <p className="font-mono text-2xl">{data.headline.percent}</p>
+      <ProofNumber
+        className="font-mono text-2xl"
+        title={t("q3.joint.headline")}
+        value={data.headline.percent}
+        proof={{ receipt: lines }}
+      />
       <p className="mt-1 font-mono text-sm text-ink2">
         {data.headline.fraction} · {data.headline.oneIn}
       </p>
@@ -427,7 +441,6 @@ function Q3JointResult({ data }: { data: Q3JointData }) {
           fraction: data.headline.fraction,
         })}
       />
-      <MathReceipt lines={lines} />
       <JointTable
         legend={data.legend}
         comboHeader={data.comboHeader}

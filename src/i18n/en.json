@@ -359,6 +359,8 @@
   "error.basicUnknown": "Mark which cards are Basic Pokémon first to enable the mulligan correction.",
   "receipt.footer": "Exact BigInt fractions throughout; decimals shown round-half-up.",
   "proof.show": "Show the math behind {name}",
+  "proof.title.mulligan": "Opening mulligan probability",
+  "proof.title.derivation": "Derivation",
   "proof.formula": "Formula",
   "proof.sub": "Substitute",
   "proof.frac": "Fraction",

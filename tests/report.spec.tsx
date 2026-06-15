@@ -62,7 +62,7 @@ describe("health report — zero-config sections", () => {
     render(<App />);
     await viewReady();
 
-    await user.click(screen.getAllByRole("button", { name: "展開數學收據 ▾" })[0]!);
+    await user.click(screen.getByRole("button", { name: "顯示「起手重抽概率」的數學證明" }));
     expect(screen.getByText(/opening_basics_B10/)).toBeInTheDocument();
     expect(screen.getByText("P(重抽) = C(50, 7) / C(60, 7)")).toBeInTheDocument();
   });
