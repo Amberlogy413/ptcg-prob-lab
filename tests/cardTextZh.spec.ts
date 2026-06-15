@@ -1,9 +1,9 @@
 /**
  * 暫譯卡效 integrity (owner mandate 2026-06-15: 繁中 must not silently show ja,
- * but translations must be real, not fabricated). These guard that every
- * provisional translation targets a REAL card, carries NO Japanese kana (it is
- * actually zh), and aligns index-wise with the card's own abilities/attacks so
- * it can never attach to the wrong ability/attack.
+ * but translations must be REAL, not fabricated). Guards that every provisional
+ * translation targets a real card name, that each ability/attack key is a real
+ * Japanese move name on that card (so a translation can never attach to the wrong
+ * move), and that no translated value leaks Japanese kana.
  */
 
 import { readFileSync } from "node:fs";
@@ -12,11 +12,29 @@ import { dirname, join } from "node:path";
 import { describe, it, expect } from "vitest";
 import { CARD_TEXT_ZH, hasKana } from "../src/data/cardTextZh.ts";
 
+interface RawCard {
+  name: string;
+  nameZh?: string;
+  abilities?: { name?: string }[];
+  attacks?: { name?: string }[];
+}
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const catalog = JSON.parse(
   readFileSync(join(root, "public", "catalog", "cards-zh-Hant.json"), "utf8"),
-) as { cards: { id: string; abilities?: unknown[]; attacks?: unknown[] }[] };
-const byId = new Map(catalog.cards.map((c) => [c.id, c]));
+) as { cards: RawCard[] };
+
+// display name → the union of every ability/attack ja-name across all its prints.
+const abilityNames = new Map<string, Set<string>>();
+const attackNames = new Map<string, Set<string>>();
+for (const c of catalog.cards) {
+  const k = c.nameZh ?? c.name;
+  const ab = abilityNames.get(k) ?? new Set();
+  const at = attackNames.get(k) ?? new Set();
+  for (const a of c.abilities ?? []) if (a.name) ab.add(a.name);
+  for (const a of c.attacks ?? []) if (a.name) at.add(a.name);
+  abilityNames.set(k, ab);
+  attackNames.set(k, at);
+}
 
 describe("hasKana", () => {
   it("detects Japanese kana, ignores pure zh / empty", () => {
@@ -28,31 +46,34 @@ describe("hasKana", () => {
 });
 
 describe("CARD_TEXT_ZH provisional translations", () => {
-  it("every override targets a real catalog card", () => {
-    for (const id of Object.keys(CARD_TEXT_ZH)) {
-      expect(byId.has(id), id).toBe(true);
+  it("every override targets a real catalog card name", () => {
+    for (const name of Object.keys(CARD_TEXT_ZH)) {
+      expect(abilityNames.has(name), name).toBe(true);
     }
   });
 
-  it("no translated field leaks Japanese kana (it must be real zh)", () => {
+  it("each ability/attack key is a REAL Japanese move name on that card", () => {
+    for (const [name, ov] of Object.entries(CARD_TEXT_ZH)) {
+      for (const jaName of Object.keys(ov.abilities ?? {})) {
+        expect(abilityNames.get(name)?.has(jaName), `${name} / ability ${jaName}`).toBe(true);
+      }
+      for (const jaName of Object.keys(ov.attacks ?? {})) {
+        expect(attackNames.get(name)?.has(jaName), `${name} / attack ${jaName}`).toBe(true);
+      }
+    }
+  });
+
+  it("no translated value leaks Japanese kana (it must be real zh)", () => {
     for (const [id, ov] of Object.entries(CARD_TEXT_ZH)) {
-      for (const a of ov.abilities ?? []) {
+      for (const a of Object.values(ov.abilities ?? {})) {
         expect(hasKana(a.name), `${id} ability name`).toBe(false);
         expect(hasKana(a.effect), `${id} ability effect`).toBe(false);
       }
-      for (const a of ov.attacks ?? []) {
+      for (const a of Object.values(ov.attacks ?? {})) {
         expect(hasKana(a.name), `${id} attack name`).toBe(false);
         expect(hasKana(a.effect), `${id} attack effect`).toBe(false);
       }
       expect(hasKana(ov.effect), `${id} effect`).toBe(false);
-    }
-  });
-
-  it("override arrays stay within the card's own ability/attack counts", () => {
-    for (const [id, ov] of Object.entries(CARD_TEXT_ZH)) {
-      const c = byId.get(id)!;
-      if (ov.abilities) expect(ov.abilities.length, id).toBeLessThanOrEqual((c.abilities ?? []).length);
-      if (ov.attacks) expect(ov.attacks.length, id).toBeLessThanOrEqual((c.attacks ?? []).length);
     }
   });
 });

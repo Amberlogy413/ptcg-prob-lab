@@ -36,7 +36,7 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
   // 暫譯卡效 (owner mandate 2026-06-15): newest ja-only sets have no official zh,
   // so prefer a hand-checked provisional translation and flag it; any still-ja
   // field is shown HONESTLY as 「官方中文未發行」 — never silently in Japanese.
-  const ov = CARD_TEXT_ZH[card.id];
+  const ov = CARD_TEXT_ZH[card.nameZh ?? card.name];
   const ProvTag = ({ ja }: { ja?: string }) => (
     <span
       title={t("catalog.provisionalTitle") + (ja !== undefined && ja !== "" ? `\n原文:${ja}` : "")}
@@ -114,7 +114,7 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
           Map over the ORIGINAL array so the 暫譯 override aligns by index. */}
       {(card.abilities ?? []).map((ab, i) => {
         if (typeof ab.name !== "string" || ab.name === "") return null;
-        const o = ov?.abilities?.[i];
+        const o = ov?.abilities?.[ab.name];
         const name = o?.name ?? ab.name;
         const effect = o?.effect ?? ab.effect;
         const prov = o !== undefined;
@@ -141,7 +141,7 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
       {/* Attacks */}
       {(card.attacks ?? []).map((atk, i) => {
         if (typeof atk.name !== "string" || atk.name === "") return null;
-        const o = ov?.attacks?.[i];
+        const o = ov?.attacks?.[atk.name];
         const name = o?.name ?? atk.name;
         const effect = o?.effect ?? atk.effect;
         const prov = o !== undefined;
