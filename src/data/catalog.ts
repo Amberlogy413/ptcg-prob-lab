@@ -409,16 +409,22 @@ export function groupByName(catalog: Catalog, cards: CatalogCard[]): PrintGroup[
   const order: string[] = [];
   const byName = new Map<string, CatalogCard[]>();
   for (const c of cards) {
-    let g = byName.get(c.name);
+    // Group by the zh DISPLAY name, not the canonical `name`: a newest ja-only
+    // set keeps its print's canonical name in Japanese (謝米 M3-003 = シェイミ)
+    // while older prints are canonically 謝米 — keying on `name` would wrongly
+    // show the SAME card as two tiles (owner caught this 2026-06-15). nameZh is
+    // the stable cross-era card identity; ex/V/VMAX keep distinct nameZh.
+    const key = c.nameZh ?? c.name;
+    let g = byName.get(key);
     if (g === undefined) {
       g = [];
-      byName.set(c.name, g);
-      order.push(c.name);
+      byName.set(key, g);
+      order.push(key);
     }
     g.push(c);
   }
-  return order.map((name) => {
-    const prints = sortPrints(catalog, byName.get(name) as CatalogCard[]);
+  return order.map((key) => {
+    const prints = sortPrints(catalog, byName.get(key) as CatalogCard[]);
     return { rep: prints[0] as CatalogCard, prints };
   });
 }
