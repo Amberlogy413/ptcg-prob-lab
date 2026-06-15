@@ -674,3 +674,21 @@
 - **數學零改動**:√ popover 只係換個容器顯示同一個 exact receipt(BigInt 分數、黃金向量
   cross-check 照舊)。質量:tsc 乾淨 · 329 測試 · 黃金 27/507 · 0 console error · 主調石墨灰。
   預覽實測:Q1/中局/獎賞 √ 正常,舊收據已清。
+
+## 2026-06-15 (五) — #29 牌組儲存庫 完成 + 牌組診斷(deck doctor / 載入即分析)
+
+- **現狀核實(誠實)**:#29 嘅「存/讀/命名/刪」其實已存在——deckStore 有 createDeck /
+  renameDeck / duplicateDeck / deleteDeck + 自訂 localStorage 持久化;UI 喺 DeckView
+  (分頁/新增)同 DeckEditor(改名 input、刪除確認)已接好。故 CRUD 部分當完成,唔重做。
+- **真正未做嘅嚿 = 載入即分析(deck doctor)**:把 體檢(ReportView)嘅數字變成有優先次序、
+  可行動嘅建議。
+- **實作**:`src/state/deckDoctor.ts` `computeDeckDoctor(deck)` → 建議陣列,嚴格只用
+  真實規則(deckLegality)同精確數學(openingBasics,BigInt):legality 項係硬規則違反
+  (over-60 / >4 同名 / 光輝>1 / 冇基礎),mulligan 項係精確值,**「+1 基礎」槓桿**係換 1
+  張填充後嘅精確重抽率(N 固定 60)——全部係事實,絕不估。`DeckDoctor.tsx` 緊湊清單
+  (icon+一行,石墨灰,語意色只做 good/warn/bad),置於 體檢 最頂。
+- **誠實取態**:唔用任意門檻扮權威;只陳述精確數字 + 數學上必然嘅槓桿(加基礎→重抽單調
+  下降),legality 用真實 PTCG 規則。
+- **質量**:tsc 乾淨 · 333 測試(+4 deckDoctor)· 黃金 27/507 · 0 console error · 數學
+  零改動。預覽實測:多龍巴魯托(12 基礎)→ 合法、重抽 19.064669%、+1 基礎精確降至
+  16.284405%。

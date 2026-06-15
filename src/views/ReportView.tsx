@@ -10,6 +10,7 @@ import { computeQ3Single } from "../state/q3.ts";
 import { useComboResult } from "../state/useComboResult.ts";
 import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
+import { DeckDoctor } from "../components/DeckDoctor.tsx";
 import { IconLegal, IconWarn, IconIllegal } from "../components/icons.tsx";
 import { buildReportCardSvg, type ReportCardLine } from "../utils/reportCard.ts";
 import { downloadSvgPng } from "../utils/svgPng.ts";
@@ -190,6 +191,12 @@ export function ReportView() {
           </button>
         </div>
       </section>
+
+      {deck && (
+        <Section title={t("doctor.title")}>
+          <DeckDoctor deck={deck} />
+        </Section>
+      )}
 
       <Section title={t("report.mull")}>
         <ProofNumber
