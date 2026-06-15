@@ -18,6 +18,7 @@ import {
 } from "./icons.tsx";
 import { cardSurface } from "../data/typeColors.ts";
 import { useCardName } from "../state/cardLang.ts";
+import { CARD_TEXT_ZH, hasKana, setNameZh, serieZh } from "../data/cardTextZh.ts";
 
 /**
  * Full-information card visual — an ORIGINAL text-only frame (no artwork, no
@@ -31,6 +32,23 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
   const label = (key: string | null, raw: string) => (key !== null ? t(key) : raw);
   const kind = kindOf(card);
   const { primary, others } = useCardName(card);
+
+  // 暫譯卡效 (owner mandate 2026-06-15): newest ja-only sets have no official zh,
+  // so prefer a hand-checked provisional translation and flag it; any still-ja
+  // field is shown HONESTLY as 「官方中文未發行」 — never silently in Japanese.
+  const ov = CARD_TEXT_ZH[card.id];
+  const ProvTag = ({ ja }: { ja?: string }) => (
+    <span
+      title={t("catalog.provisionalTitle") + (ja !== undefined && ja !== "" ? `\n原文:${ja}` : "")}
+      className="ml-1 rounded-ctl px-1 py-0.5 align-middle text-[10px] font-medium text-white"
+      style={{ backgroundColor: "#B7791F" }}
+    >
+      {t("catalog.provisional")}
+    </span>
+  );
+  const JaNote = () => (
+    <span className="ml-1 align-middle text-xs text-warn">〔{t("catalog.noOfficialZh")}〕</span>
+  );
 
   return (
     <div
@@ -92,41 +110,76 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         </p>
       )}
 
-      {/* Abilities — upstream data can ship unnamed slots; never render those. */}
-      {(card.abilities ?? [])
-        .filter((ab) => typeof ab.name === "string" && ab.name !== "")
-        .map((ab, i) => (
-        <div key={`${ab.name}-${i}`} className="mt-3 border-t hairline pt-2">
-          <p className="font-medium">
-            <span className="mr-1 rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
-              {t("catalog.ability")}
-            </span>
-            {ab.name}
-          </p>
-          {ab.effect !== undefined && <p className="mt-0.5 text-ink2">{ab.effect}</p>}
-        </div>
-      ))}
+      {/* Abilities — upstream data can ship unnamed slots; never render those.
+          Map over the ORIGINAL array so the 暫譯 override aligns by index. */}
+      {(card.abilities ?? []).map((ab, i) => {
+        if (typeof ab.name !== "string" || ab.name === "") return null;
+        const o = ov?.abilities?.[i];
+        const name = o?.name ?? ab.name;
+        const effect = o?.effect ?? ab.effect;
+        const prov = o !== undefined;
+        const ja = !prov && (hasKana(name) || hasKana(effect));
+        return (
+          <div key={`${ab.name}-${i}`} className="mt-3 border-t hairline pt-2">
+            <p className="font-medium">
+              <span className="mr-1 rounded-ctl border hairline px-1.5 py-0.5 text-xs text-ink2">
+                {t("catalog.ability")}
+              </span>
+              {name}
+              {prov && <ProvTag ja={ab.name} />}
+              {ja && <JaNote />}
+            </p>
+            {effect !== undefined && effect !== "" && (
+              <p className="mt-0.5 text-ink2" title={prov ? ab.effect : undefined}>
+                {effect}
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       {/* Attacks */}
-      {(card.attacks ?? [])
-        .filter((atk) => typeof atk.name === "string" && atk.name !== "")
-        .map((atk, i) => (
-        <div key={`${atk.name}-${i}`} className="mt-3 border-t hairline pt-2">
-          <p className="flex flex-wrap items-center gap-1 font-medium">
-            {(atk.cost ?? []).map((c, i) => (
-              <TypeChip key={`${c}${i}`} type={c} />
-            ))}
-            <span className="ml-1">{atk.name}</span>
-            {atk.damage !== undefined && <span className="ml-auto font-mono">{atk.damage}</span>}
-          </p>
-          {atk.effect !== undefined && <p className="mt-0.5 text-ink2">{atk.effect}</p>}
-        </div>
-      ))}
+      {(card.attacks ?? []).map((atk, i) => {
+        if (typeof atk.name !== "string" || atk.name === "") return null;
+        const o = ov?.attacks?.[i];
+        const name = o?.name ?? atk.name;
+        const effect = o?.effect ?? atk.effect;
+        const prov = o !== undefined;
+        const ja = !prov && (hasKana(name) || hasKana(effect));
+        return (
+          <div key={`${atk.name}-${i}`} className="mt-3 border-t hairline pt-2">
+            <p className="flex flex-wrap items-center gap-1 font-medium">
+              {(atk.cost ?? []).map((c, j) => (
+                <TypeChip key={`${c}${j}`} type={c} />
+              ))}
+              <span className="ml-1">{name}</span>
+              {prov && <ProvTag ja={atk.name} />}
+              {ja && <JaNote />}
+              {atk.damage !== undefined && <span className="ml-auto font-mono">{atk.damage}</span>}
+            </p>
+            {effect !== undefined && effect !== "" && (
+              <p className="mt-0.5 text-ink2" title={prov ? atk.effect : undefined}>
+                {effect}
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       {/* Trainer / Energy rule text */}
-      {card.effect !== undefined && (
-        <p className="mt-3 border-t hairline pt-2 text-ink2">{card.effect}</p>
-      )}
+      {card.effect !== undefined &&
+        (() => {
+          const effect = ov?.effect ?? card.effect;
+          const prov = ov?.effect !== undefined;
+          const ja = !prov && hasKana(effect);
+          return (
+            <p className="mt-3 border-t hairline pt-2 text-ink2" title={prov ? card.effect : undefined}>
+              {effect}
+              {prov && <ProvTag ja={card.effect} />}
+              {ja && <JaNote />}
+            </p>
+          );
+        })()}
       {card.item !== undefined && (
         <div className="mt-3 border-t hairline pt-2">
           <p className="font-medium">{card.item.name}</p>
@@ -166,19 +219,30 @@ export function CardVisual({ card, setInfo }: { card: CatalogCard; setInfo?: Cat
         </p>
       )}
 
-      {/* Flavor */}
+      {/* Flavor (ja-only sets keep flavor in Japanese — flag it honestly). */}
       {card.description !== undefined && (
-        <p className="mt-2 text-xs italic text-ink2">{card.description}</p>
+        <p className="mt-2 text-xs italic text-ink2">
+          {card.description}
+          {hasKana(card.description) && <JaNote />}
+        </p>
       )}
 
-      {/* Identity footer: set · number · date · mark · legality · rarity · illustrator · dex */}
-      <p className="mt-3 border-t hairline pt-2 text-xs text-ink2">
-        {t("catalog.set")}:{setInfo?.name ?? card.set ?? "?"}(
-        {card.set ?? "?"} {card.localId}
-        {setInfo?.official != null && ` / ${setInfo.official}`})
-        {setInfo?.serie != null && ` · ${setInfo.serie}`}
-        {setInfo?.date != null && ` · ${t("catalog.date")} ${setInfo.date}`}
-      </p>
+      {/* Identity footer: set · number · date · mark · legality · rarity · illustrator · dex.
+          Set name is zh (暫譯) / set code, never the raw Japanese name. */}
+      {(() => {
+        const sn = setNameZh(card.set, setInfo?.name);
+        const serie = serieZh(setInfo?.serie);
+        return (
+          <p className="mt-3 border-t hairline pt-2 text-xs text-ink2">
+            {t("catalog.set")}:{sn.text}
+            {sn.provisional && <ProvTag ja={setInfo?.name ?? undefined} />}(
+            {card.set ?? "?"} {card.localId}
+            {setInfo?.official != null && ` / ${setInfo.official}`})
+            {serie != null && ` · ${serie}`}
+            {setInfo?.date != null && ` · ${t("catalog.date")} ${setInfo.date}`}
+          </p>
+        );
+      })()}
       <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink2">
         {card.regulationMark !== undefined && (
           <span className="rounded-ctl border hairline px-1.5 py-0.5 font-mono">
