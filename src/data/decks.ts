@@ -117,8 +117,10 @@ export function tierKey(players: number): string {
 // Pokémon (+ Mega / possessive prefixes / a few descriptors). Pokémon map via
 // the official dex (catalog.dexEnZh); unknown tokens stay English (no guessing).
 
+// Verified against the catalog's official ja→zh card names (Nの→N的, ヒビキ→阿響…),
+// 2026-06-16. The possessive 的 (not 之) matches the printed cards.
 const ARCH_POSSESSIVE: Record<string, string> = {
-  "n's": "N之",
+  "n's": "N的",
   "rocket's": "火箭隊的",
   "team rocket's": "火箭隊的",
   "cynthia's": "竹蘭的",
@@ -127,7 +129,8 @@ const ARCH_POSSESSIVE: Record<string, string> = {
   "misty's": "小霞的",
   "marnie's": "瑪俐的",
   "iono's": "奇樹的",
-  "ethan's": "阿正的",
+  "ethan's": "阿響的",
+  "arven's": "派帕的",
 };
 const ARCH_WORD: Record<string, string> = {
   box: "盒組",

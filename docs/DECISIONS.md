@@ -761,3 +761,23 @@
   Hop's Trevenant)需 enNameToZh 加 possessive 橋(同 ARCH_POSSESSIVE)。
 - **質量**:tsc 乾淨 · 341 測試 · 黃金 27/507 · 數學零改動。CI restamp 保留 embed;
   embed 已改為讀兩表,將來 re-embed 自動合併。
+
+## 2026-06-16 — 牌組推薦卡名負責任重生(ex / 屬格 / 面具)
+
+- **問題(產品負責人:太唔專業,覆核所有卡名)**:主軸名缺 ex/屬格(N之索羅亞克 應 N的索羅亞克ex、
+  大針蜂 應 大針蜂ex、火箭隊的超夢 應…ex…),拳頭 icon 唔似拳頭。
+- **ROOT CAUSE**:最新 ex 卡喺 catalog 冇 dexId,fetch_decks 嘅 dexId 橋接靜靜跌返舊版
+  (索羅亞克 2021 而唔係 N的索羅亞克ex)。
+- **負責任修法(全部用真實數據核實)**:
+  1. fetch_decks 加 `reconstructZh`:由英文全名重構正確中文(屬格 owner + 超級/地區 + 種名
+     + 厄鬼椪面具 + ex/V 後綴)。owner/面具中文**逐個對 catalog 真實 ja→zh 印刷名核實**
+     (Nの→N的、ヒビキ→阿響、碧草面具…),唔估。Pokémon 一律行重構,dexId 只做最後備援。
+  2. 改正 `ARCH_POSSESSIVE`(N之→N的、阿正→阿響、加派帕的),令標題屬格同卡名一致。
+  3. **由 Limitless 即時重抓全部 80 場賽事重生** decks-zh-Hant.json(同時窗,順帶刷新真實數據)。
+- **結果**:主軸/路線名正確帶 ex/屬格 — 超級甲賀忍蛙ex、大針蜂ex、N的索羅亞克ex、
+  火箭隊的超夢ex、猛雷鼓ex、竹蘭的烈咬陸鯊ex、阿響的火爆獸、莉莉艾的皮皮ex;變體亦帶 ex
+  (多龍巴魯托ex 火焰雞ex)。Pokémon 0 殘留英文。拳頭 icon 重畫。
+- **誠實剩項**:厄鬼椪「面具」未入系列標題(原型名只係 Ogerpon;tierize 唔接多 token 面具)
+  —— 但底色(草)同牌表內卡名(厄鬼椪 碧草面具)已正確。
+- **質量**:tsc 乾淨 · 341 測試 · 黃金 27/507 · 0 console error · 數學零改動。CI 將來重抓自動用
+  新 reconstructZh。

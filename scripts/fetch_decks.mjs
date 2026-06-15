@@ -78,6 +78,73 @@ function suffixClass(name) {
   return "";
 }
 
+// Reconstruct a Pokémon card's full zh name from its English name — possessive
+// owner + Mega/region prefix + species (official dex) + Ogerpon mask + ex/V
+// suffix. The newest ex cards have NO dexId in the catalog, so the dexId bridge
+// silently fell back to an OLD non-ex print (索羅亞克 2021 instead of N的索羅亞克ex).
+// Owner/mask zh are VERIFIED against the catalog's printed ja→zh names, not guessed.
+const OWNER_EN = {
+  "n's": "N的",
+  "team rocket's": "火箭隊的",
+  "rocket's": "火箭隊的",
+  "marnie's": "瑪俐的",
+  "cynthia's": "竹蘭的",
+  "hop's": "赫普的",
+  "lillie's": "莉莉艾的",
+  "misty's": "小霞的",
+  "iono's": "奇樹的",
+  "ethan's": "阿響的",
+  "arven's": "派帕的",
+};
+const MASK_EN = {
+  "teal mask": "碧草面具",
+  "wellspring mask": "水井面具",
+  "hearthflame mask": "火灶面具",
+  "cornerstone mask": "礎石面具",
+};
+const REGION_EN = { alolan: "阿羅拉", galarian: "伽勒爾", hisuian: "洗翠", paldean: "帕底亞" };
+function reconstructZh(enName, dexEnZh) {
+  let s = enName.trim();
+  let suffix = "";
+  const sm = s.match(/\s+(ex|V-UNION|VMAX|VSTAR|V)$/i);
+  if (sm) {
+    const t = sm[1].toUpperCase();
+    suffix = t === "EX" ? "ex" : t;
+    s = s.slice(0, sm.index).trim();
+  }
+  let owner = "";
+  for (const k of Object.keys(OWNER_EN).sort((a, b) => b.length - a.length)) {
+    if (s.toLowerCase().startsWith(k + " ")) {
+      owner = OWNER_EN[k];
+      s = s.slice(k.length).trim();
+      break;
+    }
+  }
+  let prefix = "";
+  if (/^mega\s+/i.test(s)) {
+    prefix = "超級";
+    s = s.replace(/^mega\s+/i, "");
+  }
+  for (const k of Object.keys(REGION_EN)) {
+    if (new RegExp(`^${k}\\s+`, "i").test(s)) {
+      prefix += REGION_EN[k];
+      s = s.replace(new RegExp(`^${k}\\s+`, "i"), "");
+      break;
+    }
+  }
+  let mask = "";
+  for (const k of Object.keys(MASK_EN)) {
+    if (s.toLowerCase().endsWith(" " + k)) {
+      mask = " " + MASK_EN[k];
+      s = s.slice(0, s.length - (k.length + 1)).trim();
+      break;
+    }
+  }
+  const sp = dexEnZh[s.toLowerCase()];
+  if (sp === undefined) return null;
+  return owner + prefix + sp + mask + suffix;
+}
+
 async function main() {
   await mkdir(CACHE_DIR, { recursive: true });
 
@@ -127,6 +194,7 @@ async function main() {
 
   console.log("[3/5] card resolver (catalog + verified table + en fallback)…");
   const catalog = JSON.parse(await readFile(CATALOG, "utf8"));
+  const dexEnZh = catalog.dexEnZh ?? {};
   const bridge = JSON.parse(await readFile(path.join(ROOT, "scripts", "name_bridge.json"), "utf8")).map;
   // zh index for Pokémon dexId bridge + name set.
   const zhByDex = new Map(); // dexId → [{name, std, suf, native}]
@@ -185,19 +253,27 @@ async function main() {
     }
     const section = cat === "Pokemon" ? "pokemon" : cat === "Energy" ? "energy" : cat === "Trainer" ? "trainer" : "unknown";
     const isBasic = cat === "Pokemon" && basicStage;
-    // Pokémon zh by dexId + suffix + native preference.
+    // Pokémon name: reconstruct the full zh name from the English (possessive +
+    // Mega/region + species + mask + ex/V). This is reliable even when the card
+    // has no dexId — unlike the old dexId bridge, which fell back to wrong/old
+    // prints. dexId path is only a last resort when the species isn't in the dex.
     let zh = enName;
-    if (cat === "Pokemon" && enDex.size > 0) {
-      const enSuf = suffixClass(enName);
-      const cands2 = [];
-      for (const d of enDex) for (const z of zhByDex.get(d) ?? []) cands2.push(z);
-      cands2.sort(
-        (a, b) =>
-          (b.suf === enSuf ? 1 : 0) - (a.suf === enSuf ? 1 : 0) ||
-          b.native - a.native ||
-          (b.std ? 1 : 0) - (a.std ? 1 : 0),
-      );
-      if (cands2[0] !== undefined) zh = cands2[0].name;
+    if (cat === "Pokemon") {
+      const recon = reconstructZh(enName, dexEnZh);
+      if (recon !== null) {
+        zh = recon;
+      } else if (enDex.size > 0) {
+        const enSuf = suffixClass(enName);
+        const cands2 = [];
+        for (const d of enDex) for (const z of zhByDex.get(d) ?? []) cands2.push(z);
+        cands2.sort(
+          (a, b) =>
+            (b.suf === enSuf ? 1 : 0) - (a.suf === enSuf ? 1 : 0) ||
+            b.native - a.native ||
+            (b.std ? 1 : 0) - (a.std ? 1 : 0),
+        );
+        if (cands2[0] !== undefined) zh = cands2[0].name;
+      }
     }
     resolved.set(enName, { name: zh, isBasic, section });
   });

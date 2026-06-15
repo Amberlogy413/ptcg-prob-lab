@@ -27,7 +27,8 @@ describe("localizeArchetype", () => {
   it("localizes multi-Pokémon, Mega and possessive archetype names", () => {
     expect(localizeArchetype("Dragapult Dusknoir", catalog)).toBe("多龍巴魯托 黑夜魔靈");
     expect(localizeArchetype("Mega Greninja", catalog)).toBe("超級甲賀忍蛙");
-    expect(localizeArchetype("N's Zoroark", catalog)).toBe("N之索羅亞克");
+    // Possessive 的 (not 之), verified against the printed Nの→N的 card name.
+    expect(localizeArchetype("N's Zoroark", catalog)).toBe("N的索羅亞克");
   });
   it("maps descriptor words and applies curated overrides", () => {
     // Word-mapping path: Pokémon via dex + descriptor via ARCH_WORD.
