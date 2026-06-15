@@ -10,6 +10,8 @@ import { TemplateDialog } from "../components/TemplateDialog.tsx";
 import { DeckSheetDialog } from "../components/DeckSheetDialog.tsx";
 import { DeckBuilderDialog } from "../components/DeckBuilderDialog.tsx";
 import { RotationPanel } from "../components/RotationPanel.tsx";
+import { SectionHeader } from "../components/ui/SectionHeader.tsx";
+import { OptionCard, OptionGrid } from "../components/ui/OptionCard.tsx";
 import {
   IconBuilder,
   IconImport,
@@ -18,6 +20,7 @@ import {
   IconTag,
   IconLink,
   IconTemplate,
+  IconDeck,
 } from "../components/icons.tsx";
 
 const TOOLBTN =
@@ -53,42 +56,42 @@ export function DeckView() {
 
   if (decks.length === 0) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
-        <h2 className="text-xl font-medium">{t("nav.deck")}</h2>
-        <p className="mt-2 text-sm text-ink2">{t("empty.deck")}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-ctl bg-blue px-4 py-2 text-sm font-medium text-white"
-          >
-            <IconImport />
-            {t("deck.import")}
-          </button>
-          <button
-            type="button"
-            onClick={startBuilder}
-            className="inline-flex items-center gap-1.5 rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
-          >
-            <IconBuilder />
-            {t("builder.button")}
-          </button>
-          <button
-            type="button"
-            onClick={startBlank}
-            className="rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
-          >
-            {t("deck.startBlank")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setTemplatesOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-ctl border hairline px-4 py-2 text-sm text-ink2 hover:text-ink"
-          >
-            <IconTemplate />
-            {t("templates.button")}
-          </button>
-        </div>
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+        <SectionHeader title={t("nav.deck")} helper={t("empty.deck")} />
+        <OptionGrid>
+          <OptionCard
+            badge="01"
+            icon={<IconBuilder />}
+            title={t("builder.button")}
+            subline={t("empty.opt.builder.sub")}
+            selected={false}
+            onSelect={startBuilder}
+          />
+          <OptionCard
+            badge="02"
+            icon={<IconImport />}
+            title={t("deck.import")}
+            subline={t("empty.opt.import.sub")}
+            selected={false}
+            onSelect={() => setImportOpen(true)}
+          />
+          <OptionCard
+            badge="03"
+            icon={<IconTemplate />}
+            title={t("templates.button")}
+            subline={t("empty.opt.templates.sub")}
+            selected={false}
+            onSelect={() => setTemplatesOpen(true)}
+          />
+          <OptionCard
+            badge="04"
+            icon={<IconDeck />}
+            title={t("deck.startBlank")}
+            subline={t("empty.opt.blank.sub")}
+            selected={false}
+            onSelect={startBlank}
+          />
+        </OptionGrid>
         {importOpen && <ImportWizard onClose={() => setImportOpen(false)} />}
         {templatesOpen && <TemplateDialog onClose={() => setTemplatesOpen(false)} />}
         {builderOpen && activeDeck !== null && (

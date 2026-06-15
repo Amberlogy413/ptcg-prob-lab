@@ -50,7 +50,7 @@ describe("PTCG Live import flow", () => {
     render(<App />);
 
     // Empty state → open the import wizard.
-    await user.click(screen.getByRole("button", { name: "匯入牌表" }));
+    await user.click(screen.getByRole("button", { name: /匯入牌表/ }));
     const dialog = screen.getByRole("dialog");
 
     // Step 1: paste and continue.
@@ -67,8 +67,9 @@ describe("PTCG Live import flow", () => {
     await user.click(within(dialog).getByRole("checkbox", { name: /Shinx/ }));
     await user.click(within(dialog).getByRole("button", { name: "完成匯入" }));
 
-    // The summary sidebar reflects the import instantly.
-    expect(screen.getByText("25.862923%")).toBeInTheDocument();
+    // The summary sidebar reflects the import instantly (and the TopNav live chip
+    // echoes the same headline, so the percent now appears in more than one place).
+    expect(screen.getAllByText("25.862923%").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("75670/292581 · 1 in 3.867")).toBeInTheDocument();
     expect(screen.getByText("0.348853")).toBeInTheDocument(); // E[mulligans]
     expect(screen.getByText("74.137077%")).toBeInTheDocument(); // valid hand
@@ -91,7 +92,7 @@ describe("PTCG Live import flow", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "匯入牌表" }));
+    await user.click(screen.getByRole("button", { name: /匯入牌表/ }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: LIVE_LIST } });
     await user.click(within(dialog).getByRole("button", { name: "下一步" }));
@@ -105,7 +106,7 @@ describe("PTCG Live import flow", () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await user.click(screen.getByRole("button", { name: "匯入牌表" }));
+    await user.click(screen.getByRole("button", { name: /匯入牌表/ }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByRole("textbox"), {
       target: { value: "Pokémon: 4\n4 Pikachu MEW 25\n" },

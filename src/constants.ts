@@ -6,6 +6,10 @@
 export const GOLDEN_CASE_COUNT = 27;
 export const GOLDEN_ASSERTION_COUNT = 507;
 
+/** App version shown in the TopNav version tag. tests/version.spec.ts pins this
+ *  to package.json so the displayed version can never silently drift. */
+export const APP_VERSION = "1.1.0";
+
 /** Standard game model (docs/02 §0). */
 export const DECK_SIZE = 60;
 export const HAND_SIZE = 7;

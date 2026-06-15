@@ -53,7 +53,7 @@ describe("template bank UI", () => {
     render(<App />);
     await viewReady();
 
-    await user.click(screen.getByRole("button", { name: "範本牌組庫" }));
+    await user.click(screen.getByRole("button", { name: /範本牌組庫/ }));
     const dialog = screen.getByRole("dialog");
     // The badge itself already shows the exact value before loading. The Greninja
     // deck is a real legal list (B=11): Radiant Greninja is 1-of and IS a Basic.
@@ -76,7 +76,7 @@ describe("import bridge guide (P8.2)", () => {
     render(<App />);
     await viewReady();
 
-    await user.click(screen.getByRole("button", { name: "匯入牌表" }));
+    await user.click(screen.getByRole("button", { name: /匯入牌表/ }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("由外部組牌工具搬牌組過來?")).toBeInTheDocument();
     expect(within(dialog).getByText(/轉換成 Live 英文/)).toBeInTheDocument();
