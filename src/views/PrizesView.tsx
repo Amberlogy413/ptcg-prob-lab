@@ -7,6 +7,7 @@ import { PresetStrip } from "../components/PresetStrip.tsx";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
 import { type ReceiptLine } from "../components/MathReceipt.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { DistTable } from "../components/DistTable.tsx";
 import { JointTable } from "../components/JointTable.tsx";
 import { OptionCard, OptionGrid } from "../components/ui/OptionCard.tsx";
@@ -271,6 +272,11 @@ function Q3SingleResult({ data }: { data: Q3SingleData }) {
         className="font-mono text-headline leading-none"
         title={t("q3.headline.label")}
         value={data.headline.percent}
+        explain={buildExplain(t, "prize", {
+          pct: data.headline.percent,
+          frac: data.headline.fraction,
+          oneIn: data.headline.oneIn,
+        })}
         proof={{
           receipt: lines,
           interpret: data.headline.games

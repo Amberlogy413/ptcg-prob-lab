@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { computeMidgame, computeShuffleBack, computeScenario } from "../state/midgame.ts";
 import {
   loadCatalog,
@@ -95,6 +96,11 @@ export function MidgameView() {
               className="font-mono text-2xl"
               title={t("proof.title.derivation")}
               value={result.percent}
+              explain={buildExplain(t, "midgame", {
+                pct: result.percent,
+                frac: result.fraction,
+                oneIn: result.oneIn,
+              })}
               proof={{ receipt: result.derivation.map((text) => ({ label: "", text })) }}
             />
             <p className="mt-1 font-mono text-sm text-ink2">
@@ -338,6 +344,11 @@ function ScenarioBuilder() {
               className="font-mono text-2xl"
               title={t("proof.title.derivation")}
               value={result.percent}
+              explain={buildExplain(t, "midgame", {
+                pct: result.percent,
+                frac: result.fraction,
+                oneIn: result.oneIn,
+              })}
               proof={{ receipt: result.derivation.map((text) => ({ label: "", text })) }}
             />
             <p className="mt-1 font-mono text-sm text-ink2">
@@ -464,6 +475,11 @@ function ShuffleBackSection() {
               className="font-mono text-2xl"
               title={t("proof.title.derivation")}
               value={result.percent}
+              explain={buildExplain(t, "midgame", {
+                pct: result.percent,
+                frac: result.fraction,
+                oneIn: result.oneIn,
+              })}
               proof={{ receipt: result.derivation.map((text) => ({ label: "", text })) }}
             />
             <p className="mt-1 font-mono text-sm text-ink2">

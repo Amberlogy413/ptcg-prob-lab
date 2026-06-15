@@ -2,6 +2,7 @@ import { useT } from "../i18n/index.ts";
 import { PrecisionRuler } from "./PrecisionRuler.tsx";
 import { type ReceiptLine } from "./MathReceipt.tsx";
 import { ProofNumber } from "./ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { JointTable } from "./JointTable.tsx";
 import type { ComboResultState } from "../state/useComboResult.ts";
 import type { Q2Data } from "../state/selectors.ts";
@@ -68,6 +69,11 @@ function Q2Ready({ data }: { data: Q2Data }) {
         className="font-mono text-headline leading-none"
         title={t("q2.headline.label")}
         value={data.headline.percent}
+        explain={buildExplain(t, "combo", {
+          pct: data.headline.percent,
+          frac: data.headline.fraction,
+          oneIn: data.headline.oneIn,
+        })}
         proof={{
           receipt: receiptLines,
           interpret: data.headline.games

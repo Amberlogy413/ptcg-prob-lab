@@ -5,6 +5,7 @@ import { computeQ1 } from "../state/selectors.ts";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
 import { type ReceiptLine } from "../components/MathReceipt.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { MulliganDashboard } from "../components/MulliganDashboard.tsx";
 import { DistChart } from "../components/DistChart.tsx";
 import { DistTable } from "../components/DistTable.tsx";
@@ -82,6 +83,11 @@ export function Q1Section() {
             className="font-mono text-headline leading-none"
             title={t("proof.title.mulligan")}
             value={data.headline.percent}
+            explain={buildExplain(t, "mulligan", {
+              pct: data.headline.percent,
+              frac: data.headline.fraction,
+              oneIn: data.headline.oneIn,
+            })}
             proof={{
               receipt: receiptLines,
               interpret: data.headline.games

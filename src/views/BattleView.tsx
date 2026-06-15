@@ -18,6 +18,7 @@ import { cardAccent, NEUTRAL_ACCENT } from "../data/typeColors.ts";
 import { useCardLang } from "../state/cardLang.ts";
 import { CardVisual } from "../components/CardVisual.tsx";
 import { ProofNumber, type Proof } from "../components/ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { Modal } from "../components/Modal.tsx";
 
 // Zones offered as move targets (stadium/lost-zone kept simple for v1).
@@ -359,7 +360,13 @@ function DrawHud({
         </label>
       </div>
       <p className="mt-3">
-        <ProofNumber className="font-mono text-2xl" title={t("battle.hud.title")} value={odds.percent} proof={proof} />
+        <ProofNumber
+          className="font-mono text-2xl"
+          title={t("battle.hud.title")}
+          value={odds.percent}
+          explain={buildExplain(t, "draw", { pct: odds.percent, frac: odds.fraction, oneIn: odds.oneIn })}
+          proof={proof}
+        />
       </p>
       <p className="mt-1 font-mono text-xs text-ink2">
         {odds.fraction} · {odds.oneIn} · {t("battle.hud.deckLeft", { n: deckSize })}

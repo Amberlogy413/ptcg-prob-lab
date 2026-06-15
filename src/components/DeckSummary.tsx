@@ -4,6 +4,7 @@ import { useDeckStore } from "../state/deckStore.ts";
 import { computeDeckSummary } from "../state/selectors.ts";
 import { PrecisionRuler } from "./PrecisionRuler.tsx";
 import { ProofNumber, type Proof } from "./ProofNumber.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { IconWarn, IconRotate, IconLegal } from "./icons.tsx";
 import { DECK_SIZE } from "../constants.ts";
 import { deckLegality } from "../utils/deckRules.ts";
@@ -107,6 +108,11 @@ export function DeckSummary() {
                   className="font-mono text-xl"
                   title={t("summary.mulligan")}
                   value={summary.mulligan.percent}
+                  explain={buildExplain(t, "mulligan", {
+                    pct: summary.mulligan.percent,
+                    frac: summary.mulligan.fraction,
+                    oneIn: summary.mulligan.oneIn,
+                  })}
                   proof={
                     ((): Proof => {
                       const N = summary.total;

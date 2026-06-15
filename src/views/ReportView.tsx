@@ -11,6 +11,7 @@ import { useComboResult } from "../state/useComboResult.ts";
 import { MathReceipt, type ReceiptLine } from "../components/MathReceipt.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
 import { DeckDoctor } from "../components/DeckDoctor.tsx";
+import { buildExplain } from "../data/explain.ts";
 import { IconLegal, IconWarn, IconIllegal } from "../components/icons.tsx";
 import { buildReportCardSvg, type ReportCardLine } from "../utils/reportCard.ts";
 import { downloadSvgPng } from "../utils/svgPng.ts";
@@ -203,6 +204,11 @@ export function ReportView() {
           className="font-mono text-2xl"
           title={t("proof.title.mulligan")}
           value={q1d.headline.percent}
+          explain={buildExplain(t, "mulligan", {
+            pct: q1d.headline.percent,
+            frac: q1d.headline.fraction,
+            oneIn: q1d.headline.oneIn,
+          })}
           proof={{ receipt: q1Receipt }}
         />
         <p className="mt-1 font-mono text-sm text-ink2">
@@ -275,6 +281,11 @@ export function ReportView() {
               className="font-mono text-2xl"
               title={t("report.combo")}
               value={combo.data.headline.percent}
+              explain={buildExplain(t, "combo", {
+                pct: combo.data.headline.percent,
+                frac: combo.data.headline.fraction,
+                oneIn: combo.data.headline.oneIn,
+              })}
               proof={{
                 receipt: [
                   { label: t("receipt.label.formula"), text: combo.data.receipt.formula },
