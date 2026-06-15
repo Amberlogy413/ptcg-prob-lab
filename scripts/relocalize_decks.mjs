@@ -21,7 +21,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const CATALOG = path.join(ROOT, "public", "catalog", "cards-zh-Hant.json");
@@ -155,7 +155,7 @@ function resolveMon(rawName, dexIdx) {
   return owner + prefix + zh + suffix;
 }
 
-async function main() {
+export async function relocalizeDecks() {
   const catalog = JSON.parse(await readFile(CATALOG, "utf8"));
   const dex = JSON.parse(await readFile(DEX, "utf8"));
   const trainer = JSON.parse(await readFile(TRAINER, "utf8")).map ?? {};
@@ -236,7 +236,11 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// CLI entry — also callable as a library (fetch_decks.mjs runs it as its final
+// pass so the weekly auto-update CI gets clean zh names without a workflow edit).
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  relocalizeDecks().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

@@ -22,6 +22,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { relocalizeDecks } from "./relocalize_decks.mjs";
 
 const LIMITLESS = "https://play.limitlesstcg.com/api";
 const TCGDEX_EN = "https://api.tcgdex.net/v2/en";
@@ -356,6 +357,12 @@ async function main() {
   await writeFile(OUT, JSON.stringify(payload));
   console.log(`OK → ${OUT}  (${top.length} archetypes)`);
   console.log("  top:", top.slice(0, 8).map((a) => `${a.name}(${a.deckCount})`).join(" · "));
+
+  // [6/6] Final pass: rewrite every card line to clean official zh via the
+  // catalog + verified bridges (en→ja→catalog). Done here so the weekly CI —
+  // which only invokes fetch_decks.mjs — never re-leaks English trainer names.
+  console.log("[6/6] relocalize card names to zh…");
+  await relocalizeDecks();
 }
 
 main().catch((e) => {

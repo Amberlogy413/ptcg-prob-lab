@@ -59,7 +59,7 @@
     "Dawn": "小光",
     "Hilda": "白露",
 
-    "_provisional_note": "Below: cards with NO official zh-Hant release yet (newest ME/SV10.5/SV11 sets). Faithful translations (暫譯) referencing https://wiki.52poke.com; the weekly auto-update CI will replace each with the official name once zh-tw releases it. Character names use the official video-game zh-tw where the character exists in SV/XY.",
+    "_provisional_note": "Below: cards with NO official zh-Hant release yet (newest ME/Ascended Heroes/SV10.5/SV11 sets). Faithful translations (暫譯) verified against documented Chinese names on https://wiki.52poke.com and https://bulbapedia.bulbagarden.net (the card's 'In other languages' table) — never invented; the weekly auto-update CI will replace each with the official name once zh-tw releases it. Character names use the official video-game zh-tw where the character exists in SV/XY.",
     "Academy at Night": "夜間學院",
     "Battle Cage": "戰鬥牢籠",
     "Black Belt's Training": "黑帶高手的特訓",
@@ -89,6 +89,9 @@
     "Philippe": "吉普索",
     "Harlequin": "小丑",
     "Team Rocket's Proton": "火箭隊的普魯特",
-    "Postwick": "波斯威克鎮"
+    "Postwick": "波斯威克鎮",
+    "Team Rocket's Hypnotizer": "火箭隊的催眠裝置",
+    "Brilliant Blender": "完全體攪拌器",
+    "Urbain": "蓋伊"
   }
 }

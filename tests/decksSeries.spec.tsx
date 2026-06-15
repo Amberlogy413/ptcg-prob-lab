@@ -142,6 +142,11 @@ describe("deckEnergyTypes (#colour & icons by real energy, en + zh)", () => {
     expect(deckEnergyTypes(build([["Water Energy", 6], ["Neo Upper Energy", 1], ["能量回收", 1]]))).toEqual([
       "Water",
     ]);
+    // A proper-noun energy must NOT false-match an element it merely contains:
+    // 火箭隊能量 (Team Rocket's Energy) has 火 inside 火箭隊 but is a special energy.
+    expect(deckEnergyTypes(build([["火箭隊能量", 4]]))).toEqual([]);
+    // Typed special energies still colour by the element before 能量.
+    expect(deckEnergyTypes(build([["點火能量", 4], ["岩石鬥能量", 3]]))).toEqual(["Fire", "Fighting"]);
   });
 
   it("is empty for a build with no typed energy", () => {

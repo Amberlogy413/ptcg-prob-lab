@@ -49,9 +49,18 @@ const ENERGY_EN_TYPE: Array<[RegExp, string]> = [
 ];
 
 /** Elemental type of an Energy card from its zh OR English name; null if none
- *  (special energies, trainers mis-filed under energy). Deterministic. */
+ *  (special energies, trainers mis-filed under energy). Deterministic.
+ *  zh basic/typed energies put the element char immediately before the trailing
+ *  能量 (基本火能量 / 點火能量 / 心靈感應超能量 / 妖精能量). We match that *trailing*
+ *  element only — NOT any occurrence — so a proper-noun energy like 火箭隊能量
+ *  (Team Rocket's Energy, 火 ∈ 火箭隊) stays neutral instead of false-matching Fire. */
 export function energyType(name: string): string | null {
-  for (const [ch, ty] of ENERGY_CHAR_TYPE) if (name.includes(ch)) return ty;
+  const zh = name.match(/^(.*)能量$/);
+  if (zh !== null) {
+    const head = zh[1] ?? "";
+    for (const [ch, ty] of ENERGY_CHAR_TYPE) if (head.endsWith(ch)) return ty;
+    return null; // zh energy with no trailing element → special
+  }
   if (/energy/i.test(name)) for (const [re, ty] of ENERGY_EN_TYPE) if (re.test(name)) return ty;
   return null;
 }
