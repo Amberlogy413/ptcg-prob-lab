@@ -8,9 +8,11 @@ import {
   buildToInputs,
   tierKey,
   localizeArchetype,
+  localizeCarry,
+  groupSeries,
   deckTags,
   type DeckData,
-  type Archetype,
+  type DeckSeries,
   type DeckBuild,
 } from "../data/decks.ts";
 import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
@@ -29,7 +31,9 @@ export function DecksView() {
   const [status, setStatus] = useState<Status>("loading");
   const [data, setData] = useState<DeckData | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [openArch, setOpenArch] = useState<string | null>(null);
+  const [openSeries, setOpenSeries] = useState<string | null>(null);
+
+  const series = useMemo(() => (data === null ? [] : groupSeries(data.archetypes)), [data]);
 
   useEffect(() => {
     let alive = true;
@@ -38,7 +42,7 @@ export function DecksView() {
         if (!alive) return;
         setData(d);
         setStatus("ready");
-        setOpenArch(d.archetypes[0]?.id ?? null);
+        setOpenSeries(groupSeries(d.archetypes)[0]?.id ?? null);
       },
       () => alive && setStatus("error"),
     );
@@ -91,13 +95,13 @@ export function DecksView() {
       </p>
 
       <ul className="mt-4 flex flex-col gap-2">
-        {data.archetypes.map((a) => (
-          <ArchetypeCard
-            key={a.id}
-            arch={a}
+        {series.map((s) => (
+          <SeriesCard
+            key={s.id}
+            series={s}
             catalog={catalog}
-            open={openArch === a.id}
-            onToggle={() => setOpenArch(openArch === a.id ? null : a.id)}
+            open={openSeries === s.id}
+            onToggle={() => setOpenSeries(openSeries === s.id ? null : s.id)}
           />
         ))}
       </ul>
@@ -105,20 +109,35 @@ export function DecksView() {
   );
 }
 
-function ArchetypeCard({
-  arch,
+function SeriesCard({
+  series,
   catalog,
   open,
   onToggle,
 }: {
-  arch: Archetype;
+  series: DeckSeries;
   catalog: Catalog | null;
   open: boolean;
   onToggle: () => void;
 }) {
   const t = useT();
-  const title = useMemo(() => localizeArchetype(arch.name, catalog), [arch.name, catalog]);
-  const tags = useMemo(() => deckTags(arch.builds[0]?.cards ?? [], catalog), [arch, catalog]);
+  const multi = series.members.length > 1;
+  const [variant, setVariant] = useState(0);
+  const selected = series.members[Math.min(variant, series.members.length - 1)] ?? series.members[0]!;
+
+  // A multi-variant series is titled by its carry Pokémon; a single-variant one
+  // keeps the full archetype name so possessive / Mega / descriptor context is
+  // never lost (behaviour identical to the pre-#40 archetype card).
+  const title = useMemo(
+    () => (multi ? localizeCarry(series, catalog) : localizeArchetype(selected.name, catalog)),
+    [multi, series, selected.name, catalog],
+  );
+  const variantName = useMemo(
+    () => localizeArchetype(selected.name, catalog),
+    [selected.name, catalog],
+  );
+  const tags = useMemo(() => deckTags(selected.builds[0]?.cards ?? [], catalog), [selected, catalog]);
+
   return (
     <li className="rounded-ctl border hairline bg-paper">
       <button
@@ -127,11 +146,16 @@ function ArchetypeCard({
         onClick={onToggle}
         className="flex w-full flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-left"
       >
-        <span className="min-w-0 flex-1 truncate font-medium" title={arch.name}>
+        <span className="min-w-0 flex-1 truncate font-medium" title={series.members.map((m) => m.name).join(" / ")}>
           {title}
         </span>
+        {multi && (
+          <span className="shrink-0 rounded-full border hairline bg-surface px-2 py-0.5 text-xs text-ink2">
+            {t("decks.seriesBadge", { n: series.members.length })}
+          </span>
+        )}
         <span className="shrink-0 rounded-full border border-pink px-2 py-0.5 font-mono text-xs text-pink">
-          {t("decks.deckCount", { n: arch.deckCount })}
+          {t("decks.deckCount", { n: series.deckCount })}
         </span>
         <span className="shrink-0 text-ink2">{open ? "▾" : "▸"}</span>
         {tags.length > 0 && (
@@ -146,13 +170,39 @@ function ArchetypeCard({
       </button>
       {open && (
         <div className="border-t hairline p-2">
+          {multi && (
+            <div className="mb-2">
+              <p className="mb-1 px-1 text-xs text-ink2">{t("decks.variantHint")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {series.members.map((m, i) => {
+                  const on = i === variant;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setVariant(i)}
+                      className={
+                        on
+                          ? "rounded-full border border-pink bg-pink px-2.5 py-1 text-xs font-medium text-white"
+                          : "rounded-full border hairline bg-surface px-2.5 py-1 text-xs text-ink2 hover:text-ink"
+                      }
+                    >
+                      {localizeArchetype(m.name, catalog)}
+                      <span className="ml-1 font-mono opacity-70">{m.deckCount}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <p className="mb-2 px-1 text-xs text-ink2">{t("decks.buildsHint")}</p>
           <ul className="flex flex-col gap-2">
-            {arch.builds.map((b, i) => (
+            {selected.builds.map((b, i) => (
               <BuildRow
-                key={`${b.event}-${b.date}-${i}`}
+                key={`${selected.id}-${b.event}-${b.date}-${i}`}
                 build={b}
-                archName={title}
+                archName={variantName}
                 catalog={catalog}
               />
             ))}

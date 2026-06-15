@@ -615,3 +615,27 @@
 - **誠實債(續)**:仲有約 440 個 std 卡名未譯,暫顯「官方中文未發行」;之後逐批補,
   優先按採用率。`cardTextZh.ts` 由 auto-update 保留(唔被覆寫)。
 - **質量**:tsc 乾淨 · 320 測試(+4)· 黃金 27/507 · 0 console error · 數學零改動。
+
+## 2026-06-15 (五) — 牌組推薦:同主軸寶可夢摺成「系列」+ 路線選擇器(#40)
+
+- **需求**:產品負責人要「同主軸熱門牌組以系列形式喺同一卡欄揀」。原本 28 個 Limitless
+  原型逐個一行,當中多個其實同一主軸(4 個多龍巴魯托變體、3 個超級寶石海星變體…),
+  揀起上嚟好雜。
+- **裁決(只憑真實數據,唔猜)**:用 Limitless 自己嘅 icon slug 做依據——`icons[0]` =
+  主軸卡。去掉 form 後綴(`-mega/-gmax/-vmax/-vstar/-gx/-ex/-v/-tera`)得出主軸 key
+  (`greninja-mega`→`greninja`,與純甲賀忍蛙合併);**多字種名(raging-bolt)唔會被
+  誤剝成 -bolt**,因為剝除清單只含真實 form 字。同主軸者摺成一個 `DeckSeries`,內含
+  多個變體(路線),系列同路線一律按真實採用率(deckCount)排序。
+- **機制命名例外**:有 curated handle override 嘅原型(太晶Box=Basic Box、祭典樂舞=
+  Festival Lead)係自成一格嘅身份,**唔當作某主軸嘅變體**——即使佢 icon 撞主軸(Basic
+  Box 領頭 icon 係厄鬼椪)亦保持獨立(key 用 `@<archId>`)。
+- **UI**:單變體系列 = 同改革前一模一樣(顯示完整原型名,零退化)。多變體系列 = 顯示
+  主軸 zh 名(由 `dexEnZh` 查 icon slug,查唔到誠實 Title-Case fallback,絕不老作)+
+  「系列 · N 路線」標籤 + 路線 chip 揀(每 chip 顯該路線 deckCount),揀邊個就顯邊個嘅
+  真實比賽牌表 + 精確重抽 teaser。28 原型 → 21 系列(多龍巴魯托·4、甲賀忍蛙·2、
+  路卡利歐·2、寶石海星·3)。
+- **實作**:`src/data/decks.ts` 新增 `DeckSeries`、`groupSeries()`、`localizeCarry()`;
+  `src/views/DecksView.tsx` `ArchetypeCard`→`SeriesCard`(路線 state + chip 切換);
+  i18n 加 `decks.seriesBadge`/`decks.variantHint`,subtitle 改為「歸納為系列」。
+- **質量**:tsc 乾淨 · 329 測試(+9,`tests/decksSeries.spec.tsx`)· 黃金 27/507 ·
+  0 console error · 數學零改動。預覽實測:多龍巴魯托 4 路線切換正常、太晶Box 保持獨立。

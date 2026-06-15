@@ -49,6 +49,27 @@ export interface DeckData {
   archetypes: Archetype[];
 }
 
+/**
+ * A 系列 (owner request #40 2026-06-15): one or more Limitless archetypes that
+ * share the same 主軸 (carry Pokémon) folded into a single column, so the user
+ * picks the pairing 路線 (e.g. Dragapult / Dragapult+Dusknoir / Dragapult+
+ * Blaziken) within one card instead of scanning four near-identical rows.
+ */
+export interface DeckSeries {
+  /** carry species key, or "@<archId>" for a mechanic-named standalone. */
+  id: string;
+  /** representative icon slug of the most-played member (for the dex lookup). */
+  carryIcon: string;
+  /** true = a Pokémon carry (localize via dex); false = a mechanic handle. */
+  isCarry: boolean;
+  /** variants, most-played first. */
+  members: Archetype[];
+  /** total decks across all variants of this carry. */
+  deckCount: number;
+  /** max member score (series ordering). */
+  score: number;
+}
+
 let decksPromise: Promise<DeckData> | null = null;
 
 export function loadDecks(): Promise<DeckData> {
@@ -167,6 +188,74 @@ export function localizeArchetype(name: string, catalog: Catalog | null): string
   }
   if (prefix !== "") parts.push(prefix); // dangling Mega with no match
   return parts.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// 系列 grouping (owner request #40 2026-06-15): fold archetypes that share a
+// carry Pokémon into one column with a 路線 picker. Driven by Limitless's own
+// icon slugs (icons[0] = the carry), so it's data, not a guess.
+
+// Form suffixes on an icon slug (greninja-mega, starmie-mega). NOT "-bolt" etc.,
+// so multi-word species like raging-bolt keep their distinct carry key.
+const ICON_FORM = /-(mega|gmax|vmax|vstar|gx|ex|v|tera)$/;
+
+/** Carry species key of an archetype: its lead icon with any form suffix removed. */
+function carryKeyOf(arch: Archetype): string {
+  return (arch.icons[0] ?? arch.id).replace(ICON_FORM, "");
+}
+
+/**
+ * Group archetypes into series by shared carry. Mechanic-named archetypes (those
+ * with a curated handle override, e.g. 太晶Box / 祭典樂舞) stay standalone — they
+ * are an identity of their own, not "a variant of a carry". Series and the
+ * variants within each are ordered by real popularity (deck count) descending.
+ */
+export function groupSeries(archetypes: Archetype[]): DeckSeries[] {
+  const byKey = new Map<string, DeckSeries>();
+  const order: string[] = [];
+  for (const a of archetypes) {
+    const mechanic = ARCH_OVERRIDE[a.name.trim().toLowerCase()] !== undefined;
+    const key = mechanic ? `@${a.id}` : carryKeyOf(a);
+    let s = byKey.get(key);
+    if (s === undefined) {
+      s = {
+        id: key,
+        carryIcon: a.icons[0] ?? a.id,
+        isCarry: !mechanic,
+        members: [],
+        deckCount: 0,
+        score: 0,
+      };
+      byKey.set(key, s);
+      order.push(key);
+    }
+    s.members.push(a);
+    s.deckCount += a.deckCount;
+    if (a.score > s.score) s.score = a.score;
+  }
+  const series = order.map((k) => byKey.get(k) as DeckSeries);
+  const byPopularity = (a: Archetype, b: Archetype) =>
+    b.deckCount - a.deckCount || b.score - a.score;
+  for (const s of series) {
+    s.members.sort(byPopularity);
+    s.carryIcon = s.members[0]?.icons[0] ?? s.carryIcon;
+  }
+  series.sort((a, b) => b.deckCount - a.deckCount || b.score - a.score);
+  return series;
+}
+
+/**
+ * zh display name for a series' carry. A Pokémon carry localizes via the official
+ * dex (icon slug → species); a mechanic-named standalone uses its curated handle.
+ * Unknown carry → an honest Title-Cased fallback (never a guess).
+ */
+export function localizeCarry(series: DeckSeries, catalog: Catalog | null): string {
+  const first = series.members[0];
+  if (!series.isCarry && first !== undefined) return localizeArchetype(first.name, catalog);
+  const species = series.carryIcon.replace(ICON_FORM, "").replace(/-/g, " ");
+  const zh = catalog?.dexEnZh?.[species];
+  if (zh !== undefined) return zh;
+  return species.replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
 // ---------------------------------------------------------------------------
