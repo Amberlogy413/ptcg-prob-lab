@@ -25,6 +25,7 @@ export const NEUTRAL_ACCENT = "#8A9298";
 const ENERGY_CHAR_TYPE: Array<[string, string]> = [
   ["草", "Grass"],
   ["火", "Fire"],
+  ["炎", "Fire"], // older/JP wording for the Fire type (基本【炎】能量)
   ["水", "Water"],
   ["雷", "Lightning"],
   ["超", "Psychic"],
@@ -55,13 +56,16 @@ const ENERGY_EN_TYPE: Array<[RegExp, string]> = [
  *  element only — NOT any occurrence — so a proper-noun energy like 火箭隊能量
  *  (Team Rocket's Energy, 火 ∈ 火箭隊) stays neutral instead of false-matching Fire. */
 export function energyType(name: string): string | null {
-  const zh = name.match(/^(.*)能量$/);
+  // Strip the 【】 brackets some prints wrap the element in (基本【火】能量) so the
+  // trailing-element match still sees 火/水/… right before 能量.
+  const clean = name.replace(/[【】]/g, "");
+  const zh = clean.match(/^(.*)能量$/);
   if (zh !== null) {
     const head = zh[1] ?? "";
     for (const [ch, ty] of ENERGY_CHAR_TYPE) if (head.endsWith(ch)) return ty;
     return null; // zh energy with no trailing element → special
   }
-  if (/energy/i.test(name)) for (const [re, ty] of ENERGY_EN_TYPE) if (re.test(name)) return ty;
+  if (/energy/i.test(clean)) for (const [re, ty] of ENERGY_EN_TYPE) if (re.test(clean)) return ty;
   return null;
 }
 

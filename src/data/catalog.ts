@@ -360,7 +360,12 @@ export function toNewCardInput(card: CatalogCard): NewCardInput {
       ? card.regulationMark
       : undefined;
   return {
-    name: card.name,
+    // Canonical grouping name (nameZh / energy-folded), NOT the print's raw name,
+    // so every name variant of one logical card (謝米/シェイミ, 基本火能量/基本【火】
+    // 能量) folds onto ONE deck row — the ≤4 / ≤60 caps and the legality check key
+    // on this name, so they aggregate across variants instead of being bypassable
+    // by switching the print version (adversarial review 2026-06-16).
+    name: groupName(card),
     count: 1,
     isBasic: isBasicPokemon(card),
     section: sectionOf(card),
@@ -405,6 +410,15 @@ export interface PrintGroup {
   rep: CatalogCard;
   prints: CatalogCard[];
 }
+/** Canonical grouping name. Basic energies are printed with several name
+ *  variants across sets — 基本【火】能量 / 基本火能量 / 基本【炎】能量 — all the
+ *  SAME card; collapse the 【】 brackets and the 炎→火 wording so every print of a
+ *  basic energy folds onto one tile (owner caught the duplicate 基本鬥能量 2026-06-16). */
+export function groupName(card: CatalogCard): string {
+  const name = card.nameZh ?? card.name;
+  if (card.category !== "Energy") return name;
+  return name.replace(/[【】]/g, "").replace(/^基本炎能量$/, "基本火能量");
+}
 export function groupByName(catalog: Catalog, cards: CatalogCard[]): PrintGroup[] {
   const order: string[] = [];
   const byName = new Map<string, CatalogCard[]>();
@@ -414,7 +428,7 @@ export function groupByName(catalog: Catalog, cards: CatalogCard[]): PrintGroup[
     // while older prints are canonically 謝米 — keying on `name` would wrongly
     // show the SAME card as two tiles (owner caught this 2026-06-15). nameZh is
     // the stable cross-era card identity; ex/V/VMAX keep distinct nameZh.
-    const key = c.nameZh ?? c.name;
+    const key = groupName(c);
     let g = byName.get(key);
     if (g === undefined) {
       g = [];

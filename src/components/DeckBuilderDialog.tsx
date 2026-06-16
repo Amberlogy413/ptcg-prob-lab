@@ -9,6 +9,8 @@ import {
   toNewCardInput,
   sortPrints,
   groupByName,
+  groupName,
+  cardTier,
   stageKey,
   trainerTypeKey,
   energyTypeKey,
@@ -61,13 +63,15 @@ const TYPE_ORDER = [
   "Colorless",
   "Fairy",
 ];
-const GRID_CAP = 48;
 
 /** Sub-facet of a card inside the active category: owner for the trainer-owned
  *  bucket, otherwise stage / trainer type / energy type. */
 function subOf(card: CatalogCard, category: Category | null): string | undefined {
   if (category === "OwnedPokemon") return card.owner;
-  if (card.category === "Pokemon") return card.stage;
+  // Mega ex cards carry their PRE-mega TCGdex stage (Basic/Stage1/Stage2), so the
+  // stage field alone hides them. Bucket every 超級…ex under 超級進化 (MEGA) by the
+  // name-based tier — owner: "超級進化點止得咁少" (2026-06-16).
+  if (card.category === "Pokemon") return cardTier(card) === "MEGA" ? "MEGA" : card.stage;
   if (card.category === "Trainer") return card.trainerType;
   return card.energyType;
 }
@@ -118,6 +122,8 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   const t = useT();
   const { lang } = useCardLang();
   const addCardFrom = useDeckStore((s) => s.addCardFrom);
+  const updateCard = useDeckStore((s) => s.updateCard);
+  const removeCard = useDeckStore((s) => s.removeCard);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [failed, setFailed] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
@@ -259,12 +265,93 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     }
   }
 
+  // Set the deck to EXACTLY n copies of a card (matched by name), capped by the
+  // real rules via the store (per-name ≤4 / Basic Energy exempt / ≤60 total).
+  // Collapses any duplicate-name rows so a tile's count always matches the deck.
+  // Owner 2026-06-16: x1–x4 pickers (non-energy) + −/+/input (energy), ≤60.
+  function setDeckCount(card: CatalogCard, n: number) {
+    // Match on the canonical grouping name so all of a card's name variants
+    // (and the loaded-deck row, which uses the canonical name) fold to one row.
+    const canon = groupName(card);
+    const rows = deck.cards.filter((c) => c.name === canon);
+    if (rows.length === 0) {
+      if (n > 0) addCardFrom(deck.id, { ...toNewCardInput(card), count: n });
+      return;
+    }
+    const [first, ...extra] = rows;
+    for (const e of extra) removeCard(deck.id, e.id);
+    if (n <= 0) removeCard(deck.id, first!.id);
+    else updateCard(deck.id, first!.id, { count: n });
+  }
+
+  // Quantity picker for a tile: x1–x4 quick-set for capped cards, −/+/number for
+  // energy (Basic Energy is uncapped per name, only the 60-deck total binds).
+  // A plain function (not a nested <Component/>) so the number input keeps focus
+  // across re-renders instead of remounting on every keystroke.
+  const qtyControls = (card: CatalogCard) => {
+    const owned = nameTotals.get(groupName(card)) ?? 0;
+    const headroom = DECK_SIZE - total + owned; // most this card may reach now
+    if (card.category === "Energy") {
+      return (
+        <div className="mt-2 flex items-center gap-1">
+          <button
+            type="button"
+            aria-label={t("builder.qtyDec")}
+            disabled={owned <= 0}
+            onClick={() => setDeckCount(card, owned - 1)}
+            className="h-8 w-8 rounded-ctl border hairline bg-surface text-ink2 hover:text-ink disabled:opacity-40"
+          >
+            −
+          </button>
+          <input
+            type="number"
+            min={0}
+            max={headroom}
+            value={owned}
+            aria-label={t("builder.qtyInput")}
+            onChange={(e) => setDeckCount(card, Math.max(0, Math.trunc(Number(e.target.value) || 0)))}
+            className="h-8 w-14 rounded-ctl border hairline bg-surface px-1 text-center font-mono text-sm"
+          />
+          <button
+            type="button"
+            aria-label={t("builder.qtyInc")}
+            disabled={headroom <= owned}
+            onClick={() => setDeckCount(card, owned + 1)}
+            className="h-8 w-8 rounded-ctl border hairline bg-surface text-ink2 hover:text-ink disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="mt-2 flex items-center gap-1">
+        {[1, 2, 3, 4].map((n) => (
+          <button
+            key={n}
+            type="button"
+            aria-label={t("builder.qtySet", { n })}
+            aria-pressed={owned === n}
+            disabled={n > owned && n > headroom}
+            onClick={() => setDeckCount(card, owned === n ? 0 : n)}
+            className={
+              "h-8 flex-1 rounded-ctl border text-xs font-medium transition-colors disabled:opacity-40 " +
+              (owned === n ? "border-blue bg-blue text-white" : "hairline bg-surface text-ink2 hover:text-ink")
+            }
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   // One card tile (shared by the flat grid and the evolution-family layout).
   const renderTile = (group: PrintGroup) => {
     const { rep, prints } = group;
     const card = prints.find((p) => p.id === printChoice[rep.name]) ?? rep;
     const kind = kindOf(card);
-    const owned = nameTotals.get(rep.name) ?? 0;
+    const owned = nameTotals.get(groupName(card)) ?? 0;
     const addLabel =
       t("catalog.addAria", { name: card.name, id: card.id }) +
       (card.usage !== undefined ? `,${t("catalog.usageAria", { p: card.usage })}` : "") +
@@ -305,6 +392,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
             {card.std !== true && <span>{t("catalog.legal.not")}</span>}
           </span>
         </button>
+        {qtyControls(card)}
         <div className="mt-2 flex gap-1">
           {prints.length > 1 && (
             <select
@@ -344,7 +432,7 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
     // Show the 主軸's OWN deck count (≤4, legal), never the line sum — a summed
     // ×8 on a single card-looking tile misreads as a rule violation (owner
     // request 2026-06-15). Per-member counts are visible once expanded.
-    const owned = nameTotals.get(face.name) ?? 0;
+    const owned = nameTotals.get(groupName(face)) ?? 0;
     const stages = fam.members.map((m) => {
       const k = stageKey(m.rep.stage ?? "Basic");
       return k !== null ? t(k) : (m.rep.stage ?? "");
@@ -391,9 +479,13 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   // Evolution lines ALWAYS group into one series (owner request 2026-06-15: 多龍
   // 系列要以系列形式顯示),even in the mixed/default view — not only when the
   // 寶可夢 category is picked. Non-Pokémon become singletons (packed into a
-  // shared grid at render). Capped to keep the grid light.
-  const families =
-    catalog !== null ? evolutionFamilies(catalog, results).slice(0, GRID_CAP) : null;
+  // shared grid at render). Show ALL results — owner: "請全部顯示" (2026-06-16);
+  // the grid scrolls, and the layered filters keep any single view manageable.
+  // Memoized so a keystroke that only changes the deck doesn't re-group the pool.
+  const families = useMemo(
+    () => (catalog !== null ? evolutionFamilies(catalog, results) : null),
+    [catalog, results],
+  );
 
   return (
     <Modal wide title={t("builder.title")} onClose={onClose}>
@@ -611,11 +703,6 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
                 return blocks;
               })()}
             </div>
-          )}
-          {results.length > GRID_CAP && (
-            <p className="mt-2 text-xs text-ink2">
-              {t("builder.more", { n: results.length - GRID_CAP })}
-            </p>
           )}
           <p className="mt-3 text-xs text-ink2">
             {catalog.format !== undefined &&
