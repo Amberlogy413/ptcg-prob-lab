@@ -646,6 +646,7 @@ function DrawHud({
       <p className="mt-1 font-mono text-xs text-ink2">
         {odds.fraction} · {odds.oneIn} · {t("battle.hud.deckLeft", { n: deckSize })}
       </p>
+      <p className="mt-1 text-[11px] text-ink2">{t("battle.hud.shuffleNote")}</p>
     </section>
   );
 }

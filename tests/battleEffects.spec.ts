@@ -109,20 +109,10 @@ describe("applyAutoEffect — exact, verified mechanics", () => {
     expect(new Set(ids(p1)).size).toBe(TOTAL); // nothing lost or duplicated
   });
 
-  it("奇樹 (Iono): both players shuffle hand into deck and draw their own prize count", () => {
+  it("奇樹 (Iono) is NOT auto-resolved — rotated out of Standard + bottom-placement would break the draw HUD", () => {
     useBattleStore.getState().newGame({ p1: SPEC, p2: SPEC, seed: 9 });
-    // Make the prize counts asymmetric to prove "own remaining prizes" is used.
-    const prize = useBattleStore.getState().p2.prizes[0]!;
-    useBattleStore.getState().moveCard("p2", prize.iid, "discard"); // p2 now has 5 prizes
     const played = useBattleStore.getState().p1.hand[0]!;
-    applyAutoEffect("p1", played.iid, "奇樹");
-    const { p1, p2 } = useBattleStore.getState();
-    expect(p1.prizes.length).toBe(6);
-    expect(p1.hand.length).toBe(6); // drew = own 6 prizes
-    expect(p2.prizes.length).toBe(5);
-    expect(p2.hand.length).toBe(5); // drew = own 5 prizes
-    expect(sum(p1)).toBe(TOTAL);
-    expect(sum(p2)).toBe(TOTAL);
+    expect(applyAutoEffect("p1", played.iid, "奇樹")).toBe(false); // stays manual
   });
 
   it("裁判 (Judge): both players shuffle hand into deck and draw 4", () => {

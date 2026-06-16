@@ -136,6 +136,10 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
   // Which evolution lines are expanded to their member chooser (owner request
   // 2026-06-15: a line is one collapsed card; tap to enlarge and pick a card).
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  // Current-deck management panel (owner 2026-06-16): when the deck is full and
+  // you want to add a card, you need to SEE what's in it and trim — so the
+  // builder can show + reduce the live deck inline, not only the catalog.
+  const [showDeck, setShowDeck] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -504,22 +508,79 @@ export function DeckBuilderDialog({ deck, onClose }: { deck: Deck; onClose: () =
             </span>
           )}
         </span>
-        <label className="ml-auto flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={stdOnly}
-            onChange={(e) => onStdToggle(e.target.checked)}
-          />
-          {t("builder.std")}
-        </label>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-ctl bg-blue px-3 py-1.5 text-sm font-medium text-white"
-        >
-          {t("builder.done")}
-        </button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-expanded={showDeck}
+            onClick={() => setShowDeck((v) => !v)}
+            className={
+              "rounded-ctl border px-2.5 py-1.5 text-sm " +
+              (total >= DECK_SIZE
+                ? "border-warn text-warn"
+                : "hairline bg-surface text-ink2 hover:text-ink")
+            }
+          >
+            {showDeck ? "▾ " : "▸ "}
+            {t("builder.manageDeck", { n: total })}
+          </button>
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={stdOnly}
+              onChange={(e) => onStdToggle(e.target.checked)}
+            />
+            {t("builder.std")}
+          </label>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-ctl bg-blue px-3 py-1.5 text-sm font-medium text-white"
+          >
+            {t("builder.done")}
+          </button>
+        </div>
       </div>
+
+      {/* Current-deck panel: see + trim what's in the deck (esp. when full). */}
+      {showDeck && (
+        <div className="mt-2 rounded-ctl border hairline bg-surface p-2">
+          {total >= DECK_SIZE && (
+            <p className="mb-1.5 text-xs text-warn" role="note">{t("builder.deckFull")}</p>
+          )}
+          {deck.cards.length === 0 ? (
+            <p className="text-xs text-ink2">{t("builder.deckEmpty")}</p>
+          ) : (
+            <ul className="grid gap-1 sm:grid-cols-2">
+              {deck.cards.map((c) => (
+                <li key={c.id} className="flex items-center gap-1.5 text-xs">
+                  <span className="w-5 shrink-0 text-right font-mono">{c.count}</span>
+                  <span className="min-w-0 flex-1 truncate" title={c.name}>{c.name}</span>
+                  <button
+                    type="button"
+                    aria-label={t("builder.qtyDec")}
+                    onClick={() =>
+                      c.count > 1
+                        ? updateCard(deck.id, c.id, { count: c.count - 1 })
+                        : removeCard(deck.id, c.id)
+                    }
+                    className="h-7 w-7 shrink-0 rounded-ctl border hairline bg-surface text-ink2 hover:text-ink"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("builder.removeCard")}
+                    onClick={() => removeCard(deck.id, c.id)}
+                    className="h-7 w-7 shrink-0 rounded-ctl border hairline bg-surface text-ink2 hover:text-warn"
+                  >
+                    ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {catalog === null ? (
         <p className="mt-4 text-sm text-ink2" role="status">
