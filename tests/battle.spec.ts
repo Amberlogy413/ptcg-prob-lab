@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { mulberry32, shuffle } from "../src/utils/rng.ts";
-import { useBattleStore, type CardSpec, type PlayerBoard, type BattleCard } from "../src/state/battleStore.ts";
+import { useBattleStore, gameResult, type CardSpec, type PlayerBoard, type BattleCard, type InPlay } from "../src/state/battleStore.ts";
 import { computeDrawOdds } from "../src/state/battle.ts";
 
 const SPEC: CardSpec[] = [
@@ -166,6 +166,77 @@ describe("type-correct play (the core faithful rules)", () => {
     expect(p1.active).toBeNull();
     expect(p1.discard.map((c) => c.iid).sort()).toEqual(["e1", "e2", "pikachu"]);
     expect(countAll(p1)).toBe(3); // nothing lost on KO
+  });
+});
+
+function unit(card: BattleCard): InPlay {
+  return { uid: card.iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] };
+}
+const prize6 = () => Array.from({ length: 6 }, (_, i) => bc(`pz${i}`, "basic"));
+
+describe("gameResult — win detection (P3)", () => {
+  const base = () => ({
+    started: true,
+    turn: 3,
+    p1: { ...emptyBoard(), prizes: prize6() },
+    p2: { ...emptyBoard(), prizes: prize6() },
+    everInPlay: { p1: true, p2: true },
+  });
+
+  it("nobody wins before the game starts", () => {
+    expect(gameResult({ ...base(), started: false })).toBeNull();
+  });
+
+  it("taking all 6 Prize cards wins", () => {
+    const s = base();
+    s.p1.prizes = [];
+    expect(gameResult(s)).toEqual({ winner: "p1", reason: "prizes" });
+  });
+
+  it("a wiped board loses — but ONLY after that side has had a Pokémon (no false setup win)", () => {
+    const s = base();
+    s.p1.active = unit(bc("pika", "basic", { hp: 60 })); // p1 has one, p2 empty
+    expect(gameResult(s)).toEqual({ winner: "p1", reason: "noPokemon" });
+    s.everInPlay = { p1: true, p2: false }; // p2 never set up → not a loss yet
+    expect(gameResult(s)).toBeNull();
+  });
+});
+
+describe("special conditions + between-turns checkup (P3)", () => {
+  beforeEach(() => useBattleStore.getState().reset());
+
+  it("toggles conditions and applies Poison +10 / Burn +20 at endTurn checkup", () => {
+    useBattleStore.setState({
+      started: true,
+      turn: 2,
+      current: "p1",
+      firstPlayer: "p1",
+      p1: { ...emptyBoard(), active: unit(bc("pika", "basic", { hp: 120 })) },
+      p2: emptyBoard(),
+    });
+    const id = useBattleStore.getState().p1.active!.uid;
+    useBattleStore.getState().toggleStatus("p1", id, "poison");
+    useBattleStore.getState().toggleStatus("p1", id, "burn");
+    expect([...useBattleStore.getState().p1.active!.status].sort()).toEqual(["burn", "poison"]);
+    useBattleStore.getState().endTurn();
+    expect(useBattleStore.getState().p1.active!.damage).toBe(30); // 10 + 20
+    useBattleStore.getState().toggleStatus("p1", id, "poison"); // remove poison
+    expect(useBattleStore.getState().p1.active!.status).toEqual(["burn"]);
+  });
+
+  it("evolving clears Special Conditions", () => {
+    useBattleStore.setState({
+      started: true,
+      turn: 2,
+      current: "p1",
+      firstPlayer: "p1",
+      p1: { ...emptyBoard(), active: unit(bc("dreepy", "basic", { hp: 70 })), hand: [bc("drakloak", "evolution", { hp: 90 })] },
+      p2: emptyBoard(),
+    });
+    const id = useBattleStore.getState().p1.active!.uid;
+    useBattleStore.getState().toggleStatus("p1", id, "asleep");
+    useBattleStore.getState().evolve("p1", "drakloak", id);
+    expect(useBattleStore.getState().p1.active!.status).toEqual([]);
   });
 });
 

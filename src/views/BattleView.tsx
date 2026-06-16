@@ -3,12 +3,15 @@ import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import {
   useBattleStore,
+  gameResult,
+  SPECIAL_CONDITIONS,
   type Pile,
   type PlayerId,
   type BattleCard,
   type InPlay,
   type PlayerBoard,
   type CardSpec,
+  type SpecialCondition,
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
@@ -74,6 +77,7 @@ export function BattleView() {
   const turnSupporterUsed = useBattleStore((s) => s.turnSupporterUsed);
   const turnEnergyAttached = useBattleStore((s) => s.turnEnergyAttached);
   const turnStadiumPlayed = useBattleStore((s) => s.turnStadiumPlayed);
+  const everInPlay = useBattleStore((s) => s.everInPlay);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
   const p2 = useBattleStore((s) => s.p2);
@@ -396,6 +400,9 @@ export function BattleView() {
     setMsg(result);
   }
 
+  // Win detection (P3): all prizes taken, or a wiped board.
+  const result = gameResult({ started, turn, p1, p2, everInPlay });
+
   return (
     <div className="flex flex-col gap-3">
       {/* Control bar */}
@@ -413,7 +420,19 @@ export function BattleView() {
           <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
         )}
         {msg !== null && <p className="w-full text-xs text-warn" role="alert">{msg}</p>}
+        {meBoard.deck.length === 0 && (
+          <p className="w-full text-xs text-warn" role="note">{t("battle.win.deckOut", { name: names[me] })}</p>
+        )}
       </div>
+
+      {result !== null && (
+        <div className="rounded-card border border-good bg-good/5 p-3 text-center" role="status">
+          <p className="text-lg font-semibold text-good">{t("battle.win.banner", { name: names[result.winner] })}</p>
+          <p className="mt-0.5 text-xs text-ink2">
+            {t(result.reason === "prizes" ? "battle.win.byPrizes" : "battle.win.byWipe", { loser: names[result.winner === "p1" ? "p2" : "p1"] })}
+          </p>
+        </div>
+      )}
 
       {/* Opponent (top, mirrored): board only, hand hidden */}
       <PlayerHalf
@@ -678,6 +697,7 @@ function FieldRow({
                 onSelect={() => setSel(selected ? null : { scope: "unit", player, unitId: u.uid })}
                 onAction={(kind) => onUnitAction(player, u.uid, kind)}
                 onSetDamage={(d) => useBattleStore.getState().setDamage(player, u.uid, d)}
+                onToggleStatus={(cond) => useBattleStore.getState().toggleStatus(player, u.uid, cond)}
                 onVisual={onVisual}
                 t={t}
               />
@@ -691,7 +711,7 @@ function FieldRow({
 
 /** One in-play Pokémon unit: name + HP/damage + attached energy/tools + stage. */
 function UnitTile({
-  unit, slot, selected, hasActive, resolve, onSelect, onAction, onSetDamage, onVisual, t,
+  unit, slot, selected, hasActive, resolve, onSelect, onAction, onSetDamage, onToggleStatus, onVisual, t,
 }: {
   unit: InPlay;
   slot: string;
@@ -701,6 +721,7 @@ function UnitTile({
   onSelect: () => void;
   onAction: (kind: UnitActionKind) => void;
   onSetDamage: (damage: number) => void;
+  onToggleStatus: (cond: SpecialCondition) => void;
   onVisual: (c: BattleCard) => void;
   t: Tr;
 }) {
@@ -733,6 +754,15 @@ function UnitTile({
           {unit.tools.length > 0 && <span className="font-mono">{t("battle.unit.tools")}{unit.tools.length}</span>}
           {unit.under.length > 0 && <span className="font-mono">{t("battle.unit.stage", { n: unit.under.length + 1 })}</span>}
         </span>
+        {unit.status.length > 0 && (
+          <span className="mt-0.5 flex flex-wrap gap-0.5">
+            {unit.status.map((c) => (
+              <span key={c} className="rounded-full border border-warn/50 bg-warn/10 px-1 text-[9px] text-warn">
+                {t(`battle.cond.${c}`)}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
       {selected && (
         <span className="mt-1 flex flex-wrap gap-0.5">
@@ -746,6 +776,28 @@ function UnitTile({
           )}
           <UnitBtn onClick={() => onAction("ko")} danger>{t("battle.unit.ko")}</UnitBtn>
           <UnitBtn onClick={() => onAction("scoop")}>{t("battle.unit.scoop")}</UnitBtn>
+        </span>
+      )}
+      {selected && isActiveSlot && (
+        <span className="mt-1 flex flex-wrap items-center gap-0.5">
+          <span className="text-[10px] text-ink2">{t("battle.cond.label")}</span>
+          {SPECIAL_CONDITIONS.map((c) => {
+            const on = unit.status.includes(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onToggleStatus(c)}
+                aria-pressed={on}
+                className={
+                  "rounded-ctl border px-1 text-[10px] " +
+                  (on ? "border-warn bg-warn/10 text-warn" : "hairline text-ink2 hover:text-ink")
+                }
+              >
+                {t(`battle.cond.${c}`)}
+              </button>
+            );
+          })}
         </span>
       )}
     </span>

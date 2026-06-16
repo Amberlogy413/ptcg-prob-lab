@@ -73,7 +73,13 @@ export interface InPlay {
   damage: number;
   /** Turn this Pokémon came into play / last evolved (summoning-sickness rules). */
   playedTurn: number;
+  /** Special Conditions on this Pokémon (only meaningful on the Active). Cleared
+   *  when it leaves the Active spot or evolves. */
+  status: SpecialCondition[];
 }
+
+export type SpecialCondition = "poison" | "burn" | "asleep" | "confused" | "paralyzed";
+export const SPECIAL_CONDITIONS: SpecialCondition[] = ["poison", "burn", "asleep", "confused", "paralyzed"];
 
 export interface PlayerBoard {
   deck: BattleCard[];
@@ -130,6 +136,9 @@ interface BattleState {
   turnEnergyAttached: boolean;
   turnStadiumPlayed: boolean;
   turnRetreated: boolean;
+  /** Has each player ever had a Pokémon in play? — so "no Pokémon left = loss"
+   *  fires only after a wipe, never during the spread-out manual setup. */
+  everInPlay: { p1: boolean; p2: boolean };
   p1: PlayerBoard;
   p2: PlayerBoard;
   names: { p1: string; p2: string };
@@ -164,6 +173,8 @@ interface BattleState {
   takePrize: (player: PlayerId, n: number) => void;
   /** Adjust a unit's damage (clamped ≥0). */
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
+  /** Toggle a Special Condition on a unit (poison/burn/asleep/confused/paralyzed). */
+  toggleStatus: (player: PlayerId, unitId: string, cond: SpecialCondition) => void;
   /** Scoop a whole unit back to hand (board correction / Scoop Up effects). */
   scoopToHand: (player: PlayerId, unitId: string) => void;
 
@@ -212,7 +223,7 @@ function rngFor(seed: number, player: PlayerId, nonce: number): Rng {
 
 /** Wrap a freshly-played Pokémon card as a new in-play unit. */
 function newUnit(card: BattleCard, turn: number): InPlay {
-  return { uid: card.iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: turn };
+  return { uid: card.iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: turn, status: [] };
 }
 
 /** All in-play units on a board (active first), for lookups. */
@@ -259,6 +270,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   turnEnergyAttached: false,
   turnStadiumPlayed: false,
   turnRetreated: false,
+  everInPlay: { p1: false, p2: false },
   p1: emptyBoard(),
   p2: emptyBoard(),
   names: { p1: "P1", p2: "P2" },
@@ -276,6 +288,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       turnEnergyAttached: false,
       turnStadiumPlayed: false,
       turnRetreated: false,
+      everInPlay: { p1: false, p2: false },
       p1: { ...emptyBoard(), deck: instantiate(p1) },
       p2: { ...emptyBoard(), deck: instantiate(p2) },
       names: names ?? { p1: "P1", p2: "P2" },
@@ -320,7 +333,10 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       const card = handCard(board, iid);
       if (card === undefined || card.kind !== "basic" || board.active !== null) return {} as Partial<BattleState>;
       ok = true;
-      return { [player]: { ...board, hand: withoutHand(board, iid), active: newUnit(card, s.turn) } } as Partial<BattleState>;
+      return {
+        [player]: { ...board, hand: withoutHand(board, iid), active: newUnit(card, s.turn) },
+        everInPlay: { ...s.everInPlay, [player]: true },
+      } as Partial<BattleState>;
     });
     return ok;
   },
@@ -332,7 +348,10 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       const card = handCard(board, iid);
       if (card === undefined || card.kind !== "basic" || board.bench.length >= MAX_BENCH) return {} as Partial<BattleState>;
       ok = true;
-      return { [player]: { ...board, hand: withoutHand(board, iid), bench: [...board.bench, newUnit(card, s.turn)] } } as Partial<BattleState>;
+      return {
+        [player]: { ...board, hand: withoutHand(board, iid), bench: [...board.bench, newUnit(card, s.turn)] },
+        everInPlay: { ...s.everInPlay, [player]: true },
+      } as Partial<BattleState>;
     });
     return ok;
   },
@@ -357,6 +376,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
         card,
         under: [...u.under, u.card],
         playedTurn: s.turn,
+        status: [], // evolving removes Special Conditions
       });
       return { [player]: { ...mapUnit(board, unitId, evolved), hand: withoutHand(board, handIid) } } as Partial<BattleState>;
     });
@@ -422,8 +442,9 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       ok = true;
       const incoming = board.bench[i]!;
       const bench = board.bench.filter((u) => u.uid !== benchUnitId);
-      // The old Active drops to the bench (energy cost is paid manually).
-      const newBench = board.active !== null ? [...bench, board.active] : bench;
+      // The old Active drops to the bench (energy cost is paid manually) and its
+      // Special Conditions are removed (they only exist on the Active spot).
+      const newBench = board.active !== null ? [...bench, { ...board.active, status: [] }] : bench;
       return { [player]: { ...board, active: incoming, bench: newBench }, turnRetreated: true } as Partial<BattleState>;
     });
     return ok;
@@ -469,6 +490,18 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
     set((s) => {
       const board = s[player];
       return { [player]: mapUnit(board, unitId, (u) => ({ ...u, damage: Math.max(0, Math.trunc(damage)) })) } as Partial<BattleState>;
+    });
+  },
+
+  toggleStatus: (player, unitId, cond) => {
+    set((s) => {
+      const board = s[player];
+      return {
+        [player]: mapUnit(board, unitId, (u) => ({
+          ...u,
+          status: u.status.includes(cond) ? u.status.filter((c) => c !== cond) : [...u.status, cond],
+        })),
+      } as Partial<BattleState>;
     });
   },
 
@@ -557,14 +590,26 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   },
 
   endTurn: () => {
-    set((s) => ({
-      current: s.current === "p1" ? "p2" : "p1",
-      turn: s.turn + 1,
-      turnSupporterUsed: false,
-      turnEnergyAttached: false,
-      turnStadiumPlayed: false,
-      turnRetreated: false,
-    }));
+    set((s) => {
+      // Pokémon Checkup between turns: each Active takes its deterministic
+      // Special-Condition damage — Poisoned +10, Burned +20. (Sleep/Confused/
+      // Paralyzed recovery needs a coin flip → left to the player, honest.)
+      const checkup = (b: PlayerBoard): PlayerBoard => {
+        if (b.active === null) return b;
+        const extra = (b.active.status.includes("poison") ? 10 : 0) + (b.active.status.includes("burn") ? 20 : 0);
+        return extra === 0 ? b : { ...b, active: { ...b.active, damage: b.active.damage + extra } };
+      };
+      return {
+        p1: checkup(s.p1),
+        p2: checkup(s.p2),
+        current: s.current === "p1" ? "p2" : "p1",
+        turn: s.turn + 1,
+        turnSupporterUsed: false,
+        turnEnergyAttached: false,
+        turnStadiumPlayed: false,
+        turnRetreated: false,
+      };
+    });
   },
 
   reset: () => {
@@ -579,6 +624,38 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       turnEnergyAttached: false,
       turnStadiumPlayed: false,
       turnRetreated: false,
+      everInPlay: { p1: false, p2: false },
     });
   },
 }));
+
+export interface GameResult {
+  winner: PlayerId;
+  reason: "prizes" | "noPokemon";
+}
+
+/**
+ * Who has won, if anyone. Two faithful, unambiguous conditions:
+ *  1. A player has taken all their Prize cards (prizes → 0).
+ *  2. A player who HAS had a Pokémon in play now has none (a wipe). The
+ *     `everInPlay` guard means the spread-out manual setup never false-triggers
+ *     this. (The "can't draw at start of turn" loss is surfaced as a warning in
+ *     the view, not auto-decided, since the draw is a manual action here.)
+ */
+export function gameResult(s: {
+  started: boolean;
+  turn: number;
+  p1: PlayerBoard;
+  p2: PlayerBoard;
+  everInPlay: { p1: boolean; p2: boolean };
+}): GameResult | null {
+  if (!s.started) return null;
+  if (s.p1.prizes.length === 0) return { winner: "p1", reason: "prizes" };
+  if (s.p2.prizes.length === 0) return { winner: "p2", reason: "prizes" };
+  const empty = (b: PlayerBoard) => b.active === null && b.bench.length === 0;
+  const p1Wiped = s.everInPlay.p1 && empty(s.p1);
+  const p2Wiped = s.everInPlay.p2 && empty(s.p2);
+  if (p2Wiped && !p1Wiped) return { winner: "p1", reason: "noPokemon" };
+  if (p1Wiped && !p2Wiped) return { winner: "p2", reason: "noPokemon" };
+  return null;
+}
