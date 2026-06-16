@@ -1,20 +1,28 @@
 /**
- * Pokémon type DATA colors (docs/04 §2 revision two) — data-encoding colors
+ * Pokémon type DATA colors (docs/04 §2 revision three) — data-encoding colors
  * like chart colors, used only for type identity (TypeChip), never as UI
  * decoration. Not part of the UI token palette by decision (DECISIONS.md).
+ *
+ * Revision three (owner 2026-06-17: 「顏色要更精準,分別更明顯,而家雷同龍一樣色」)
+ * re-spaces all eleven hues so no two read alike at chip size:
+ *  - Lightning is now a BRIGHT clean yellow vs Dragon a DARK red-bronze — a
+ *    decisive lightness + hue gap (the old golds were near-identical).
+ *  - The three greys (Darkness / Metal / Colorless) are pulled apart into
+ *    dark-indigo / steel-blue / light-neutral so they no longer collide.
+ *  - Fire (red) and Fighting (orange) are split further apart on the warm arc.
  */
 export const TYPE_COLORS: Record<string, string> = {
-  Grass: "#4C9F60",
-  Fire: "#E25B45",
-  Water: "#3D8FD1",
-  Lightning: "#E0A800", // bright golden-yellow (electric) — kept clearly apart from Dragon
-  Psychic: "#9A66C4",
-  Fighting: "#C07140",
-  Darkness: "#5A5470",
-  Metal: "#75828F",
-  Dragon: "#6E5A2E", // deep bronze/olive-brown — was a near-identical gold to Lightning (owner 2026-06-17)
-  Colorless: "#8A9298",
-  Fairy: "#D173A8",
+  Grass: "#3B9E55", // leaf green
+  Fire: "#E0402F", // clear red
+  Water: "#2A82C7", // clear blue
+  Lightning: "#E0A800", // bright golden YELLOW — unmistakably electric, clearly apart from Dragon
+  Psychic: "#9A4FC2", // violet
+  Fighting: "#CB6A2C", // bright orange — sits between Fire-red and Lightning-yellow
+  Darkness: "#46415E", // dark indigo-charcoal — the darkest swatch
+  Metal: "#5E7488", // steel blue-grey (mid, clearly bluish)
+  Dragon: "#7C5410", // deep dark BRONZE — decisively unlike bright Lightning (owner 2026-06-17)
+  Colorless: "#9AA1A9", // light neutral grey — clearly lighter than Metal
+  Fairy: "#D75FA0", // pink-magenta
 };
 
 /** Neutral accent for cards without a typed identity (most Trainers). */
