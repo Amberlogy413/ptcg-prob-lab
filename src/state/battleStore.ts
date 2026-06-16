@@ -599,10 +599,20 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
         const extra = (b.active.status.includes("poison") ? 10 : 0) + (b.active.status.includes("burn") ? 20 : 0);
         return extra === 0 ? b : { ...b, active: { ...b.active, damage: b.active.damage + extra } };
       };
+      const next: PlayerId = s.current === "p1" ? "p2" : "p1";
+      // Start-of-turn draw for the incoming player (PTCG Live auto-draws; a real
+      // turn begins with a draw). An empty deck draws nothing — the can't-draw
+      // LOSS is surfaced as a warning, not auto-decided (the draw is manual too).
+      const drawTop = (b: PlayerBoard): PlayerBoard =>
+        b.deck.length > 0 ? { ...b, hand: [...b.hand, b.deck[0]!], deck: b.deck.slice(1) } : b;
+      let p1n = checkup(s.p1);
+      let p2n = checkup(s.p2);
+      if (next === "p1") p1n = drawTop(p1n);
+      else p2n = drawTop(p2n);
       return {
-        p1: checkup(s.p1),
-        p2: checkup(s.p2),
-        current: s.current === "p1" ? "p2" : "p1",
+        p1: p1n,
+        p2: p2n,
+        current: next,
         turn: s.turn + 1,
         turnSupporterUsed: false,
         turnEnergyAttached: false,

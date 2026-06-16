@@ -834,6 +834,7 @@
   "battle.win.byPrizes": "攞晒 6 張獎賞卡,達成勝利條件。",
   "battle.win.byWipe": "{loser} 場上已無寶可夢可戰。",
   "battle.win.deckOut": "{name} 牌庫已空——下回合開始抽唔到牌就會落敗(官方規則)。",
+  "battle.undo": "復原",
   "battle.cond.label": "狀態:",
   "battle.cond.poison": "中毒",
   "battle.cond.burn": "灼傷",

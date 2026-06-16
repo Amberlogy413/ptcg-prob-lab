@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import {
@@ -63,6 +63,37 @@ function buildSpecs(build: DeckBuild | undefined, catalog: Catalog | null): Card
   return build.cards.map((c) => toBattleSpec(catalog, { name: c.name, count: c.count, isBasic: c.isBasic, section: c.section }));
 }
 
+/** Undo snapshot — the mutable game fields, captured before each action. */
+type BattleSnapshot = Pick<
+  ReturnType<typeof useBattleStore.getState>,
+  | "turn"
+  | "current"
+  | "firstPlayer"
+  | "turnSupporterUsed"
+  | "turnEnergyAttached"
+  | "turnStadiumPlayed"
+  | "turnRetreated"
+  | "everInPlay"
+  | "p1"
+  | "p2"
+  | "shuffleNonce"
+>;
+function snapOf(s: ReturnType<typeof useBattleStore.getState>): BattleSnapshot {
+  return {
+    turn: s.turn,
+    current: s.current,
+    firstPlayer: s.firstPlayer,
+    turnSupporterUsed: s.turnSupporterUsed,
+    turnEnergyAttached: s.turnEnergyAttached,
+    turnStadiumPlayed: s.turnStadiumPlayed,
+    turnRetreated: s.turnRetreated,
+    everInPlay: s.everInPlay,
+    p1: s.p1,
+    p2: s.p2,
+    shuffleNonce: s.shuffleNonce,
+  };
+}
+
 /** A faithful, turn-based local battle (owner request 2026-06-17). */
 export function BattleView() {
   const t = useT();
@@ -93,6 +124,31 @@ export function BattleView() {
   const [seed, setSeed] = useState<number>(1);
   const [first, setFirst] = useState<PlayerId>("p1");
   const [msg, setMsg] = useState<string | null>(null);
+
+  // Undo (P4): snapshot the state BEFORE each action via a store subscription, so
+  // a misclick in the manual board is one tap to reverse. View-level so the store
+  // stays clean; capped history; cleared on a fresh deal.
+  const history = useRef<BattleSnapshot[]>([]);
+  const undoing = useRef(false);
+  useEffect(() => {
+    return useBattleStore.subscribe((_state, prev) => {
+      if (undoing.current) {
+        undoing.current = false;
+        return;
+      }
+      if (!prev.started) return; // don't record pre-game / setup transitions
+      history.current.push(snapOf(prev));
+      if (history.current.length > 40) history.current.shift();
+    });
+  }, []);
+  function undo() {
+    const prev = history.current.pop();
+    if (prev === undefined) return;
+    undoing.current = true;
+    store.setState(prev);
+    setSel(null);
+    setMsg(null);
+  }
 
   useEffect(() => {
     let alive = true;
@@ -178,6 +234,8 @@ export function BattleView() {
     const o2 = byId.get(p2Opt);
     if (o1 === undefined || o2 === undefined) return;
     store.getState().newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label }, first });
+    store.getState().draw(first, 1); // the first player's turn-1 draw (current rules: going first DOES draw)
+    history.current = []; // a fresh deal starts a fresh undo history
     setSel(null);
     setMsg(null);
   }
@@ -412,9 +470,17 @@ export function BattleView() {
           <span className="text-ink2">{t("battle.actingNow")}</span>
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={undo}
+            disabled={history.current.length === 0}
+            className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink disabled:opacity-40"
+          >
+            {t("battle.undo")}
+          </button>
           <button type="button" onClick={() => { store.getState().endTurn(); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
-          <button type="button" onClick={() => store.getState().reset()} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
+          <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
         {turn === 1 && me === firstPlayer && (
           <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
