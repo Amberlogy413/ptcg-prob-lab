@@ -1,13 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useT } from "../i18n/index.ts";
 import { useDeckStore } from "../state/deckStore.ts";
 import {
   useBattleStore,
-  type Zone,
+  type Pile,
   type PlayerId,
   type BattleCard,
+  type InPlay,
+  type PlayerBoard,
   type CardSpec,
+  MAX_BENCH,
 } from "../state/battleStore.ts";
+import { toBattleSpec } from "../state/battlePlay.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
 import {
@@ -17,11 +21,7 @@ import {
   type DeckData,
   type DeckBuild,
 } from "../data/decks.ts";
-import {
-  loadCatalog,
-  localizeDeckRow,
-  type Catalog,
-} from "../data/catalog.ts";
+import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
 import { cardAccent, NEUTRAL_ACCENT } from "../data/typeColors.ts";
 import { useCardLang } from "../state/cardLang.ts";
 import { CardVisual } from "../components/CardVisual.tsx";
@@ -29,32 +29,19 @@ import { ProofNumber, type Proof } from "../components/ProofNumber.tsx";
 import { buildExplain } from "../data/explain.ts";
 import { Modal } from "../components/Modal.tsx";
 
-// Zones a selected card can be played/moved to — board order (front line first).
-const MOVE_ZONES: Zone[] = ["active", "bench", "stadium", "hand", "discard", "deck", "prizes", "lostzone"];
+type Resolve = (c: BattleCard) => { name: string; accent: string };
+type Tr = (k: string, p?: Record<string, string | number>) => string;
 
 /** A pickable deck for the sandbox: a real meta archetype or a saved deck. */
 interface DeckOption {
   id: string;
   label: string;
-  /** "popular" = real Limitless data, "saved" = the player's own deck. */
   group: "popular" | "saved";
   total: number;
   specs: CardSpec[];
 }
 
-/** A build's 60 lines as battle specs (math reads only count + isBasic). */
-function buildSpecs(build: DeckBuild | undefined): CardSpec[] {
-  if (build === undefined) return [];
-  return build.cards.map((c) => ({
-    name: c.name,
-    count: c.count,
-    isBasic: c.isBasic,
-    section: c.section,
-  }));
-}
-
-/** zh title for a meta archetype, with the real tier read off its top build
- *  (多龍巴魯托ex / 超級甲賀忍蛙ex …) — same logic as the 牌組推薦 list. */
+/** zh title for a meta archetype, with the real tier read off its top build. */
 function archLabel(name: string, build: DeckBuild | undefined, catalog: Catalog | null): string {
   const cardNames =
     catalog === null
@@ -65,7 +52,13 @@ function archLabel(name: string, build: DeckBuild | undefined, catalog: Catalog 
   return tierizeName(localizeArchetype(name, catalog), cardNames);
 }
 
-/** Faithful local two-player sandbox + live exact draw odds (owner 2026-06-14). */
+/** A build's 60 lines as battle specs, enriched with real play kind + facts. */
+function buildSpecs(build: DeckBuild | undefined, catalog: Catalog | null): CardSpec[] {
+  if (build === undefined) return [];
+  return build.cards.map((c) => toBattleSpec(catalog, { name: c.name, count: c.count, isBasic: c.isBasic, section: c.section }));
+}
+
+/** A faithful, turn-based local battle (owner request 2026-06-17). */
 export function BattleView() {
   const t = useT();
   const { lang } = useCardLang();
@@ -77,30 +70,23 @@ export function BattleView() {
   const current = useBattleStore((s) => s.current);
   const firstPlayer = useBattleStore((s) => s.firstPlayer);
   const turnSupporterUsed = useBattleStore((s) => s.turnSupporterUsed);
+  const turnEnergyAttached = useBattleStore((s) => s.turnEnergyAttached);
+  const turnStadiumPlayed = useBattleStore((s) => s.turnStadiumPlayed);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
   const p2 = useBattleStore((s) => s.p2);
-  const newGame = useBattleStore((s) => s.newGame);
-  const draw = useBattleStore((s) => s.draw);
-  const moveCard = useBattleStore((s) => s.moveCard);
-  const shuffleDeck = useBattleStore((s) => s.shuffleDeck);
-  const mulligan = useBattleStore((s) => s.mulligan);
-  const endTurn = useBattleStore((s) => s.endTurn);
-  const markSupporterUsed = useBattleStore((s) => s.markSupporterUsed);
-  const reset = useBattleStore((s) => s.reset);
+  const store = useBattleStore;
 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [data, setData] = useState<DeckData | null>(null);
   const [decksError, setDecksError] = useState(false);
-  const [selected, setSelected] = useState<{ player: PlayerId; iid: string } | null>(null);
+  const [sel, setSel] = useState<Sel | null>(null);
   const [visual, setVisual] = useState<BattleCard | null>(null);
-  // Matchup selection (option ids) + reproducible seed + who takes the first turn.
   const [p1Opt, setP1Opt] = useState<string>("");
   const [p2Opt, setP2Opt] = useState<string>("");
   const [seed, setSeed] = useState<number>(1);
   const [first, setFirst] = useState<PlayerId>("p1");
-  // Transient note when an auto-effect is blocked by a real rule (turn-1 / 1-per-turn).
-  const [effectMsg, setEffectMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -117,7 +103,6 @@ export function BattleView() {
     };
   }, []);
 
-  // Pickable decks: real meta archetypes (popular) + the player's saved decks.
   const options = useMemo<DeckOption[]>(() => {
     const popular: DeckOption[] =
       data === null
@@ -128,9 +113,8 @@ export function BattleView() {
               id: `pop:${a.id}`,
               label: archLabel(a.name, build, catalog),
               group: "popular" as const,
-              // Honest size: never assume 60 for a build-less archetype.
               total: build === undefined ? 0 : build.total,
-              specs: buildSpecs(build),
+              specs: buildSpecs(build, catalog),
             };
           });
     const saved: DeckOption[] = decks.map((d) => ({
@@ -138,21 +122,21 @@ export function BattleView() {
       label: d.name || t("deck.untitled"),
       group: "saved" as const,
       total: d.cards.reduce((s, c) => s + c.count, 0),
-      specs: d.cards.map((c) => ({
-        name: c.name,
-        count: c.count,
-        isBasic: c.isBasic,
-        section: c.section === "unknown" ? "unknown" : c.section,
-        ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}),
-      })),
+      specs: d.cards.map((c) =>
+        toBattleSpec(catalog, {
+          name: c.name,
+          count: c.count,
+          isBasic: c.isBasic,
+          section: c.section === "unknown" ? "unknown" : c.section,
+          ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}),
+        }),
+      ),
     }));
     return [...popular, ...saved];
   }, [data, catalog, decks, t]);
 
   const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
 
-  // Sensible defaults once options exist: you = your active deck (else top meta),
-  // opponent = the most-played meta deck distinct from yours.
   useEffect(() => {
     if (options.length === 0) return;
     setP1Opt((cur) => {
@@ -167,71 +151,116 @@ export function BattleView() {
     });
   }, [options, byId, activeDeckId]);
 
-  // Resolve a battle card to its localized name + type accent. Stable identity
-  // (deps: catalog, lang) so the HUD's grouping useMemo keys off real changes.
-  const resolve = useCallback(
-    (card: BattleCard): { name: string; accent: string } => {
+  const resolve = useCallback<Resolve>(
+    (card) => {
       if (catalog === null) return { name: card.name, accent: NEUTRAL_ACCENT };
-      const loc = localizeDeckRow(catalog, { name: card.name, catalogId: card.catalogId }, lang);
+      const loc = localizeDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }, lang);
       return { name: loc.name, accent: loc.card !== null ? cardAccent(loc.card) : NEUTRAL_ACCENT };
     },
     [catalog, lang],
   );
 
-  // v2 (owner 2026-06-16): each side picks its OWN deck — straight from the real
-  // 牌組推薦 meta or a saved deck. Seeded shuffle keeps every deal reproducible.
   function begin(useSeed: number) {
     const o1 = byId.get(p1Opt);
     const o2 = byId.get(p2Opt);
     if (o1 === undefined || o2 === undefined) return;
-    newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label }, first });
-    setSelected(null);
-    setEffectMsg(null);
+    store.getState().newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label }, first });
+    setSel(null);
+    setMsg(null);
   }
   const start = () => begin(seed);
-  // "重新開局": same matchup, fresh deal — advance the seed deterministically (an
-  // LCG step, no hidden randomness) so the new shuffle differs yet stays inspectable.
   function restart() {
     const ns = (Math.imul(seed, 1103515245) + 12345) >>> 0;
     setSeed(ns);
     begin(ns);
   }
 
-  // Auto-resolve a known, deterministic card effect — but only when the REAL
-  // rules allow it: a Supporter is once-per-turn and the going-first player may
-  // not play one on turn 1. Blocked attempts explain why (honest, faithful).
-  function handleEffect(player: PlayerId, card: BattleCard) {
-    const fx = AUTO_EFFECTS[card.name];
-    if (fx === undefined) return;
-    if (fx.supporter) {
-      if (player !== current) {
-        setEffectMsg(t("battle.fx.notYourTurn"));
-        return;
+  // --- Play a hand card by its real type (the core faithful rules) ---------
+  const me = current; // the player whose turn it is acts; their hand is shown.
+  function play(card: BattleCard, action: PlayAction) {
+    const s = store.getState();
+    setMsg(null);
+    switch (action.type) {
+      case "toActive":
+        if (!s.playToActive(me, card.iid)) setMsg(t("battle.field.activeFull"));
+        break;
+      case "toBench":
+        if (!s.playToBench(me, card.iid)) setMsg(t("battle.field.benchFull"));
+        break;
+      case "evolve":
+        s.evolve(me, card.iid, action.unitId);
+        break;
+      case "energy":
+        if (turnEnergyAttached) {
+          setMsg(t("battle.gate.energyUsed"));
+          return;
+        }
+        s.attachEnergy(me, card.iid, action.unitId);
+        break;
+      case "tool":
+        s.attachTool(me, card.iid, action.unitId);
+        break;
+      case "stadium":
+        if (turnStadiumPlayed) {
+          setMsg(t("battle.gate.stadiumUsed"));
+          return;
+        }
+        s.playStadium(me, card.iid);
+        break;
+      case "supporter": {
+        if (turn === 1 && me === firstPlayer) {
+          setMsg(t("battle.fx.firstTurnNoSupporter"));
+          return;
+        }
+        if (turnSupporterUsed) {
+          setMsg(t("battle.fx.supporterUsed"));
+          return;
+        }
+        if (AUTO_EFFECTS[card.name] !== undefined) {
+          applyAutoEffect(me, card.iid, card.name); // resolves + discards faithfully
+        } else {
+          s.discardFromHand(me, card.iid); // unknown supporter: you resolve it by hand
+        }
+        s.markSupporterUsed();
+        break;
       }
-      if (turn === 1 && player === firstPlayer) {
-        setEffectMsg(t("battle.fx.firstTurnNoSupporter"));
-        return;
-      }
-      if (turnSupporterUsed) {
-        setEffectMsg(t("battle.fx.supporterUsed"));
-        return;
-      }
+      case "item":
+        s.discardFromHand(me, card.iid);
+        break;
+      case "discard":
+        s.discardFromHand(me, card.iid);
+        break;
+      case "toPile":
+        s.moveToPile(me, card.iid, action.pile);
+        break;
     }
-    const ok = applyAutoEffect(player, card.iid, card.name);
-    if (!ok) return; // unrecognised card → stay manual, don't consume the Supporter
-    if (fx.supporter) markSupporterUsed();
-    setSelected(null);
-    setEffectMsg(null);
+    setSel(null);
   }
 
-  // A faithful opening needs at least 7 (hand) + 6 (prizes) = 13 cards. Real meta
-  // decks are always 60; this only guards a half-built saved deck (honesty: never
-  // deal a broken opening while the sandbox promises a faithful one).
+  function unitAction(player: PlayerId, unitId: string, kind: UnitActionKind) {
+    const s = store.getState();
+    setMsg(null);
+    switch (kind) {
+      case "retreat":
+        if (!s.retreat(player, unitId)) setMsg(t("battle.field.noActive"));
+        break;
+      case "promote":
+        s.promote(player, unitId);
+        break;
+      case "ko":
+        s.knockOut(player, unitId);
+        break;
+      case "scoop":
+        s.scoopToHand(player, unitId);
+        break;
+    }
+    setSel(null);
+  }
+
   const MIN_DEAL = 13;
   const sel1 = byId.get(p1Opt);
   const sel2 = byId.get(p2Opt);
-  const undealable =
-    (sel1 !== undefined && sel1.total < MIN_DEAL) || (sel2 !== undefined && sel2.total < MIN_DEAL);
+  const undealable = (sel1 !== undefined && sel1.total < MIN_DEAL) || (sel2 !== undefined && sel2.total < MIN_DEAL);
 
   if (!started) {
     return (
@@ -246,17 +275,13 @@ export function BattleView() {
           </p>
         ) : (
           <>
-            {decksError && (
-              <p className="mt-3 text-xs text-warn" role="alert">{t("battle.decksPartial")}</p>
-            )}
+            {decksError && <p className="mt-3 text-xs text-warn" role="alert">{t("battle.decksPartial")}</p>}
             <p className="mt-4 text-sm">{t("battle.setupHint")}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <DeckSelect label={t("battle.deckYou")} value={p1Opt} onChange={setP1Opt} options={options} t={t} />
               <DeckSelect label={t("battle.deckOpp")} value={p2Opt} onChange={setP2Opt} options={options} t={t} />
             </div>
-            {undealable && (
-              <p className="mt-2 text-xs text-warn" role="alert">{t("battle.deckTooSmall")}</p>
-            )}
+            {undealable && <p className="mt-2 text-xs text-warn" role="alert">{t("battle.deckTooSmall")}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 text-sm text-ink2">
                 <span>{t("battle.firstLabel")}</span>
@@ -310,83 +335,77 @@ export function BattleView() {
     );
   }
 
+  const meBoard: PlayerBoard = me === "p1" ? p1 : p2;
+  const oppId: PlayerId = me === "p1" ? "p2" : "p1";
+  const oppBoard: PlayerBoard = oppId === "p1" ? p1 : p2;
+  const meUnits = unitList(meBoard);
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       {/* Control bar */}
-      <div className="flex flex-wrap items-center gap-2 rounded-ctl border hairline bg-paper p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2 rounded-ctl border hairline bg-paper p-2.5 text-sm">
         <span className="font-mono">
-          {t("battle.turn", { n: turn })} · {current === "p1" ? t("battle.you") : t("battle.opp")} ·{" "}
-          {current === "p1" ? names.p1 : names.p2}
+          {t("battle.turn", { n: turn })} · <span className="font-medium">{names[me]}</span>{" "}
+          <span className="text-ink2">{t("battle.actingNow")}</span>
         </span>
         <div className="ml-auto flex flex-wrap gap-2">
-          <button type="button" onClick={() => { endTurn(); setEffectMsg(null); }} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
-            {t("battle.endTurn")}
-          </button>
-          <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
-            {t("battle.newGame")}
-          </button>
-          <button type="button" onClick={() => reset()} className="rounded-ctl border hairline px-3 py-1.5 text-ink2 hover:text-ink">
-            {t("battle.pickAgain")}
-          </button>
+          <button type="button" onClick={() => { store.getState().endTurn(); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+          <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
+          <button type="button" onClick={() => store.getState().reset()} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
-        {turn === 1 && (
+        {turn === 1 && me === firstPlayer && (
           <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
         )}
-        {effectMsg !== null && (
-          <p className="w-full text-xs text-warn" role="alert">{effectMsg}</p>
-        )}
+        {msg !== null && <p className="w-full text-xs text-warn" role="alert">{msg}</p>}
       </div>
 
-      {/* Opponent (top) — mirrored so its 戰鬥場 sits at the bottom, facing yours */}
-      <PlayerStrip
-        player="p2"
-        board={p2}
-        name={names.p2}
-        opponent
+      {/* Opponent (top, mirrored): board only, hand hidden */}
+      <PlayerHalf
+        player={oppId}
+        board={oppBoard}
+        name={names[oppId]}
+        roleLabel={t("battle.opp")}
         mirror
         resolve={resolve}
-        selected={selected}
-        onSelect={(iid) => setSelected({ player: "p2", iid })}
-        onMove={(iid, to) => { moveCard("p2", iid, to); setSelected(null); }}
+        sel={sel}
+        setSel={setSel}
+        onUnitAction={unitAction}
         onVisual={setVisual}
-        onDraw={(n) => draw("p2", n)}
-        onShuffle={() => shuffleDeck("p2")}
-        onMulligan={() => mulligan("p2")}
-        onEffect={(card) => handleEffect("p2", card)}
+        store={store}
         t={t}
       />
 
-      {/* Shared centre: the 場地牌區 (stadium), between the two facing 戰鬥場 */}
-      <StadiumBand
-        p1={p1}
-        p2={p2}
-        names={names}
+      <StadiumBand meBoard={meBoard} oppBoard={oppBoard} meName={names[me]} oppName={names[oppId]} resolve={resolve} onVisual={setVisual} t={t} />
+
+      {/* You (bottom): board + the actionable hand */}
+      <PlayerHalf
+        player={me}
+        board={meBoard}
+        name={names[me]}
+        roleLabel={t("battle.you")}
+        isMe
         resolve={resolve}
-        selected={selected}
-        onSelect={(player, iid) => setSelected({ player, iid })}
-        onMove={(player, iid, to) => { moveCard(player, iid, to); setSelected(null); }}
+        sel={sel}
+        setSel={setSel}
+        onUnitAction={unitAction}
         onVisual={setVisual}
+        store={store}
         t={t}
       />
 
-      {/* You (bottom) + the live HUD */}
-      <PlayerStrip
-        player="p1"
-        board={p1}
-        name={names.p1}
+      <HandRow
+        board={meBoard}
+        units={meUnits}
+        flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: turn === 1 && me === firstPlayer }}
         resolve={resolve}
-        selected={selected}
-        onSelect={(iid) => setSelected({ player: "p1", iid })}
-        onMove={(iid, to) => { moveCard("p1", iid, to); setSelected(null); }}
+        sel={sel}
+        setSel={setSel}
+        onPlay={play}
         onVisual={setVisual}
-        onDraw={(n) => draw("p1", n)}
-        onShuffle={() => shuffleDeck("p1")}
-        onMulligan={() => mulligan("p1")}
-        onEffect={(card) => handleEffect("p1", card)}
         t={t}
       />
 
-      <DrawHud board={p1} resolve={resolve} t={t} />
+      <DrawHud board={meBoard} resolve={resolve} t={t} />
 
       {visual !== null && catalog !== null && (
         <BattleCardVisual card={visual} catalog={catalog} onClose={() => setVisual(null)} />
@@ -396,8 +415,47 @@ export function BattleView() {
 }
 
 // ---------------------------------------------------------------------------
+// Selection + action types
 
-/** Deck picker for one side — real meta decks + the player's saved decks. */
+type Sel =
+  | { scope: "hand"; iid: string }
+  | { scope: "unit"; player: PlayerId; unitId: string }
+  | { scope: "pile"; player: PlayerId; iid: string };
+
+type PlayAction =
+  | { type: "toActive" }
+  | { type: "toBench" }
+  | { type: "evolve"; unitId: string }
+  | { type: "energy"; unitId: string }
+  | { type: "tool"; unitId: string }
+  | { type: "stadium" }
+  | { type: "supporter" }
+  | { type: "item" }
+  | { type: "discard" }
+  | { type: "toPile"; pile: Pile };
+
+type UnitActionKind = "retreat" | "promote" | "ko" | "scoop";
+
+interface HandFlags {
+  supporterUsed: boolean;
+  energyUsed: boolean;
+  stadiumUsed: boolean;
+  firstTurnNoSupporter: boolean;
+}
+
+function unitList(board: PlayerBoard): InPlay[] {
+  return board.active !== null ? [board.active, ...board.bench] : board.bench;
+}
+
+/** A short label for an in-play unit slot (戰鬥場 / 備戰 n). */
+function unitSlotLabel(board: PlayerBoard, unitId: string, t: Tr): string {
+  if (board.active?.uid === unitId) return t("battle.zone.active");
+  const i = board.bench.findIndex((u) => u.uid === unitId);
+  return i === -1 ? t("battle.zone.bench") : `${t("battle.zone.bench")}${i + 1}`;
+}
+
+// ---------------------------------------------------------------------------
+
 function DeckSelect({
   label, value, onChange, options, t,
 }: {
@@ -405,7 +463,7 @@ function DeckSelect({
   value: string;
   onChange: (id: string) => void;
   options: DeckOption[];
-  t: (k: string, p?: Record<string, string | number>) => string;
+  t: Tr;
 }) {
   const popular = options.filter((o) => o.group === "popular");
   const saved = options.filter((o) => o.group === "saved");
@@ -418,11 +476,7 @@ function DeckSelect({
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="text-ink2">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-ctl border hairline bg-surface px-2 text-sm"
-      >
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="h-10 rounded-ctl border hairline bg-surface px-2 text-sm">
         {popular.length > 0 && <optgroup label={t("battle.optPopular")}>{popular.map(opt)}</optgroup>}
         {saved.length > 0 && <optgroup label={t("battle.optSaved")}>{saved.map(opt)}</optgroup>}
       </select>
@@ -431,210 +485,454 @@ function DeckSelect({
 }
 
 // ---------------------------------------------------------------------------
+// One player's half of the board.
 
-interface StripProps {
+function PlayerHalf({
+  player, board, name, roleLabel, mirror, isMe, resolve, sel, setSel, onUnitAction, onVisual, store, t,
+}: {
   player: PlayerId;
-  board: import("../state/battleStore.ts").PlayerBoard;
+  board: PlayerBoard;
   name: string;
-  opponent?: boolean;
-  resolve: (c: BattleCard) => { name: string; accent: string };
-  selected: { player: PlayerId; iid: string } | null;
-  onSelect: (iid: string) => void;
-  onMove: (iid: string, to: Zone) => void;
-  onVisual: (c: BattleCard) => void;
-  onDraw: (n: number) => void;
-  onShuffle: () => void;
-  onMulligan: () => void;
-  /** Auto-resolve a known card effect (hand cards only). */
-  onEffect: (c: BattleCard) => void;
-  /** Opponent half: render mirrored so the 戰鬥場 sits at the BOTTOM, facing
-   *  your 戰鬥場 across the central 場地牌區. */
+  roleLabel: string;
   mirror?: boolean;
-  t: (k: string, p?: Record<string, string | number>) => string;
-}
-
-const ZONE_KEYS: Record<Zone, string> = {
-  deck: "battle.zone.deck",
-  hand: "battle.zone.hand",
-  active: "battle.zone.active",
-  bench: "battle.zone.bench",
-  stadium: "battle.zone.stadium",
-  discard: "battle.zone.discard",
-  prizes: "battle.zone.prizes",
-  lostzone: "battle.zone.lostzone",
-};
-
-function PlayerStrip({
-  player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, onEffect, mirror, t,
-}: StripProps) {
-  // Public board zones (stadium lives in the shared centre band, not here).
-  // Your half reads active-first (active sits at the TOP, by the centre); the
-  // opponent half is mirrored so its active sits at the BOTTOM, facing yours.
-  const base: Zone[] = ["active", "bench", "discard", "lostzone"];
-  const zones = mirror ? [...base].reverse() : base;
-  const handVisible = !opponent;
+  isMe?: boolean;
+  resolve: Resolve;
+  sel: Sel | null;
+  setSel: (s: Sel | null) => void;
+  onUnitAction: (player: PlayerId, unitId: string, kind: UnitActionKind) => void;
+  onVisual: (c: BattleCard) => void;
+  store: typeof useBattleStore;
+  t: Tr;
+}) {
   const header = (
     <div className="mb-2 flex flex-wrap items-center gap-2">
       <h3 className="text-sm font-medium">
-        <span className="text-ink2">{opponent ? t("battle.opp") : t("battle.you")}</span> · {name}
+        <span className="text-ink2">{roleLabel}</span> · {name}
       </h3>
       <span className="font-mono text-xs text-ink2">
         {t("battle.zone.deck")} {board.deck.length} · {t("battle.zone.prizes")} {board.prizes.length} · {t("battle.zone.hand")} {board.hand.length}
       </span>
-      <div className="ml-auto flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => onDraw(1)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
-        <button type="button" onClick={() => onShuffle()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
-        <button type="button" onClick={() => onMulligan()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
-      </div>
+      {isMe && (
+        <div className="ml-auto flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => store.getState().draw(player, 1)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
+          <button type="button" onClick={() => store.getState().shuffleDeck(player)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
+          <button type="button" onClick={() => store.getState().mulligan(player)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
+        </div>
+      )}
     </div>
   );
-  const zoneRows = zones.map((z) => (
-    <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} front={z === "active"} t={t} />
-  ));
-  const hand = handVisible ? (
-    <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} onEffect={onEffect} t={t} />
-  ) : null;
+
+  const activeRow = (
+    <FieldRow
+      label={t("battle.zone.active")}
+      front
+      units={board.active !== null ? [board.active] : []}
+      empty={t("battle.field.noActive")}
+      board={board}
+      player={player}
+      resolve={resolve}
+      sel={sel}
+      setSel={setSel}
+      onUnitAction={onUnitAction}
+      onVisual={onVisual}
+      t={t}
+    />
+  );
+  const benchRow = (
+    <FieldRow
+      label={`${t("battle.zone.bench")} ${board.bench.length}/${MAX_BENCH}`}
+      units={board.bench}
+      empty={t("battle.field.benchEmpty")}
+      board={board}
+      player={player}
+      resolve={resolve}
+      sel={sel}
+      setSel={setSel}
+      onUnitAction={onUnitAction}
+      onVisual={onVisual}
+      t={t}
+    />
+  );
+  const piles = (
+    <div className="mt-1 flex flex-wrap gap-3 text-xs text-ink2">
+      <PileChip label={t("battle.zone.discard")} cards={board.discard} player={player} resolve={resolve} sel={sel} setSel={setSel} onVisual={onVisual} />
+      <PileChip label={t("battle.zone.lostzone")} cards={board.lostzone} player={player} resolve={resolve} sel={sel} setSel={setSel} onVisual={onVisual} />
+    </div>
+  );
+
+  // Active sits nearest the centre: your half = active on TOP; opponent mirror =
+  // active at the BOTTOM (facing yours across the stadium band).
+  const body = mirror ? [piles, benchRow, activeRow] : [activeRow, benchRow, piles];
+
   return (
     <section className="rounded-card border hairline bg-surface p-3">
-      {/* Opponent: header on top, then zones (active last, by the centre). You:
-          zones first (active on top, by the centre), hand at the very bottom. */}
       {header}
-      {zoneRows}
-      {hand}
+      {body.map((node, i) => (
+        <div key={i}>{node}</div>
+      ))}
     </section>
   );
 }
 
-/** The shared 場地牌區 (stadium) — a slim centre band between the two facing
- *  戰鬥場. Only one Stadium is really in play; the sandbox is manual, so each
- *  side has a slot and either card can be selected/moved here. */
-function StadiumBand({
-  p1, p2, names, resolve, selected, onSelect, onMove, onVisual, t,
+/** A labelled row of in-play units (active or bench). */
+function FieldRow({
+  label, front, units, empty, board, player, resolve, sel, setSel, onUnitAction, onVisual, t,
 }: {
-  p1: import("../state/battleStore.ts").PlayerBoard;
-  p2: import("../state/battleStore.ts").PlayerBoard;
-  names: { p1: string; p2: string };
-  resolve: (c: BattleCard) => { name: string; accent: string };
-  selected: { player: PlayerId; iid: string } | null;
-  onSelect: (player: PlayerId, iid: string) => void;
-  onMove: (player: PlayerId, iid: string, to: Zone) => void;
+  label: string;
+  front?: boolean;
+  units: InPlay[];
+  empty: string;
+  board: PlayerBoard;
+  player: PlayerId;
+  resolve: Resolve;
+  sel: Sel | null;
+  setSel: (s: Sel | null) => void;
+  onUnitAction: (player: PlayerId, unitId: string, kind: UnitActionKind) => void;
   onVisual: (c: BattleCard) => void;
-  t: (k: string, p?: Record<string, string | number>) => string;
+  t: Tr;
 }) {
-  const sides: Array<{ player: PlayerId; who: string; cards: BattleCard[] }> = [
-    { player: "p2", who: `${t("battle.opp")} · ${names.p2}`, cards: p2.stadium },
-    { player: "p1", who: `${t("battle.you")} · ${names.p1}`, cards: p1.stadium },
+  return (
+    <div className={"mb-1.5 rounded-ctl " + (front ? "border border-blue/30 bg-blue/5 p-1.5" : "")}>
+      <p className={"text-xs " + (front ? "font-medium text-blue" : "text-ink2")}>{label}</p>
+      {units.length === 0 ? (
+        <p className="mt-0.5 text-[11px] text-ink2">{empty}</p>
+      ) : (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {units.map((u) => {
+            const selected = sel?.scope === "unit" && sel.player === player && sel.unitId === u.uid;
+            return (
+              <UnitTile
+                key={u.uid}
+                unit={u}
+                slot={unitSlotLabel(board, u.uid, t)}
+                selected={selected}
+                hasActive={board.active !== null}
+                resolve={resolve}
+                onSelect={() => setSel(selected ? null : { scope: "unit", player, unitId: u.uid })}
+                onAction={(kind) => onUnitAction(player, u.uid, kind)}
+                onSetDamage={(d) => useBattleStore.getState().setDamage(player, u.uid, d)}
+                onVisual={onVisual}
+                t={t}
+              />
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One in-play Pokémon unit: name + HP/damage + attached energy/tools + stage. */
+function UnitTile({
+  unit, slot, selected, hasActive, resolve, onSelect, onAction, onSetDamage, onVisual, t,
+}: {
+  unit: InPlay;
+  slot: string;
+  selected: boolean;
+  hasActive: boolean;
+  resolve: Resolve;
+  onSelect: () => void;
+  onAction: (kind: UnitActionKind) => void;
+  onSetDamage: (damage: number) => void;
+  onVisual: (c: BattleCard) => void;
+  t: Tr;
+}) {
+  const { name, accent } = resolve(unit.card);
+  const hp = unit.card.hp;
+  const remaining = hp !== undefined ? hp - unit.damage : undefined;
+  const ko = remaining !== undefined && remaining <= 0;
+  const isActiveSlot = slot === t("battle.zone.active");
+  return (
+    <span className="inline-flex flex-col">
+      <button
+        type="button"
+        onClick={onSelect}
+        style={{ borderLeftColor: accent, borderLeftWidth: "3px" }}
+        className={
+          "min-w-[7.5rem] max-w-48 rounded-ctl border hairline px-2 py-1 text-left hover:bg-paper " +
+          (selected ? "ring-2 ring-blue " : "") +
+          (ko ? "border-bad/60 " : "")
+        }
+        title={name}
+      >
+        <span className="block truncate text-xs font-medium">{name}</span>
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-ink2">
+          {hp !== undefined && (
+            <span className={ko || unit.damage > 0 ? "font-mono text-bad" : "font-mono"}>
+              {t("battle.unit.hp")} {Math.max(0, remaining ?? 0)}/{hp}
+            </span>
+          )}
+          {unit.energy.length > 0 && <span className="font-mono">{t("battle.unit.energy")}{unit.energy.length}</span>}
+          {unit.tools.length > 0 && <span className="font-mono">{t("battle.unit.tools")}{unit.tools.length}</span>}
+          {unit.under.length > 0 && <span className="font-mono">{t("battle.unit.stage", { n: unit.under.length + 1 })}</span>}
+        </span>
+      </button>
+      {selected && (
+        <span className="mt-1 flex flex-wrap gap-0.5">
+          <UnitBtn onClick={() => onVisual(unit.card)}>{t("battle.act.detail")}</UnitBtn>
+          <UnitBtn onClick={() => onSetDamage(unit.damage + 10)}>{t("battle.unit.dmgPlus")}</UnitBtn>
+          <UnitBtn onClick={() => onSetDamage(Math.max(0, unit.damage - 10))}>{t("battle.unit.dmgMinus")}</UnitBtn>
+          {isActiveSlot ? null : !hasActive ? (
+            <UnitBtn onClick={() => onAction("promote")}>{t("battle.unit.promote")}</UnitBtn>
+          ) : (
+            <UnitBtn onClick={() => onAction("retreat")}>{t("battle.unit.retreat")}</UnitBtn>
+          )}
+          <UnitBtn onClick={() => onAction("ko")} danger>{t("battle.unit.ko")}</UnitBtn>
+          <UnitBtn onClick={() => onAction("scoop")}>{t("battle.unit.scoop")}</UnitBtn>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function UnitBtn({ children, onClick, danger }: { children: ReactNode; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "rounded-ctl border px-1 text-[11px] " +
+        (danger ? "border-bad/50 text-bad hover:bg-bad/5" : "hairline text-ink2 hover:text-ink")
+      }
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Shared stadium band (場地牌區).
+
+function StadiumBand({
+  meBoard, oppBoard, meName, oppName, resolve, onVisual, t,
+}: {
+  meBoard: PlayerBoard;
+  oppBoard: PlayerBoard;
+  meName: string;
+  oppName: string;
+  resolve: Resolve;
+  onVisual: (c: BattleCard) => void;
+  t: Tr;
+}) {
+  const sides: Array<{ who: string; card: BattleCard | null }> = [
+    { who: oppName, card: oppBoard.stadium },
+    { who: meName, card: meBoard.stadium },
   ];
-  const any = p1.stadium.length + p2.stadium.length > 0;
+  const any = meBoard.stadium !== null || oppBoard.stadium !== null;
   return (
     <section className="rounded-card border border-dashed hairline bg-paper px-3 py-2">
       <p className="text-center text-xs font-medium text-ink2">— {t("battle.zone.stadium")} —</p>
       {!any ? (
         <p className="mt-1 text-center text-[11px] text-ink2">{t("battle.stadiumEmpty")}</p>
       ) : (
-        <div className="mt-1 flex flex-col gap-1">
-          {sides.filter((s) => s.cards.length > 0).map((s) => (
-            <ZoneRow
-              key={s.player}
-              label={s.who}
-              cards={s.cards}
-              player={s.player}
-              resolve={resolve}
-              selected={selected}
-              onSelect={(iid) => onSelect(s.player, iid)}
-              onMove={(iid, to) => onMove(s.player, iid, to)}
-              onVisual={onVisual}
-              t={t}
-            />
-          ))}
+        <div className="mt-1 flex flex-col items-center gap-1">
+          {sides
+            .filter((s) => s.card !== null)
+            .map((s) => (
+              <button
+                key={s.who}
+                type="button"
+                onClick={() => s.card !== null && onVisual(s.card)}
+                className="rounded-ctl border hairline bg-surface px-2 py-1 text-xs hover:bg-paper"
+              >
+                <span className="text-ink2">{s.who}:</span> {resolve(s.card as BattleCard).name}
+              </button>
+            ))}
         </div>
       )}
     </section>
   );
 }
 
-function ZoneRow({
-  label, cards, player, resolve, selected, onSelect, onMove, onVisual, onEffect, front, t,
+// ---------------------------------------------------------------------------
+// The current player's hand — type-correct play actions.
+
+function HandRow({
+  board, units, flags, resolve, sel, setSel, onPlay, onVisual, t,
 }: {
-  label: string;
-  cards: BattleCard[];
-  player: PlayerId;
-  resolve: (c: BattleCard) => { name: string; accent: string };
-  selected: { player: PlayerId; iid: string } | null;
-  onSelect: (iid: string) => void;
-  onMove: (iid: string, to: Zone) => void;
+  board: PlayerBoard;
+  units: InPlay[];
+  flags: HandFlags;
+  resolve: Resolve;
+  sel: Sel | null;
+  setSel: (s: Sel | null) => void;
+  onPlay: (card: BattleCard, action: PlayAction) => void;
   onVisual: (c: BattleCard) => void;
-  /** Present only on the hand row — auto-resolve a known card effect. */
-  onEffect?: (c: BattleCard) => void;
-  /** The 戰鬥場 front line — highlighted as the board's centre. */
-  front?: boolean;
-  t: (k: string, p?: Record<string, string | number>) => string;
+  t: Tr;
 }) {
   return (
-    <div className={"mb-1.5 rounded-ctl " + (front ? "border border-blue/30 bg-blue/5 p-1.5" : "")}>
-      <p className={"text-xs " + (front ? "font-medium text-blue" : "text-ink2")}>
-        {label} <span className="font-mono">{cards.length}</span>
+    <section className="rounded-card border hairline bg-surface p-3">
+      <p className="mb-1.5 text-xs text-ink2">
+        {t("battle.zone.hand")} <span className="font-mono">{board.hand.length}</span> · {t("battle.handHint")}
       </p>
-      <div className="mt-0.5 flex flex-wrap gap-1">
-        {cards.map((c) => {
-          const { name, accent } = resolve(c);
-          const isSel = selected?.player === player && selected.iid === c.iid;
-          return (
-            <span key={c.iid} className="inline-flex flex-col">
-              <button
-                type="button"
-                onClick={() => onSelect(c.iid)}
-                style={{ borderLeftColor: accent, borderLeftWidth: "3px" }}
-                className={
-                  "max-w-44 truncate rounded-ctl border hairline px-2 py-1 text-left text-xs hover:bg-paper " +
-                  (isSel ? "ring-2 ring-blue" : "")
-                }
-                title={name}
-              >
-                {name}
-              </button>
-              {isSel && (
-                <span className="mt-1 flex flex-wrap gap-0.5">
-                  <button type="button" onClick={() => onVisual(c)} className="rounded-ctl border hairline px-1 text-[11px] text-ink2 hover:text-ink">ⓘ</button>
-                  {onEffect !== undefined && AUTO_EFFECTS[c.name] !== undefined && (
-                    <button
-                      type="button"
-                      onClick={() => onEffect(c)}
-                      title={t(AUTO_EFFECTS[c.name]!.summaryKey)}
-                      className="rounded-ctl border border-blue px-1 text-[11px] font-medium text-blue hover:bg-blue/10"
-                    >
-                      {t("battle.fx.resolve")}
-                    </button>
-                  )}
-                  {MOVE_ZONES.map((z) => (
-                    <button key={z} type="button" onClick={() => onMove(c.iid, z)} className="rounded-ctl border hairline px-1 text-[11px] text-ink2 hover:text-ink">
-                      {t(ZONE_KEYS[z])}
-                    </button>
-                  ))}
-                </span>
-              )}
-            </span>
-          );
-        })}
-      </div>
-    </div>
+      {board.hand.length === 0 ? (
+        <p className="text-[11px] text-ink2">{t("battle.handEmpty")}</p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {board.hand.map((c) => {
+            const selected = sel?.scope === "hand" && sel.iid === c.iid;
+            const { name, accent } = resolve(c);
+            return (
+              <span key={c.iid} className="inline-flex flex-col">
+                <button
+                  type="button"
+                  onClick={() => setSel(selected ? null : { scope: "hand", iid: c.iid })}
+                  style={{ borderLeftColor: accent, borderLeftWidth: "3px" }}
+                  className={"max-w-48 truncate rounded-ctl border hairline px-2 py-1 text-left text-xs hover:bg-paper " + (selected ? "ring-2 ring-blue" : "")}
+                  title={name}
+                >
+                  {name}
+                </button>
+                {selected && (
+                  <HandActions card={c} board={board} units={units} flags={flags} resolve={resolve} onPlay={onPlay} onVisual={onVisual} t={t} />
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** The type-correct action toolbar for a selected hand card. */
+function HandActions({
+  card, board, units, flags, resolve, onPlay, onVisual, t,
+}: {
+  card: BattleCard;
+  board: PlayerBoard;
+  units: InPlay[];
+  flags: HandFlags;
+  resolve: Resolve;
+  onPlay: (card: BattleCard, action: PlayAction) => void;
+  onVisual: (c: BattleCard) => void;
+  t: Tr;
+}) {
+  const btn = "rounded-ctl border border-blue px-1.5 text-[11px] font-medium text-blue hover:bg-blue/10";
+  const sub = "rounded-ctl border hairline px-1.5 text-[11px] text-ink2 hover:text-ink";
+  const targets = units; // in-play units to attach/evolve onto
+  const targetBtns = (type: "evolve" | "energy" | "tool", disabled?: boolean) =>
+    targets.length === 0 ? (
+      <span className="text-[11px] text-ink2">{t("battle.act.needTarget")}</span>
+    ) : (
+      targets.map((u) => (
+        <button
+          key={u.uid}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPlay(card, { type, unitId: u.uid })}
+          className={btn + (disabled ? " opacity-40" : "")}
+          title={resolve(u.card).name}
+        >
+          {unitSlotLabel(board, u.uid, t)}
+        </button>
+      ))
+    );
+
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-0.5">
+      <button type="button" onClick={() => onVisual(card)} className={sub}>{t("battle.act.detail")}</button>
+      {card.kind === "basic" && (
+        <>
+          <button type="button" onClick={() => onPlay(card, { type: "toActive" })} className={btn}>{t("battle.act.toActive")}</button>
+          <button type="button" onClick={() => onPlay(card, { type: "toBench" })} className={btn}>{t("battle.act.toBench")}</button>
+        </>
+      )}
+      {card.kind === "evolution" && (
+        <>
+          <span className="text-[11px] text-ink2">{t("battle.act.evolve")}→</span>
+          {targetBtns("evolve")}
+        </>
+      )}
+      {(card.kind === "energy-basic" || card.kind === "energy-special") && (
+        <>
+          <span className="text-[11px] text-ink2">{t("battle.act.attachEnergy")}→</span>
+          {targetBtns("energy", flags.energyUsed)}
+          {flags.energyUsed && <span className="text-[11px] text-warn">{t("battle.gate.energyUsed")}</span>}
+        </>
+      )}
+      {card.kind === "tool" && (
+        <>
+          <span className="text-[11px] text-ink2">{t("battle.act.attachTool")}→</span>
+          {targetBtns("tool")}
+        </>
+      )}
+      {card.kind === "stadium" && (
+        <button type="button" onClick={() => onPlay(card, { type: "stadium" })} className={btn}>{t("battle.act.playStadium")}</button>
+      )}
+      {card.kind === "supporter" && (
+        <button
+          type="button"
+          onClick={() => onPlay(card, { type: "supporter" })}
+          className={btn}
+          title={AUTO_EFFECTS[card.name] !== undefined ? t(AUTO_EFFECTS[card.name]!.summaryKey) : t("battle.act.supporterManual")}
+        >
+          {t("battle.act.useSupporter")}
+        </button>
+      )}
+      {card.kind === "item" && (
+        <button type="button" onClick={() => onPlay(card, { type: "item" })} className={btn}>{t("battle.act.useItem")}</button>
+      )}
+      {/* Always-available manual escape hatch (honest sandbox). */}
+      <button type="button" onClick={() => onPlay(card, { type: "discard" })} className={sub}>{t("battle.act.discard")}</button>
+      <button type="button" onClick={() => onPlay(card, { type: "toPile", pile: "deck" })} className={sub}>{t("battle.act.toDeck")}</button>
+    </span>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Live exact draw-odds HUD.
 
-function DrawHud({
-  board, resolve, t,
+function PileChip({
+  label, cards, player, resolve, sel, setSel, onVisual,
 }: {
-  board: import("../state/battleStore.ts").PlayerBoard;
-  resolve: (c: BattleCard) => { name: string; accent: string };
-  t: (k: string, p?: Record<string, string | number>) => string;
+  label: string;
+  cards: BattleCard[];
+  player: PlayerId;
+  resolve: Resolve;
+  sel: Sel | null;
+  setSel: (s: Sel | null) => void;
+  onVisual: (c: BattleCard) => void;
 }) {
+  const open = sel?.scope === "pile" && sel.player === player && cards.some((c) => c.iid === sel.iid);
+  return (
+    <span className="inline-flex flex-col">
+      <button
+        type="button"
+        onClick={() => {
+          const first = cards[0];
+          if (first === undefined) return;
+          setSel(open ? null : { scope: "pile", player, iid: first.iid });
+        }}
+        className="rounded-ctl border hairline px-1.5 py-0.5 hover:text-ink"
+      >
+        {label} <span className="font-mono">{cards.length}</span>
+      </button>
+      {open && cards.length > 0 && (
+        <span className="mt-1 flex max-w-[16rem] flex-wrap gap-0.5">
+          {cards.map((c) => (
+            <button
+              key={c.iid}
+              type="button"
+              onClick={() => onVisual(c)}
+              className="max-w-32 truncate rounded-ctl border hairline px-1 text-[11px] text-ink2 hover:text-ink"
+              title={resolve(c).name}
+            >
+              {resolve(c).name}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live exact draw-odds HUD (reads board.deck — uniformly shuffled, top draws).
+
+function DrawHud({ board, resolve, t }: { board: PlayerBoard; resolve: Resolve; t: Tr }) {
   const [draws, setDraws] = useState(1);
   const [target, setTarget] = useState<string>("__basic__");
 
-  // Unique remaining card names in the deck (+ a "any Basic" pseudo-target).
   const groups = useMemo(() => {
     const m = new Map<string, { count: number; label: string }>();
     for (const c of board.deck) {
@@ -645,8 +943,6 @@ function DrawHud({
     return [...m.entries()].sort((a, b) => b[1].count - a[1].count);
   }, [board.deck, resolve]);
 
-  // If the chosen target card is fully drawn/moved out of the deck, fall back to
-  // "any Basic" so the select and the headline number never disagree (honesty).
   useEffect(() => {
     if (target !== "__basic__" && !groups.some((g) => g[0] === target)) setTarget("__basic__");
   }, [groups, target]);
@@ -665,13 +961,7 @@ function DrawHud({
       { label: t("proof.pct"), text: odds.percent },
       { label: t("proof.oneIn"), text: odds.oneIn },
     ],
-    interpret: t("battle.hud.interp", {
-      target: targetLabel,
-      k: odds.targetCount,
-      n: odds.draws,
-      pct: odds.percent,
-      oneIn: odds.oneIn,
-    }),
+    interpret: t("battle.hud.interp", { target: targetLabel, k: odds.targetCount, n: odds.draws, pct: odds.percent, oneIn: odds.oneIn }),
   };
 
   return (
@@ -680,16 +970,10 @@ function DrawHud({
       <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
         <label className="flex items-center gap-1">
           <span className="text-ink2">{t("battle.hud.target")}</span>
-          <select
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="h-9 max-w-52 rounded-ctl border hairline bg-surface px-2 text-sm"
-          >
+          <select value={target} onChange={(e) => setTarget(e.target.value)} className="h-9 max-w-52 rounded-ctl border hairline bg-surface px-2 text-sm">
             <option value="__basic__">{t("battle.anyBasic")}({basics})</option>
             {groups.map(([nm, g]) => (
-              <option key={nm} value={nm}>
-                {g.label} ×{g.count}
-              </option>
+              <option key={nm} value={nm}>{g.label} ×{g.count}</option>
             ))}
           </select>
         </label>
@@ -714,16 +998,13 @@ function DrawHud({
           proof={proof}
         />
       </p>
-      <p className="mt-1 font-mono text-xs text-ink2">
-        {odds.fraction} · {odds.oneIn} · {t("battle.hud.deckLeft", { n: deckSize })}
-      </p>
+      <p className="mt-1 font-mono text-xs text-ink2">{odds.fraction} · {odds.oneIn} · {t("battle.hud.deckLeft", { n: deckSize })}</p>
       <p className="mt-1 text-[11px] text-ink2">{t("battle.hud.shuffleNote")}</p>
     </section>
   );
 }
 
 function BattleCardVisual({ card, catalog, onClose }: { card: BattleCard; catalog: Catalog; onClose: () => void }) {
-  // Resolve the instance to its catalog print for the full visual.
   const cc =
     (card.catalogId !== undefined ? catalog.cards.find((c) => c.id === card.catalogId) : undefined) ??
     catalog.cards.find((c) => c.name === card.name || c.nameZh === card.name) ??

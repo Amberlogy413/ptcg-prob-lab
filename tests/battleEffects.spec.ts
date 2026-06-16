@@ -17,10 +17,22 @@ const SPEC: CardSpec[] = [
 ];
 const TOTAL = SPEC.reduce((s, c) => s + c.count, 0); // 60
 
+const unitCount = (u: { under: unknown[]; energy: unknown[]; tools: unknown[] }) =>
+  1 + u.under.length + u.energy.length + u.tools.length;
 const sum = (b: PlayerBoard) =>
-  b.deck.length + b.hand.length + b.active.length + b.bench.length + b.stadium.length + b.discard.length + b.prizes.length + b.lostzone.length;
+  b.deck.length + b.hand.length + b.discard.length + b.prizes.length + b.lostzone.length +
+  (b.active !== null ? unitCount(b.active) : 0) +
+  b.bench.reduce((s, u) => s + unitCount(u), 0) +
+  (b.stadium !== null ? 1 : 0);
+const unitCards = (u: { card: { iid: string }; under: { iid: string }[]; energy: { iid: string }[]; tools: { iid: string }[] }) =>
+  [u.card, ...u.under, ...u.energy, ...u.tools];
 const ids = (b: PlayerBoard) =>
-  [...b.deck, ...b.hand, ...b.active, ...b.bench, ...b.stadium, ...b.discard, ...b.prizes, ...b.lostzone].map((c) => c.iid);
+  [
+    ...b.deck, ...b.hand, ...b.discard, ...b.prizes, ...b.lostzone,
+    ...(b.active !== null ? unitCards(b.active) : []),
+    ...b.bench.flatMap(unitCards),
+    ...(b.stadium !== null ? [b.stadium] : []),
+  ].map((c) => c.iid);
 
 beforeEach(() => useBattleStore.getState().reset());
 
@@ -87,7 +99,7 @@ describe("applyAutoEffect — exact, verified mechanics", () => {
     expect(sum(p1)).toBe(TOTAL);
     // Take a prize (now 5) → next time draws 6.
     const prize = useBattleStore.getState().p1.prizes[0]!;
-    useBattleStore.getState().moveCard("p1", prize.iid, "hand");
+    useBattleStore.getState().moveToPile("p1", prize.iid, "hand");
     const played2 = useBattleStore.getState().p1.hand[0]!;
     applyAutoEffect("p1", played2.iid, "莉莉艾的決心");
     p1 = useBattleStore.getState().p1;

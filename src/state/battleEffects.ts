@@ -49,19 +49,19 @@ export function applyAutoEffect(player: PlayerId, iid: string, name: string): bo
   const store = useBattleStore.getState();
   switch (name) {
     case "莉莉艾的決心": { // shuffle hand into deck, draw 6 (or 8 if own prizes === 6)
-      store.moveCard(player, iid, "discard");
+      store.discardFromHand(player, iid);
       store.shuffleHandIntoDeck(player);
       const prizes = useBattleStore.getState()[player].prizes.length;
       store.draw(player, prizes === 6 ? 8 : 6);
       return true;
     }
     case "博士的研究": // discard your hand, draw 7
-      store.moveCard(player, iid, "discard");
+      store.discardFromHand(player, iid);
       store.discardHand(player);
       store.draw(player, 7);
       return true;
     case "裁判": // Judge: both shuffle hand into deck, each draws 4
-      store.moveCard(player, iid, "discard");
+      store.discardFromHand(player, iid);
       for (const pl of PLAYERS) {
         useBattleStore.getState().shuffleHandIntoDeck(pl);
         useBattleStore.getState().draw(pl, 4);
