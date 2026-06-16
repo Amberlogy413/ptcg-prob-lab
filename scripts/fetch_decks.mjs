@@ -133,8 +133,17 @@ function reconstructZh(enName, dexEnZh) {
       break;
     }
   }
+  // Ogerpon mask. Limitless writes it as a PREFIX ("Teal Mask Ogerpon ex"); some
+  // sources put it as a suffix ("Ogerpon Teal Mask"). Handle both — missing this
+  // made every masked Ogerpon fall back to ONE default print, so two distinct
+  // cards (碧草面具ex + 水井面具ex) collapsed into a fake 5-of (owner caught 2026-06-16).
   let mask = "";
   for (const k of Object.keys(MASK_EN)) {
+    if (s.toLowerCase().startsWith(k + " ")) {
+      mask = " " + MASK_EN[k];
+      s = s.slice(k.length).trim();
+      break;
+    }
     if (s.toLowerCase().endsWith(" " + k)) {
       mask = " " + MASK_EN[k];
       s = s.slice(0, s.length - (k.length + 1)).trim();
@@ -287,14 +296,26 @@ async function main() {
     tierWeight(d.players) * 1e8 + new Date(d.date + "T00:00:00Z").getTime() / 1e5 + (d.placing != null ? 1000 - d.placing : 0);
 
   const buildCards = (decklist) => {
-    const out = [];
+    // Merge lines that resolve to the SAME zh name (a real decklist legitimately
+    // splits one card across set prints — "Teal Mask Ogerpon ex" from two sets —
+    // which must read as ONE counted line, never two; otherwise a 2+2 split looks
+    // like an illegal 5-of after dedup). Keyed by name+section, first-seen order.
+    const byKey = new Map();
+    const order = [];
     for (const sec of ["pokemon", "trainer", "energy"]) {
       for (const c of decklist[sec] ?? []) {
         const r = resolved.get(c.name) ?? { name: c.name, isBasic: false, section: sec };
-        out.push({ count: c.count, name: r.name, isBasic: r.isBasic, section: r.section });
+        const key = `${r.section}|${r.name}`;
+        const ex = byKey.get(key);
+        if (ex === undefined) {
+          byKey.set(key, { count: c.count, name: r.name, isBasic: r.isBasic, section: r.section });
+          order.push(key);
+        } else {
+          ex.count += c.count;
+        }
       }
     }
-    return out;
+    return order.map((k) => byKey.get(k));
   };
   const hashOf = (cards) =>
     cards
