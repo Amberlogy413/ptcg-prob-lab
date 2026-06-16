@@ -18,9 +18,9 @@ const SPEC: CardSpec[] = [
 const TOTAL = SPEC.reduce((s, c) => s + c.count, 0); // 60
 
 const sum = (b: PlayerBoard) =>
-  b.deck.length + b.hand.length + b.active.length + b.bench.length + b.discard.length + b.prizes.length + b.lostzone.length;
+  b.deck.length + b.hand.length + b.active.length + b.bench.length + b.stadium.length + b.discard.length + b.prizes.length + b.lostzone.length;
 const ids = (b: PlayerBoard) =>
-  [...b.deck, ...b.hand, ...b.active, ...b.bench, ...b.discard, ...b.prizes, ...b.lostzone].map((c) => c.iid);
+  [...b.deck, ...b.hand, ...b.active, ...b.bench, ...b.stadium, ...b.discard, ...b.prizes, ...b.lostzone].map((c) => c.iid);
 
 beforeEach(() => useBattleStore.getState().reset());
 

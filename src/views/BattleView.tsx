@@ -29,8 +29,8 @@ import { ProofNumber, type Proof } from "../components/ProofNumber.tsx";
 import { buildExplain } from "../data/explain.ts";
 import { Modal } from "../components/Modal.tsx";
 
-// Zones offered as move targets (stadium/lost-zone kept simple for v1).
-const MOVE_ZONES: Zone[] = ["hand", "active", "bench", "discard", "deck", "prizes", "lostzone"];
+// Zones a selected card can be played/moved to — board order (front line first).
+const MOVE_ZONES: Zone[] = ["active", "bench", "stadium", "hand", "discard", "deck", "prizes", "lostzone"];
 
 /** A pickable deck for the sandbox: a real meta archetype or a saved deck. */
 interface DeckOption {
@@ -441,6 +441,7 @@ const ZONE_KEYS: Record<Zone, string> = {
   hand: "battle.zone.hand",
   active: "battle.zone.active",
   bench: "battle.zone.bench",
+  stadium: "battle.zone.stadium",
   discard: "battle.zone.discard",
   prizes: "battle.zone.prizes",
   lostzone: "battle.zone.lostzone",
@@ -449,8 +450,10 @@ const ZONE_KEYS: Record<Zone, string> = {
 function PlayerStrip({
   player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, onEffect, t,
 }: StripProps) {
-  // Open zones (cards visible). Opponent's hand + both prizes + deck stay hidden (counts only).
-  const visibleZones: Zone[] = ["active", "bench", "discard", "lostzone"];
+  // Public board zones, in real-board reading order: the front-line 戰鬥場 first,
+  // then 備戰區, the shared 場地牌區, then the discard/lost piles. Opponent's hand +
+  // both prizes + deck stay hidden (counts only).
+  const visibleZones: Zone[] = ["active", "bench", "stadium", "discard", "lostzone"];
   const handVisible = !opponent;
   return (
     <section className="rounded-card border hairline bg-surface p-3">
@@ -478,14 +481,14 @@ function PlayerStrip({
         <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} onEffect={onEffect} t={t} />
       )}
       {visibleZones.map((z) => (
-        <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} t={t} />
+        <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} front={z === "active"} t={t} />
       ))}
     </section>
   );
 }
 
 function ZoneRow({
-  label, cards, player, resolve, selected, onSelect, onMove, onVisual, onEffect, t,
+  label, cards, player, resolve, selected, onSelect, onMove, onVisual, onEffect, front, t,
 }: {
   label: string;
   cards: BattleCard[];
@@ -497,11 +500,13 @@ function ZoneRow({
   onVisual: (c: BattleCard) => void;
   /** Present only on the hand row — auto-resolve a known card effect. */
   onEffect?: (c: BattleCard) => void;
+  /** The 戰鬥場 front line — highlighted as the board's centre. */
+  front?: boolean;
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   return (
-    <div className="mb-1.5">
-      <p className="text-xs text-ink2">
+    <div className={"mb-1.5 rounded-ctl " + (front ? "border border-blue/30 bg-blue/5 p-1.5" : "")}>
+      <p className={"text-xs " + (front ? "font-medium text-blue" : "text-ink2")}>
         {label} <span className="font-mono">{cards.length}</span>
       </p>
       <div className="mt-0.5 flex flex-wrap gap-1">

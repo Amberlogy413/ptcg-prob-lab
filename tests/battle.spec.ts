@@ -60,6 +60,16 @@ describe("battle store", () => {
     expect(p1.hand.some((c) => c.iid === card.iid)).toBe(false);
     expect(p1.active.some((c) => c.iid === card.iid)).toBe(true);
   });
+
+  it("plays a card to the new 場地牌區 (stadium) zone, conserving the card", () => {
+    useBattleStore.getState().newGame({ p1: SPEC, p2: SPEC, seed: 7 });
+    const card = useBattleStore.getState().p1.hand[0]!;
+    useBattleStore.getState().moveCard("p1", card.iid, "stadium");
+    const { p1 } = useBattleStore.getState();
+    expect(p1.stadium.some((c) => c.iid === card.iid)).toBe(true);
+    const all = [...p1.deck, ...p1.hand, ...p1.active, ...p1.bench, ...p1.stadium, ...p1.discard, ...p1.prizes, ...p1.lostzone];
+    expect(all.length).toBe(TOTAL); // nothing lost adding the new zone
+  });
 });
 
 describe("computeDrawOdds", () => {

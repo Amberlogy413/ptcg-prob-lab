@@ -12,8 +12,8 @@ import { create } from "zustand";
 import { uid } from "../utils/uid.ts";
 import { mulberry32, shuffle, type Rng } from "../utils/rng.ts";
 
-export type Zone = "deck" | "hand" | "active" | "bench" | "discard" | "prizes" | "lostzone";
-export const ZONES: Zone[] = ["deck", "hand", "active", "bench", "discard", "prizes", "lostzone"];
+export type Zone = "deck" | "hand" | "active" | "bench" | "stadium" | "discard" | "prizes" | "lostzone";
+export const ZONES: Zone[] = ["deck", "hand", "active", "bench", "stadium", "discard", "prizes", "lostzone"];
 
 export type PlayerId = "p1" | "p2";
 
@@ -31,6 +31,9 @@ export interface PlayerBoard {
   hand: BattleCard[];
   active: BattleCard[];
   bench: BattleCard[];
+  /** Stadium in play (場地牌區). Real TCG keeps one shared Stadium; the sandbox
+   *  is manual, so each side has a slot and you discard the old one yourself. */
+  stadium: BattleCard[];
   discard: BattleCard[];
   prizes: BattleCard[];
   lostzone: BattleCard[];
@@ -82,7 +85,7 @@ interface BattleState {
 }
 
 function emptyBoard(): PlayerBoard {
-  return { deck: [], hand: [], active: [], bench: [], discard: [], prizes: [], lostzone: [] };
+  return { deck: [], hand: [], active: [], bench: [], stadium: [], discard: [], prizes: [], lostzone: [] };
 }
 
 /** Flatten a deck spec into per-instance cards. */
@@ -148,7 +151,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   setup: (player) => {
     set((s) => {
       const board = s[player];
-      const all = [...board.deck, ...board.hand, ...board.active, ...board.bench, ...board.discard, ...board.prizes, ...board.lostzone];
+      const all = ZONES.flatMap((z) => board[z]); // every card, all zones (incl. stadium)
       const shuffled = shuffle(all, rngFor(s.seed, player, s.shuffleNonce + 1));
       const hand = shuffled.slice(0, 7);
       const prizes = shuffled.slice(7, 13);
