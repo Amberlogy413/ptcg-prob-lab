@@ -31,7 +31,7 @@ export function Q1Section() {
           ? "summary.needCards"
           : "summary.noBasics";
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("view.ask.q1.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t(msgKey)}</p>
       </section>
@@ -69,7 +69,7 @@ export function Q1Section() {
   return (
     <div className="space-y-4">
       {/* Headline layer (docs/04 §5) */}
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("view.ask.q1.title")}</h2>
         <p className="mt-1 text-sm text-ink2">
           {t("q1.context", { b: data.basics, n: data.total })}
@@ -118,7 +118,7 @@ export function Q1Section() {
       <MulliganDashboard data={data} />
 
       {/* Distribution layer */}
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-medium">{t("q1.dist.title")}</h3>
           <div role="group" aria-label={t("q1.dist.toggleAria")} className="flex gap-1">

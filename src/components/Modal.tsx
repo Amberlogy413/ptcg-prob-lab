@@ -80,7 +80,7 @@ export function Modal({ title, onClose, children, wide }: ModalProps) {
         aria-label={title}
         tabIndex={-1}
         className={
-          "w-full rounded-card border hairline bg-surface p-6 " +
+          "w-full rounded-card border hairline bg-surface p-5 " +
           (wide ? "max-w-5xl" : "max-w-2xl")
         }
       >

@@ -36,7 +36,7 @@ export function TrackerView() {
 
   if (!deck) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("tracker.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("summary.noDeck")}</p>
       </section>
@@ -44,7 +44,7 @@ export function TrackerView() {
   }
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("tracker.title")}</h2>
       {/* Permanent compliance reminder (PRD §4-16) */}
       <p className="mt-2 rounded-ctl border border-warn px-3 py-2 text-xs text-warn" role="note">

@@ -133,7 +133,7 @@ function Q3SingleSection() {
   }, [mode, eff, h, preGameImpossible]);
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("q3.title")}</h2>
 
       {/* Mode chooser — numbered OptionCards (docs/07 §2.1) + a contextual HintBar
@@ -348,7 +348,7 @@ function Q3JointSection() {
   }, [joint]);
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <h3 className="text-lg font-medium">{t("q3.joint.title")}</h3>
       <p className="mt-1 text-xs text-ink2">{t("q3.joint.desc")}</p>
 

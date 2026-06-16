@@ -72,7 +72,7 @@ export function DecksView() {
 
   if (status === "loading") {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("decks.title")}</h2>
         <p className="mt-2 text-sm text-ink2" role="status">
           {t("decks.loading")}
@@ -82,7 +82,7 @@ export function DecksView() {
   }
   if (status === "error" || data === null) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("decks.title")}</h2>
         <p className="mt-2 text-sm text-warn" role="alert">
           {t("decks.error")}
@@ -92,7 +92,7 @@ export function DecksView() {
   }
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("decks.title")}</h2>
       <p className="mt-1 text-sm text-ink2">{t("decks.subtitle")}</p>
       <p className="mt-1 text-xs text-ink2">

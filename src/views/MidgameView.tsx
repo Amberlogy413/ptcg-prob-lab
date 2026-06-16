@@ -66,7 +66,7 @@ export function MidgameView() {
   return (
     <div className="flex flex-col gap-6">
       <ScenarioBuilder />
-      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("midgame.title")}</h2>
       <p className="mt-1 text-sm text-ink2">{t("midgame.subtitle")}</p>
 
@@ -212,7 +212,7 @@ function ScenarioBuilder() {
       : [];
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("scenario.title")}</h2>
       <p className="mt-1 text-sm text-ink2">{t("scenario.subtitle")}</p>
 

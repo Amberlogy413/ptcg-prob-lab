@@ -125,7 +125,7 @@ export function TrainerView() {
 
   if (!deck) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("trainer.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("summary.noDeck")}</p>
       </section>
@@ -136,7 +136,7 @@ export function TrainerView() {
     Math.abs(err) <= 2 ? "text-good" : Math.abs(err) <= 5 ? "text-warn" : "text-bad";
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("trainer.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("trainer.desc")}</p>
 
@@ -251,7 +251,7 @@ export function LuckMeter() {
   if (!deck) return null;
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-lg font-medium">{t("luck.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("luck.desc")}</p>
 
@@ -390,7 +390,7 @@ export function FallacyMuseum() {
   }, []);
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-lg font-medium">{t("museum.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("museum.desc")}</p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">

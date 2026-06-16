@@ -15,7 +15,7 @@ export function ToolsSection() {
 
   if (!deck) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("tools.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("summary.noDeck")}</p>
       </section>
@@ -67,7 +67,7 @@ function FoldBlock({ deck }: { deck: Deck }) {
   );
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-lg font-medium">{t("fold.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("fold.desc")}</p>
 
@@ -178,7 +178,7 @@ function OptimizerBlock({ deck }: { deck: Deck }) {
   }
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-lg font-medium">{t("opt.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("opt.desc")}</p>
 

@@ -66,7 +66,7 @@ export function CurveSection() {
     (active ? "bg-blue font-medium text-white" : "border hairline bg-surface text-ink2 hover:text-ink");
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-xl font-medium">{t("curve.title")}</h2>
         <button
@@ -250,7 +250,7 @@ export function EnergyCurveBlock() {
   }, [deck, total, basics, E, want, goingFirst]);
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-medium">{t("energy.title")}</h2>
         <span className="rounded-ctl bg-blue px-2 py-0.5 text-xs font-medium text-white">
@@ -441,7 +441,7 @@ export function RelayBlock() {
   );
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-medium">{t("relay.title")}</h2>
         <span className="rounded-ctl border hairline px-2 py-0.5 text-xs text-ink2">

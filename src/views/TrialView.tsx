@@ -65,7 +65,7 @@ export function TrialView() {
 
   if (!deck) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("trial.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("summary.noDeck")}</p>
       </section>
@@ -75,7 +75,7 @@ export function TrialView() {
   const total = deckTotal(deck);
   if (total < TRIAL_MIN_CARDS) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("trial.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("trial.tooFew", { n: TRIAL_MIN_CARDS })}</p>
       </section>
@@ -96,7 +96,7 @@ export function TrialView() {
 
   return (
     <>
-      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("trial.title")}</h2>
       <p className="mt-2 text-xs text-ink2">{t("trial.desc")}</p>
 

@@ -35,14 +35,19 @@ export default {
       sans: ['"Noto Sans TC"', '"IBM Plex Sans"', "system-ui", "sans-serif"],
       mono: ['"IBM Plex Mono"', "ui-monospace", "SFMono-Regular", "monospace"],
     },
+    // Compact "precision-lab" type scale (owner 2026-06-17: 消除老人化大字,
+    // 專業實驗室風格). Every notch is a step smaller and tighter than the prior
+    // humanized scale; since all `text-*` classes resolve here, the whole app
+    // densifies consistently in one place — no per-file churn. The signature
+    // headline number stays confident (clamp) but no longer billboard-sized.
     fontSize: {
-      xs: ["12px", { lineHeight: "1.5" }],
-      sm: ["13.5px", { lineHeight: "1.5" }],
-      base: ["15px", { lineHeight: "1.6" }],
-      lg: ["18px", { lineHeight: "1.5" }],
-      xl: ["24px", { lineHeight: "1.35" }],
-      "2xl": ["36px", { lineHeight: "1.2" }],
-      headline: ["clamp(40px, 9vw, 72px)", { lineHeight: "1.05" }],
+      xs: ["11.5px", { lineHeight: "1.45" }],
+      sm: ["12.5px", { lineHeight: "1.45" }],
+      base: ["13px", { lineHeight: "1.5" }],
+      lg: ["15px", { lineHeight: "1.4" }],
+      xl: ["18px", { lineHeight: "1.3" }],
+      "2xl": ["27px", { lineHeight: "1.18" }],
+      headline: ["clamp(30px, 6vw, 50px)", { lineHeight: "1.05" }],
     },
     borderRadius: {
       none: "0",

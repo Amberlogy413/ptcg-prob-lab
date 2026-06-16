@@ -26,7 +26,7 @@ import { DECK_SIZE } from "../constants.ts";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h3 className="text-lg font-medium">{title}</h3>
       <div className="mt-2">{children}</div>
     </section>
@@ -105,7 +105,7 @@ export function ReportView() {
           ? "summary.needCards"
           : "summary.noBasics";
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("report.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t(msgKey)}</p>
       </section>
@@ -177,7 +177,7 @@ export function ReportView() {
 
   return (
     <div className="space-y-4">
-      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-xl font-medium">{t("report.title")}</h2>

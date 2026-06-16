@@ -33,7 +33,7 @@ export function GradeSection() {
 
   if (!deck) {
     return (
-      <section className="rounded-card border hairline bg-surface p-6">
+      <section className="rounded-card border hairline bg-surface p-5">
         <h2 className="text-xl font-medium">{t("grade.title")}</h2>
         <p className="mt-2 text-sm text-ink2">{t("summary.noDeck")}</p>
       </section>
@@ -55,7 +55,7 @@ export function GradeSection() {
   }
 
   return (
-    <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
       <h2 className="text-xl font-medium">{t("grade.title")}</h2>
       <p className="mt-1 text-xs text-ink2">{t("grade.desc")}</p>
 

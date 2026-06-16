@@ -108,7 +108,7 @@ export default function App() {
           </p>
         </div>
       )}
-      <main className="mx-auto grid w-full max-w-6xl flex-1 items-start gap-6 px-4 py-6 lg:grid-cols-[300px_minmax(0,1fr)]">
+      <main className="mx-auto grid w-full max-w-6xl flex-1 items-start gap-5 px-4 py-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <DeckSummary />
         <div className="min-w-0">
           <Suspense

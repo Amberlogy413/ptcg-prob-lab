@@ -130,7 +130,7 @@ export function GoldfishBlock({ deck, copies }: { deck: Deck; copies: TrialCard[
     stats.games > 0 ? `${((count / stats.games) * 100).toFixed(1)}%` : "—";
 
   return (
-    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-6">
+    <section className="mt-4 rounded-card border hairline bg-surface p-4 sm:p-5">
       <h3 className="text-lg font-medium">{t("goldfish.title")}</h3>
       <p className="mt-1 text-xs text-ink2">{t("goldfish.desc")}</p>
 

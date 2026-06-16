@@ -235,7 +235,7 @@ export function BattleView() {
 
   if (!started) {
     return (
-      <section className="rounded-card border hairline bg-surface p-4 sm:p-6">
+      <section className="rounded-card border hairline bg-surface p-4 sm:p-5">
         <h2 className="text-xl font-medium">{t("battle.title")}</h2>
         <p className="mt-2 max-w-2xl text-sm text-ink2">{t("battle.intro")}</p>
         {options.length === 0 ? (
