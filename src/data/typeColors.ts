@@ -7,12 +7,12 @@ export const TYPE_COLORS: Record<string, string> = {
   Grass: "#4C9F60",
   Fire: "#E25B45",
   Water: "#3D8FD1",
-  Lightning: "#C29110",
+  Lightning: "#E0A800", // bright golden-yellow (electric) — kept clearly apart from Dragon
   Psychic: "#9A66C4",
   Fighting: "#C07140",
   Darkness: "#5A5470",
   Metal: "#75828F",
-  Dragon: "#B98A2E",
+  Dragon: "#6E5A2E", // deep bronze/olive-brown — was a near-identical gold to Lightning (owner 2026-06-17)
   Colorless: "#8A9298",
   Fairy: "#D173A8",
 };

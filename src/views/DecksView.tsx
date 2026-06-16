@@ -18,9 +18,18 @@ import {
   type DeckBuild,
   type EnergyShare,
 } from "../data/decks.ts";
-import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
+import {
+  loadCatalog,
+  localizeDeckRow,
+  resolveDeckRow,
+  cardName,
+  type Catalog,
+  type CatalogCard,
+} from "../data/catalog.ts";
 import { TYPE_COLORS, NEUTRAL_ACCENT } from "../data/typeColors.ts";
 import { TypeIcon } from "../components/TypeChip.tsx";
+import { CardVisual } from "../components/CardVisual.tsx";
+import { Modal } from "../components/Modal.tsx";
 import { useCardLang } from "../state/cardLang.ts";
 import { DECK_SIZE } from "../constants.ts";
 
@@ -306,6 +315,7 @@ function BuildRow({
   const importDeck = useDeckStore((s) => s.importDeck);
   const setActiveView = useUiStore((s) => s.setActiveView);
   const [show, setShow] = useState(false);
+  const [detail, setDetail] = useState<CatalogCard | null>(null);
 
   // Exact mulligan teaser through the selector bridge (synthetic deck shape).
   const mulligan = useMemo(() => {
@@ -388,14 +398,28 @@ function BuildRow({
                 <span className="font-mono">{g.cards.reduce((s, c) => s + c.count, 0)}</span>
               </p>
               <ul className="mt-0.5">
-                {g.cards.map((c, i) => (
-                  <li key={`${c.name}-${i}`} className="flex gap-2 font-mono text-xs">
-                    <span className="w-5 shrink-0 text-right">{c.count}</span>
-                    <span className="min-w-0 truncate">
-                      {catalog !== null ? localizeDeckRow(catalog, { name: c.name }, lang).name : c.name}
-                    </span>
-                  </li>
-                ))}
+                {g.cards.map((c, i) => {
+                  const card = catalog !== null ? resolveDeckRow(catalog, { name: c.name }) : null;
+                  return (
+                    <li key={`${c.name}-${i}`} className="flex items-center gap-2 font-mono text-xs">
+                      <span className="w-5 shrink-0 text-right">{c.count}</span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {catalog !== null ? localizeDeckRow(catalog, { name: c.name }, lang).name : c.name}
+                      </span>
+                      {card !== null && (
+                        <button
+                          type="button"
+                          aria-label={t("catalog.detailAria", { name: c.name })}
+                          aria-haspopup="dialog"
+                          onClick={() => setDetail(card)}
+                          className="shrink-0 rounded-ctl border hairline px-1 text-ink2 hover:text-ink"
+                        >
+                          ⓘ
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
@@ -403,6 +427,11 @@ function BuildRow({
       )}
       {build.total !== DECK_SIZE && (
         <p className="mt-1 text-xs text-warn">{t("decks.notSixty", { n: build.total })}</p>
+      )}
+      {detail !== null && catalog !== null && (
+        <Modal title={cardName(detail, lang)} onClose={() => setDetail(null)}>
+          <CardVisual card={detail} setInfo={catalog.sets[detail.set ?? ""] ?? null} />
+        </Modal>
       )}
     </li>
   );
