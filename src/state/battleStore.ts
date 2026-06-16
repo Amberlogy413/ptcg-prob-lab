@@ -160,6 +160,8 @@ interface BattleState {
   promote: (player: PlayerId, benchUnitId: string) => boolean;
   /** Knock out a unit: it and everything attached go to the discard. */
   knockOut: (player: PlayerId, unitId: string) => void;
+  /** Take n Prize cards (into the hand) — after scoring a Knock-Out. */
+  takePrize: (player: PlayerId, n: number) => void;
   /** Adjust a unit's damage (clamped ≥0). */
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
   /** Scoop a whole unit back to hand (board correction / Scoop Up effects). */
@@ -449,6 +451,17 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       const discard = [...board.discard, ...unitCards(u)];
       const cleared = mapUnit(board, unitId, () => null);
       return { [player]: { ...cleared, discard } } as Partial<BattleState>;
+    });
+  },
+
+  takePrize: (player, n) => {
+    set((s) => {
+      const board = s[player];
+      const k = Math.max(0, Math.min(Math.trunc(n), board.prizes.length));
+      if (k === 0) return {} as Partial<BattleState>;
+      return {
+        [player]: { ...board, prizes: board.prizes.slice(k), hand: [...board.hand, ...board.prizes.slice(0, k)] },
+      } as Partial<BattleState>;
     });
   },
 

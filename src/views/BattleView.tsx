@@ -12,6 +12,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue } from "../state/battleAttack.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
 import {
@@ -21,8 +22,9 @@ import {
   type DeckData,
   type DeckBuild,
 } from "../data/decks.ts";
-import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
-import { cardAccent, NEUTRAL_ACCENT } from "../data/typeColors.ts";
+import { loadCatalog, localizeDeckRow, resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
+import { cardAccent, NEUTRAL_ACCENT, TYPE_COLORS } from "../data/typeColors.ts";
+import { TypeIcon } from "../components/TypeChip.tsx";
 import { useCardLang } from "../state/cardLang.ts";
 import { CardVisual } from "../components/CardVisual.tsx";
 import { ProofNumber, type Proof } from "../components/ProofNumber.tsx";
@@ -158,6 +160,13 @@ export function BattleView() {
       return { name: loc.name, accent: loc.card !== null ? cardAccent(loc.card) : NEUTRAL_ACCENT };
     },
     [catalog, lang],
+  );
+
+  // Resolve a battle card to its full catalog print (for attacks / weakness).
+  const catalogOf = useCallback(
+    (card: BattleCard): CatalogCard | null =>
+      catalog === null ? null : resolveDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }),
+    [catalog],
   );
 
   function begin(useSeed: number) {
@@ -340,6 +349,53 @@ export function BattleView() {
   const oppBoard: PlayerBoard = oppId === "p1" ? p1 : p2;
   const meUnits = unitList(meBoard);
 
+  // --- Attack (P2): the Active Pokémon's real attacks vs the opponent's Active.
+  const meActiveCard = meBoard.active !== null ? catalogOf(meBoard.active.card) : null;
+  const attackList = (meActiveCard?.attacks ?? []).map((a, i) => ({
+    idx: i,
+    name: a.name,
+    cost: a.cost ?? [],
+    damage: a.damage,
+    canPay: meBoard.active !== null && canPayCost(meBoard.active.energy, a.cost),
+  }));
+  function doAttack(idx: number) {
+    setMsg(null);
+    const active = meBoard.active;
+    const oppActive = oppBoard.active;
+    if (active === null) return;
+    if (turn === 1 && me === firstPlayer) {
+      setMsg(t("battle.atk.firstTurnNoAttack"));
+      return;
+    }
+    if (oppActive === null) {
+      setMsg(t("battle.atk.noTarget"));
+      return;
+    }
+    const atk = (meActiveCard?.attacks ?? [])[idx];
+    if (atk === undefined) return;
+    if (!canPayCost(active.energy, atk.cost)) {
+      setMsg(t("battle.atk.notEnough"));
+      return;
+    }
+    const oppCard = catalogOf(oppActive.card);
+    const { damage, weakness, resistance } = finalDamage(meActiveCard, oppCard, baseDamage(atk.damage));
+    const s = store.getState();
+    const newDamage = oppActive.damage + damage;
+    s.setDamage(oppId, oppActive.uid, newDamage);
+    const tags = [weakness ? t("battle.atk.weak") : "", resistance ? t("battle.atk.resist") : ""].filter(Boolean).join(" ");
+    let result = t("battle.atk.result", { atk: atk.name, dmg: damage, tags });
+    const hp = oppActive.card.hp;
+    if (hp !== undefined && newDamage >= hp) {
+      const prizes = prizeValue(oppCard);
+      s.knockOut(oppId, oppActive.uid);
+      s.takePrize(me, prizes);
+      result += " " + t("battle.atk.ko", { n: prizes });
+    }
+    s.endTurn(); // attacking ends your turn (faithful)
+    setSel(null);
+    setMsg(result);
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {/* Control bar */}
@@ -392,6 +448,17 @@ export function BattleView() {
         store={store}
         t={t}
       />
+
+      {meBoard.active !== null && attackList.length > 0 && (
+        <AttackPanel
+          attacker={resolve(meBoard.active.card).name}
+          defender={oppBoard.active !== null ? resolve(oppBoard.active.card).name : null}
+          attacks={attackList}
+          canAttack={!(turn === 1 && me === firstPlayer) && oppBoard.active !== null}
+          onAttack={doAttack}
+          t={t}
+        />
+      )}
 
       <HandRow
         board={meBoard}
@@ -740,6 +807,67 @@ function StadiumBand({
             ))}
         </div>
       )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Attack panel (P2): the Active Pokémon's real attacks vs the opponent's Active.
+
+interface AttackOpt {
+  idx: number;
+  name: string;
+  cost: string[];
+  damage: number | string | undefined;
+  canPay: boolean;
+}
+
+function AttackPanel({
+  attacker, defender, attacks, canAttack, onAttack, t,
+}: {
+  attacker: string;
+  defender: string | null;
+  attacks: AttackOpt[];
+  canAttack: boolean;
+  onAttack: (idx: number) => void;
+  t: Tr;
+}) {
+  return (
+    <section className="rounded-card border hairline bg-surface p-3">
+      <h3 className="text-sm font-medium">{t("battle.atk.title")}</h3>
+      <p className="mt-1 text-xs text-ink2">
+        {defender !== null ? t("battle.atk.vs", { atk: attacker, def: defender }) : t("battle.atk.noTargetHint")}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {attacks.map((a) => {
+          const ready = canAttack && a.canPay;
+          return (
+            <button
+              key={a.idx}
+              type="button"
+              disabled={!ready}
+              onClick={() => onAttack(a.idx)}
+              className={
+                "flex items-center gap-1 rounded-ctl border px-2 py-1 text-xs " +
+                (ready ? "border-blue text-blue hover:bg-blue/10" : "hairline text-ink2 opacity-60")
+              }
+            >
+              {a.cost.length > 0 && (
+                <span className="flex items-center gap-0.5">
+                  {a.cost.map((c, i) => (
+                    <span key={i} style={{ color: TYPE_COLORS[c] ?? NEUTRAL_ACCENT }}>
+                      <TypeIcon type={c} />
+                    </span>
+                  ))}
+                </span>
+              )}
+              <span className="font-medium">{a.name}</span>
+              {a.damage !== undefined && a.damage !== "" && <span className="font-mono">{a.damage}</span>}
+              {!a.canPay && <span className="text-[10px] text-warn">{t("battle.atk.short")}</span>}
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
