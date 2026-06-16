@@ -1,0 +1,13 @@
+{
+  "note": "Card-NAME corrections: wrong zh-Hant (that slipped into the catalog/bridge as a literal-or-guessed translation) -> the OFFICIAL zh-Hant card name, each verified character-by-character against the official Taiwan/HK Pokémon TCG site (asia.pokemon-card.com) and Bulbapedia's 'In other languages' table (owner-flagged 2026-06-17, then web-audited). Keyed by the FULL wrong card name so a substring like 米可利 (Wallace, a different character) is never touched. Applied to public/catalog/cards-zh-Hant.json (name + nameZh) and to the deck-recommendation data via scripts/relocalize_decks.mjs. Sources are recorded per entry in DECISIONS / memory.",
+  "map": {
+    "小遙的鼓勵": "鳴依的勉勵",
+    "好友幫手百花露": "好友寶芬",
+    "米可利的體貼": "滿充的體貼",
+    "新星增幅能量": "新衝天能量",
+    "氣泡水能量": "泡沫水能量",
+    "點火能量": "燃火能量",
+    "寶可夢手錶3.0": "寶可裝置3.0",
+    "薩爾瓦托雷": "賽吉"
+  }
+}

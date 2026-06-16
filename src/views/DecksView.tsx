@@ -11,11 +11,12 @@ import {
   localizeCarry,
   groupSeries,
   tierizeName,
-  deckEnergyTypes,
+  deckEnergyMix,
   deckTags,
   type DeckData,
   type DeckSeries,
   type DeckBuild,
+  type EnergyShare,
 } from "../data/decks.ts";
 import { loadCatalog, localizeDeckRow, type Catalog } from "../data/catalog.ts";
 import { TYPE_COLORS, NEUTRAL_ACCENT } from "../data/typeColors.ts";
@@ -113,13 +114,13 @@ export function DecksView() {
   );
 }
 
-/** Row tint from the deck's basic-energy types (owner 2026-06-16): one type → a
- *  soft wash; multiple → hard-split bands (e.g. fire ｜ psychic ｜ dark), with a
- *  left edge in the dominant type's colour. */
-function energyTint(types: string[]): CSSProperties | undefined {
-  if (types.length === 0) return undefined;
-  const cols = types.map((ty) => TYPE_COLORS[ty] ?? NEUTRAL_ACCENT);
+/** Row tint from the deck's energy MIX (owner 2026-06-16): one type → a soft
+ *  wash; multiple → bands sized by each type's REAL share of the energy cards
+ *  (not an even split), with a left edge in the dominant type's colour. */
+function energyTint(mix: EnergyShare[]): CSSProperties | undefined {
+  if (mix.length === 0) return undefined;
   const fill = "1F"; // ~12% alpha
+  const cols = mix.map((m) => TYPE_COLORS[m.type] ?? NEUTRAL_ACCENT);
   if (cols.length === 1) {
     return {
       backgroundColor: cols[0] + fill,
@@ -128,9 +129,16 @@ function energyTint(types: string[]): CSSProperties | undefined {
       borderLeftWidth: "3px",
     };
   }
-  const n = cols.length;
-  const bands = cols
-    .map((c, i) => `${c}${fill} ${(i * 100) / n}% ${((i + 1) * 100) / n}%`)
+  // Proportional band stops: each colour spans its share of the total energy.
+  const total = mix.reduce((s, m) => s + m.count, 0) || 1;
+  let acc = 0;
+  const bands = mix
+    .map((m, i) => {
+      const start = (acc * 100) / total;
+      acc += m.count;
+      const end = (acc * 100) / total;
+      return `${cols[i]}${fill} ${start}% ${end}%`;
+    })
     .join(", ");
   return {
     backgroundImage: `linear-gradient(100deg, ${bands})`,
@@ -185,8 +193,9 @@ function SeriesCard({
   // Type identity (owner request 2026-06-16): colour the row + show icons by the
   // deck's REAL basic-energy types — a Grass-Energy deck reads Grass even when
   // its carry (Dipplin) is Dragon. Follows the selected variant.
-  const energyTypes = useMemo(() => deckEnergyTypes(selected.builds[0]), [selected.builds]);
-  const surface = useMemo(() => energyTint(energyTypes), [energyTypes]);
+  const energyMix = useMemo<EnergyShare[]>(() => deckEnergyMix(selected.builds[0]), [selected.builds]);
+  const energyTypes = energyMix.map((m) => m.type);
+  const surface = useMemo(() => energyTint(energyMix), [energyMix]);
 
   return (
     <li

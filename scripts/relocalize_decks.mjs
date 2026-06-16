@@ -30,6 +30,7 @@ const DEX = path.join(ROOT, "scripts", "dex_names.json");
 const TRAINER = path.join(ROOT, "scripts", "trainer_en_zh.json");
 const TRAINER_JA = path.join(ROOT, "scripts", "trainer_en_ja.json");
 const EXTRA = path.join(ROOT, "scripts", "extra_zh.json");
+const CORRECTIONS = path.join(ROOT, "scripts", "name_corrections.json");
 
 const stripBrackets = (s) => (s ?? "").replace(/[<>＜＞]/g, "");
 const hasKana = (s) => /[ぁ-んァ-ヶー]/.test(s);
@@ -161,6 +162,10 @@ export async function relocalizeDecks() {
   const trainer = JSON.parse(await readFile(TRAINER, "utf8")).map ?? {};
   const trainerJa = JSON.parse(await readFile(TRAINER_JA, "utf8")).map ?? {};
   const extra = JSON.parse(await readFile(EXTRA, "utf8")).map ?? {};
+  // Wrong zh-Hant -> OFFICIAL zh-Hant (web-verified vs asia.pokemon-card.com /
+  // Bulbapedia). Applied as the FINAL pass so any path that produced a wrong name
+  // is corrected (owner-flagged 2026-06-17). Keyed by the full card name.
+  const corrections = JSON.parse(await readFile(CORRECTIONS, "utf8")).map ?? {};
   const decks = JSON.parse(await readFile(DECKS, "utf8"));
   const dexIdx = buildDexIndex(dex);
 
@@ -211,6 +216,7 @@ export async function relocalizeDecks() {
           // Dirty = any kana, or NO Han at all (catches accented Latin like "é").
           if (hasKana(after) || !/[一-鿿]/.test(after)) note(c.section + " :: " + after);
         }
+        if (corrections[after] !== undefined) after = corrections[after]; // official-name fix
         c.name = after;
         if (after === before) kept += 1;
         else changed += 1;

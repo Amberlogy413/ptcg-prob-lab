@@ -314,7 +314,13 @@ export function tierizeName(localized: string, cardNames: string[]): string {
  * the energy-type icons — e.g. a Grass-Energy deck reads Grass even when the
  * carry Pokémon (裹蜜蟲 / Dipplin) is Dragon. Special energies map to nothing.
  */
-export function deckEnergyTypes(build: DeckBuild | undefined): string[] {
+export interface EnergyShare {
+  type: string;
+  count: number;
+}
+/** The deck's energy-type MIX with real counts (most-used first) — drives the
+ *  row colour proportionally (owner 2026-06-16: 配色要按真實比例,唔係平分). */
+export function deckEnergyMix(build: DeckBuild | undefined): EnergyShare[] {
   if (build === undefined) return [];
   const count = new Map<string, number>();
   for (const c of build.cards) {
@@ -322,7 +328,10 @@ export function deckEnergyTypes(build: DeckBuild | undefined): string[] {
     const ty = energyType(c.name);
     if (ty !== null) count.set(ty, (count.get(ty) ?? 0) + c.count);
   }
-  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([ty]) => ty);
+  return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([type, n]) => ({ type, count: n }));
+}
+export function deckEnergyTypes(build: DeckBuild | undefined): string[] {
+  return deckEnergyMix(build).map((m) => m.type);
 }
 
 // ---------------------------------------------------------------------------
