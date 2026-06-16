@@ -776,6 +776,7 @@
   "battle.zone.active": "Active",
   "battle.zone.bench": "Bench",
   "battle.zone.stadium": "Stadium",
+  "battle.stadiumEmpty": "No Stadium in play — play one from hand to place it here.",
   "battle.zone.discard": "Discard",
   "battle.zone.prizes": "Prizes",
   "battle.zone.lostzone": "Lost Zone",

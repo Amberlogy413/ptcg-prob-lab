@@ -337,12 +337,13 @@ export function BattleView() {
         )}
       </div>
 
-      {/* Opponent (top) — hand face-down */}
+      {/* Opponent (top) — mirrored so its 戰鬥場 sits at the bottom, facing yours */}
       <PlayerStrip
         player="p2"
         board={p2}
         name={names.p2}
         opponent
+        mirror
         resolve={resolve}
         selected={selected}
         onSelect={(iid) => setSelected({ player: "p2", iid })}
@@ -352,6 +353,19 @@ export function BattleView() {
         onShuffle={() => shuffleDeck("p2")}
         onMulligan={() => mulligan("p2")}
         onEffect={(card) => handleEffect("p2", card)}
+        t={t}
+      />
+
+      {/* Shared centre: the 場地牌區 (stadium), between the two facing 戰鬥場 */}
+      <StadiumBand
+        p1={p1}
+        p2={p2}
+        names={names}
+        resolve={resolve}
+        selected={selected}
+        onSelect={(player, iid) => setSelected({ player, iid })}
+        onMove={(player, iid, to) => { moveCard(player, iid, to); setSelected(null); }}
+        onVisual={setVisual}
         t={t}
       />
 
@@ -433,6 +447,9 @@ interface StripProps {
   onMulligan: () => void;
   /** Auto-resolve a known card effect (hand cards only). */
   onEffect: (c: BattleCard) => void;
+  /** Opponent half: render mirrored so the 戰鬥場 sits at the BOTTOM, facing
+   *  your 戰鬥場 across the central 場地牌區. */
+  mirror?: boolean;
   t: (k: string, p?: Record<string, string | number>) => string;
 }
 
@@ -448,41 +465,90 @@ const ZONE_KEYS: Record<Zone, string> = {
 };
 
 function PlayerStrip({
-  player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, onEffect, t,
+  player, board, name, opponent, resolve, selected, onSelect, onMove, onVisual, onDraw, onShuffle, onMulligan, onEffect, mirror, t,
 }: StripProps) {
-  // Public board zones, in real-board reading order: the front-line 戰鬥場 first,
-  // then 備戰區, the shared 場地牌區, then the discard/lost piles. Opponent's hand +
-  // both prizes + deck stay hidden (counts only).
-  const visibleZones: Zone[] = ["active", "bench", "stadium", "discard", "lostzone"];
+  // Public board zones (stadium lives in the shared centre band, not here).
+  // Your half reads active-first (active sits at the TOP, by the centre); the
+  // opponent half is mirrored so its active sits at the BOTTOM, facing yours.
+  const base: Zone[] = ["active", "bench", "discard", "lostzone"];
+  const zones = mirror ? [...base].reverse() : base;
   const handVisible = !opponent;
+  const header = (
+    <div className="mb-2 flex flex-wrap items-center gap-2">
+      <h3 className="text-sm font-medium">
+        <span className="text-ink2">{opponent ? t("battle.opp") : t("battle.you")}</span> · {name}
+      </h3>
+      <span className="font-mono text-xs text-ink2">
+        {t("battle.zone.deck")} {board.deck.length} · {t("battle.zone.prizes")} {board.prizes.length} · {t("battle.zone.hand")} {board.hand.length}
+      </span>
+      <div className="ml-auto flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => onDraw(1)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
+        <button type="button" onClick={() => onShuffle()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
+        <button type="button" onClick={() => onMulligan()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
+      </div>
+    </div>
+  );
+  const zoneRows = zones.map((z) => (
+    <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} front={z === "active"} t={t} />
+  ));
+  const hand = handVisible ? (
+    <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} onEffect={onEffect} t={t} />
+  ) : null;
   return (
     <section className="rounded-card border hairline bg-surface p-3">
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-medium">
-          <span className="text-ink2">{opponent ? t("battle.opp") : t("battle.you")}</span> · {name}
-        </h3>
-        <span className="font-mono text-xs text-ink2">
-          {t("battle.zone.deck")} {board.deck.length} · {t("battle.zone.prizes")} {board.prizes.length} · {t("battle.zone.hand")} {board.hand.length}
-        </span>
-        <div className="ml-auto flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => onDraw(1)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">
-            {t("battle.draw1")}
-          </button>
-          <button type="button" onClick={() => onShuffle()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">
-            {t("battle.shuffle")}
-          </button>
-          <button type="button" onClick={() => onMulligan()} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">
-            {t("battle.mulligan")}
-          </button>
-        </div>
-      </div>
+      {/* Opponent: header on top, then zones (active last, by the centre). You:
+          zones first (active on top, by the centre), hand at the very bottom. */}
+      {header}
+      {zoneRows}
+      {hand}
+    </section>
+  );
+}
 
-      {handVisible && (
-        <ZoneRow label={t("battle.zone.hand")} cards={board.hand} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} onEffect={onEffect} t={t} />
+/** The shared 場地牌區 (stadium) — a slim centre band between the two facing
+ *  戰鬥場. Only one Stadium is really in play; the sandbox is manual, so each
+ *  side has a slot and either card can be selected/moved here. */
+function StadiumBand({
+  p1, p2, names, resolve, selected, onSelect, onMove, onVisual, t,
+}: {
+  p1: import("../state/battleStore.ts").PlayerBoard;
+  p2: import("../state/battleStore.ts").PlayerBoard;
+  names: { p1: string; p2: string };
+  resolve: (c: BattleCard) => { name: string; accent: string };
+  selected: { player: PlayerId; iid: string } | null;
+  onSelect: (player: PlayerId, iid: string) => void;
+  onMove: (player: PlayerId, iid: string, to: Zone) => void;
+  onVisual: (c: BattleCard) => void;
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const sides: Array<{ player: PlayerId; who: string; cards: BattleCard[] }> = [
+    { player: "p2", who: `${t("battle.opp")} · ${names.p2}`, cards: p2.stadium },
+    { player: "p1", who: `${t("battle.you")} · ${names.p1}`, cards: p1.stadium },
+  ];
+  const any = p1.stadium.length + p2.stadium.length > 0;
+  return (
+    <section className="rounded-card border border-dashed hairline bg-paper px-3 py-2">
+      <p className="text-center text-xs font-medium text-ink2">— {t("battle.zone.stadium")} —</p>
+      {!any ? (
+        <p className="mt-1 text-center text-[11px] text-ink2">{t("battle.stadiumEmpty")}</p>
+      ) : (
+        <div className="mt-1 flex flex-col gap-1">
+          {sides.filter((s) => s.cards.length > 0).map((s) => (
+            <ZoneRow
+              key={s.player}
+              label={s.who}
+              cards={s.cards}
+              player={s.player}
+              resolve={resolve}
+              selected={selected}
+              onSelect={(iid) => onSelect(s.player, iid)}
+              onMove={(iid, to) => onMove(s.player, iid, to)}
+              onVisual={onVisual}
+              t={t}
+            />
+          ))}
+        </div>
       )}
-      {visibleZones.map((z) => (
-        <ZoneRow key={z} label={t(ZONE_KEYS[z])} cards={board[z]} player={player} resolve={resolve} selected={selected} onSelect={onSelect} onMove={onMove} onVisual={onVisual} front={z === "active"} t={t} />
-      ))}
     </section>
   );
 }
