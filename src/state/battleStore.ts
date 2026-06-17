@@ -436,6 +436,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   retreat: (player, benchUnitId) => {
     let ok = false;
     set((s) => {
+      if (s.turnRetreated) return {} as Partial<BattleState>; // 1 retreat per turn (real rule)
       const board = s[player];
       const i = board.bench.findIndex((u) => u.uid === benchUnitId);
       if (i === -1) return {} as Partial<BattleState>;

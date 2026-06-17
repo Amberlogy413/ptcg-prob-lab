@@ -240,6 +240,31 @@ describe("special conditions + between-turns checkup (P3)", () => {
   });
 });
 
+describe("per-turn limits (review fix)", () => {
+  beforeEach(() => useBattleStore.getState().reset());
+
+  it("allows at most one retreat per turn, and resets the limit next turn", () => {
+    useBattleStore.setState({
+      started: true,
+      turn: 2,
+      current: "p1",
+      firstPlayer: "p1",
+      turnRetreated: false,
+      p1: { ...emptyBoard(), active: unit(bc("a", "basic")), bench: [unit(bc("b", "basic")), unit(bc("c", "basic"))] },
+      p2: emptyBoard(),
+    });
+    const bench0 = useBattleStore.getState().p1.bench[0]!.uid;
+    expect(useBattleStore.getState().retreat("p1", bench0)).toBe(true);
+    expect(useBattleStore.getState().turnRetreated).toBe(true);
+    // a second retreat in the same turn is blocked
+    const bench0b = useBattleStore.getState().p1.bench[0]!.uid;
+    expect(useBattleStore.getState().retreat("p1", bench0b)).toBe(false);
+    // next turn the limit resets
+    useBattleStore.getState().endTurn();
+    expect(useBattleStore.getState().turnRetreated).toBe(false);
+  });
+});
+
 describe("computeDrawOdds", () => {
   it("matches the exact hypergeometric (4 of 10, draw 1 = 2/5)", () => {
     const o = computeDrawOdds(10, 4, 1);

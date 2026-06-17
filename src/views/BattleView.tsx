@@ -108,6 +108,7 @@ export function BattleView() {
   const turnSupporterUsed = useBattleStore((s) => s.turnSupporterUsed);
   const turnEnergyAttached = useBattleStore((s) => s.turnEnergyAttached);
   const turnStadiumPlayed = useBattleStore((s) => s.turnStadiumPlayed);
+  const turnRetreated = useBattleStore((s) => s.turnRetreated);
   const everInPlay = useBattleStore((s) => s.everInPlay);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
@@ -125,27 +126,35 @@ export function BattleView() {
   const [first, setFirst] = useState<PlayerId>("p1");
   const [msg, setMsg] = useState<string | null>(null);
 
-  // Undo (P4): snapshot the state BEFORE each action via a store subscription, so
-  // a misclick in the manual board is one tap to reverse. View-level so the store
-  // stays clean; capped history; cleared on a fresh deal.
+  // Undo (P4): run a user gesture ATOMICALLY — one snapshot BEFORE the gesture,
+  // kept only if the gesture actually changed the game. So a composite multi-step
+  // action (auto-effect Supporter, attack→KO→prize→endTurn) reverses in ONE tap,
+  // and a no-op / failed action never consumes a slot. (review fix 2026-06-17,
+  // replacing the per-set subscription that desynced composite undos.)
   const history = useRef<BattleSnapshot[]>([]);
-  const undoing = useRef(false);
-  useEffect(() => {
-    return useBattleStore.subscribe((_state, prev) => {
-      if (undoing.current) {
-        undoing.current = false;
-        return;
-      }
-      if (!prev.started) return; // don't record pre-game / setup transitions
-      history.current.push(snapOf(prev));
+  const act = useCallback((fn: () => void) => {
+    const s = useBattleStore.getState();
+    if (!s.started) {
+      fn();
+      return;
+    }
+    const before = snapOf(s);
+    fn();
+    const a = useBattleStore.getState();
+    const changed =
+      before.p1 !== a.p1 || before.p2 !== a.p2 || before.turn !== a.turn || before.current !== a.current ||
+      before.turnSupporterUsed !== a.turnSupporterUsed || before.turnEnergyAttached !== a.turnEnergyAttached ||
+      before.turnStadiumPlayed !== a.turnStadiumPlayed || before.turnRetreated !== a.turnRetreated ||
+      before.everInPlay !== a.everInPlay || before.shuffleNonce !== a.shuffleNonce;
+    if (changed) {
+      history.current.push(before);
       if (history.current.length > 40) history.current.shift();
-    });
+    }
   }, []);
   function undo() {
     const prev = history.current.pop();
     if (prev === undefined) return;
-    undoing.current = true;
-    store.setState(prev);
+    useBattleStore.setState(prev);
     setSel(null);
     setMsg(null);
   }
@@ -254,83 +263,104 @@ export function BattleView() {
 
   // --- Play a hand card by its real type (the core faithful rules) ---------
   const me = current; // the player whose turn it is acts; their hand is shown.
+  // Auto-effect lookup keys on the zh display name, so an English-named saved /
+  // imported deck still resolves the supported Supporters (review fix 2026-06-17).
+  const autoKey = useCallback(
+    (card: BattleCard): string =>
+      catalog === null
+        ? card.name
+        : localizeDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }, "zh").name,
+    [catalog],
+  );
   function play(card: BattleCard, action: PlayAction) {
-    const s = store.getState();
-    setMsg(null);
-    switch (action.type) {
-      case "toActive":
-        if (!s.playToActive(me, card.iid)) setMsg(t("battle.field.activeFull"));
-        break;
-      case "toBench":
-        if (!s.playToBench(me, card.iid)) setMsg(t("battle.field.benchFull"));
-        break;
-      case "evolve":
-        s.evolve(me, card.iid, action.unitId);
-        break;
-      case "energy":
-        if (turnEnergyAttached) {
-          setMsg(t("battle.gate.energyUsed"));
-          return;
+    act(() => {
+      const s = store.getState();
+      setMsg(null);
+      switch (action.type) {
+        case "toActive":
+          if (!s.playToActive(me, card.iid)) setMsg(t("battle.field.activeFull"));
+          break;
+        case "toBench":
+          if (!s.playToBench(me, card.iid)) setMsg(t("battle.field.benchFull"));
+          break;
+        case "evolve":
+          s.evolve(me, card.iid, action.unitId);
+          break;
+        case "energy":
+          if (turnEnergyAttached) {
+            setMsg(t("battle.gate.energyUsed"));
+            return;
+          }
+          s.attachEnergy(me, card.iid, action.unitId);
+          break;
+        case "tool":
+          s.attachTool(me, card.iid, action.unitId);
+          break;
+        case "stadium":
+          if (turnStadiumPlayed) {
+            setMsg(t("battle.gate.stadiumUsed"));
+            return;
+          }
+          s.playStadium(me, card.iid);
+          break;
+        case "supporter": {
+          if (turn === 1 && me === firstPlayer) {
+            setMsg(t("battle.fx.firstTurnNoSupporter"));
+            return;
+          }
+          if (turnSupporterUsed) {
+            setMsg(t("battle.fx.supporterUsed"));
+            return;
+          }
+          const key = autoKey(card);
+          if (AUTO_EFFECTS[key] !== undefined) {
+            applyAutoEffect(me, card.iid, key); // resolves + discards faithfully
+          } else {
+            s.discardFromHand(me, card.iid); // unknown supporter: you resolve it by hand
+          }
+          s.markSupporterUsed();
+          break;
         }
-        s.attachEnergy(me, card.iid, action.unitId);
-        break;
-      case "tool":
-        s.attachTool(me, card.iid, action.unitId);
-        break;
-      case "stadium":
-        if (turnStadiumPlayed) {
-          setMsg(t("battle.gate.stadiumUsed"));
-          return;
-        }
-        s.playStadium(me, card.iid);
-        break;
-      case "supporter": {
-        if (turn === 1 && me === firstPlayer) {
-          setMsg(t("battle.fx.firstTurnNoSupporter"));
-          return;
-        }
-        if (turnSupporterUsed) {
-          setMsg(t("battle.fx.supporterUsed"));
-          return;
-        }
-        if (AUTO_EFFECTS[card.name] !== undefined) {
-          applyAutoEffect(me, card.iid, card.name); // resolves + discards faithfully
-        } else {
-          s.discardFromHand(me, card.iid); // unknown supporter: you resolve it by hand
-        }
-        s.markSupporterUsed();
-        break;
+        case "item":
+          s.discardFromHand(me, card.iid);
+          break;
+        case "discard":
+          s.discardFromHand(me, card.iid);
+          break;
+        case "toPile":
+          s.moveToPile(me, card.iid, action.pile);
+          // Returning a card to the deck SHUFFLES it in — never silently bottom-stack
+          // a known card, which would make the exact-odds HUD wrong (review fix).
+          if (action.pile === "deck") s.shuffleDeck(me);
+          break;
       }
-      case "item":
-        s.discardFromHand(me, card.iid);
-        break;
-      case "discard":
-        s.discardFromHand(me, card.iid);
-        break;
-      case "toPile":
-        s.moveToPile(me, card.iid, action.pile);
-        break;
-    }
+    });
     setSel(null);
   }
 
   function unitAction(player: PlayerId, unitId: string, kind: UnitActionKind) {
-    const s = store.getState();
     setMsg(null);
-    switch (kind) {
-      case "retreat":
-        if (!s.retreat(player, unitId)) setMsg(t("battle.field.noActive"));
-        break;
-      case "promote":
-        s.promote(player, unitId);
-        break;
-      case "ko":
-        s.knockOut(player, unitId);
-        break;
-      case "scoop":
-        s.scoopToHand(player, unitId);
-        break;
+    if (kind === "retreat" && player === me && turnRetreated) {
+      setMsg(t("battle.gate.retreatUsed"));
+      return;
     }
+    act(() => {
+      const s = store.getState();
+      switch (kind) {
+        case "retreat":
+          if (!s.retreat(player, unitId)) setMsg(t("battle.field.noActive"));
+          break;
+        case "promote":
+          s.promote(player, unitId);
+          break;
+        case "ko":
+          s.knockOut(player, unitId);
+          break;
+        case "scoop":
+          s.scoopToHand(player, unitId);
+          break;
+      }
+    });
     setSel(null);
   }
 
@@ -447,19 +477,24 @@ export function BattleView() {
     }
     const oppCard = catalogOf(oppActive.card);
     const { damage, weakness, resistance } = finalDamage(meActiveCard, oppCard, baseDamage(atk.damage));
-    const s = store.getState();
     const newDamage = oppActive.damage + damage;
-    s.setDamage(oppId, oppActive.uid, newDamage);
+    const hp = oppActive.card.hp;
+    const ko = hp !== undefined && newDamage >= hp;
+    const prizes = ko ? prizeValue(oppCard) : 0;
+    // One atomic gesture (damage → KO+prize → endTurn) so a single Undo reverses
+    // the whole attack, not just the turn flip (review fix 2026-06-17).
+    act(() => {
+      const s = store.getState();
+      s.setDamage(oppId, oppActive.uid, newDamage);
+      if (ko) {
+        s.knockOut(oppId, oppActive.uid);
+        s.takePrize(me, prizes);
+      }
+      s.endTurn(); // attacking ends your turn (faithful)
+    });
     const tags = [weakness ? t("battle.atk.weak") : "", resistance ? t("battle.atk.resist") : ""].filter(Boolean).join(" ");
     let result = t("battle.atk.result", { atk: atk.name, dmg: damage, tags });
-    const hp = oppActive.card.hp;
-    if (hp !== undefined && newDamage >= hp) {
-      const prizes = prizeValue(oppCard);
-      s.knockOut(oppId, oppActive.uid);
-      s.takePrize(me, prizes);
-      result += " " + t("battle.atk.ko", { n: prizes });
-    }
-    s.endTurn(); // attacking ends your turn (faithful)
+    if (ko) result += " " + t("battle.atk.ko", { n: prizes });
     setSel(null);
     setMsg(result);
   }
@@ -484,7 +519,7 @@ export function BattleView() {
           >
             {t("battle.undo")}
           </button>
-          <button type="button" onClick={() => { store.getState().endTurn(); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+          <button type="button" onClick={() => { act(() => store.getState().endTurn()); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
           <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
@@ -519,6 +554,7 @@ export function BattleView() {
         onUnitAction={unitAction}
         onVisual={setVisual}
         store={store}
+        act={act}
         t={t}
       />
 
@@ -537,6 +573,7 @@ export function BattleView() {
         onUnitAction={unitAction}
         onVisual={setVisual}
         store={store}
+        act={act}
         t={t}
       />
 
@@ -560,6 +597,7 @@ export function BattleView() {
         sel={sel}
         setSel={setSel}
         onPlay={play}
+        autoKey={autoKey}
         onVisual={setVisual}
         t={t}
       />
@@ -647,7 +685,7 @@ function DeckSelect({
 // One player's half of the board.
 
 function PlayerHalf({
-  player, board, name, roleLabel, mirror, isMe, resolve, sel, setSel, onUnitAction, onVisual, store, t,
+  player, board, name, roleLabel, mirror, isMe, resolve, sel, setSel, onUnitAction, onVisual, store, act, t,
 }: {
   player: PlayerId;
   board: PlayerBoard;
@@ -661,6 +699,8 @@ function PlayerHalf({
   onUnitAction: (player: PlayerId, unitId: string, kind: UnitActionKind) => void;
   onVisual: (c: BattleCard) => void;
   store: typeof useBattleStore;
+  /** Run a mutating gesture atomically for undo. */
+  act: (fn: () => void) => void;
   t: Tr;
 }) {
   const header = (
@@ -673,9 +713,9 @@ function PlayerHalf({
       </span>
       {isMe && (
         <div className="ml-auto flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => store.getState().draw(player, 1)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
-          <button type="button" onClick={() => store.getState().shuffleDeck(player)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
-          <button type="button" onClick={() => store.getState().mulligan(player)} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
+          <button type="button" onClick={() => act(() => store.getState().draw(player, 1))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
+          <button type="button" onClick={() => act(() => store.getState().shuffleDeck(player))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
+          <button type="button" onClick={() => act(() => store.getState().mulligan(player))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
         </div>
       )}
     </div>
@@ -694,6 +734,7 @@ function PlayerHalf({
       setSel={setSel}
       onUnitAction={onUnitAction}
       onVisual={onVisual}
+      act={act}
       t={t}
     />
   );
@@ -709,6 +750,7 @@ function PlayerHalf({
       setSel={setSel}
       onUnitAction={onUnitAction}
       onVisual={onVisual}
+      act={act}
       t={t}
     />
   );
@@ -735,7 +777,7 @@ function PlayerHalf({
 
 /** A labelled row of in-play units (active or bench). */
 function FieldRow({
-  label, front, units, empty, board, player, resolve, sel, setSel, onUnitAction, onVisual, t,
+  label, front, units, empty, board, player, resolve, sel, setSel, onUnitAction, onVisual, act, t,
 }: {
   label: string;
   front?: boolean;
@@ -748,6 +790,7 @@ function FieldRow({
   setSel: (s: Sel | null) => void;
   onUnitAction: (player: PlayerId, unitId: string, kind: UnitActionKind) => void;
   onVisual: (c: BattleCard) => void;
+  act: (fn: () => void) => void;
   t: Tr;
 }) {
   return (
@@ -769,8 +812,8 @@ function FieldRow({
                 resolve={resolve}
                 onSelect={() => setSel(selected ? null : { scope: "unit", player, unitId: u.uid })}
                 onAction={(kind) => onUnitAction(player, u.uid, kind)}
-                onSetDamage={(d) => useBattleStore.getState().setDamage(player, u.uid, d)}
-                onToggleStatus={(cond) => useBattleStore.getState().toggleStatus(player, u.uid, cond)}
+                onSetDamage={(d) => act(() => useBattleStore.getState().setDamage(player, u.uid, d))}
+                onToggleStatus={(cond) => act(() => useBattleStore.getState().toggleStatus(player, u.uid, cond))}
                 onVisual={onVisual}
                 t={t}
               />
@@ -922,9 +965,9 @@ function StadiumBand({
   onVisual: (c: BattleCard) => void;
   t: Tr;
 }) {
-  const sides: Array<{ who: string; card: BattleCard | null }> = [
-    { who: oppName, card: oppBoard.stadium },
-    { who: meName, card: meBoard.stadium },
+  const sides: Array<{ side: string; who: string; card: BattleCard | null }> = [
+    { side: "opp", who: oppName, card: oppBoard.stadium },
+    { side: "me", who: meName, card: meBoard.stadium },
   ];
   const any = meBoard.stadium !== null || oppBoard.stadium !== null;
   return (
@@ -938,7 +981,7 @@ function StadiumBand({
             .filter((s) => s.card !== null)
             .map((s) => (
               <button
-                key={s.who}
+                key={s.side}
                 type="button"
                 onClick={() => s.card !== null && onVisual(s.card)}
                 className="rounded-ctl border hairline bg-surface px-2 py-1 text-xs hover:bg-paper"
@@ -1027,7 +1070,7 @@ function AttackPanel({
 // The current player's hand — type-correct play actions.
 
 function HandRow({
-  board, units, flags, resolve, sel, setSel, onPlay, onVisual, t,
+  board, units, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
 }: {
   board: PlayerBoard;
   units: InPlay[];
@@ -1036,6 +1079,7 @@ function HandRow({
   sel: Sel | null;
   setSel: (s: Sel | null) => void;
   onPlay: (card: BattleCard, action: PlayAction) => void;
+  autoKey: (c: BattleCard) => string;
   onVisual: (c: BattleCard) => void;
   t: Tr;
 }) {
@@ -1063,7 +1107,7 @@ function HandRow({
                   {name}
                 </button>
                 {selected && (
-                  <HandActions card={c} board={board} units={units} flags={flags} resolve={resolve} onPlay={onPlay} onVisual={onVisual} t={t} />
+                  <HandActions card={c} board={board} units={units} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
                 )}
               </span>
             );
@@ -1076,7 +1120,7 @@ function HandRow({
 
 /** The type-correct action toolbar for a selected hand card. */
 function HandActions({
-  card, board, units, flags, resolve, onPlay, onVisual, t,
+  card, board, units, flags, resolve, onPlay, autoKey, onVisual, t,
 }: {
   card: BattleCard;
   board: PlayerBoard;
@@ -1084,9 +1128,11 @@ function HandActions({
   flags: HandFlags;
   resolve: Resolve;
   onPlay: (card: BattleCard, action: PlayAction) => void;
+  autoKey: (c: BattleCard) => string;
   onVisual: (c: BattleCard) => void;
   t: Tr;
 }) {
+  const auto = AUTO_EFFECTS[autoKey(card)];
   const btn = "rounded-ctl border border-blue px-1.5 text-[11px] font-medium text-blue hover:bg-blue/10";
   const sub = "rounded-ctl border hairline px-1.5 text-[11px] text-ink2 hover:text-ink";
   const targets = units; // in-play units to attach/evolve onto
@@ -1144,7 +1190,7 @@ function HandActions({
           type="button"
           onClick={() => onPlay(card, { type: "supporter" })}
           className={btn}
-          title={AUTO_EFFECTS[card.name] !== undefined ? t(AUTO_EFFECTS[card.name]!.summaryKey) : t("battle.act.supporterManual")}
+          title={auto !== undefined ? t(auto.summaryKey) : t("battle.act.supporterManual")}
         >
           {t("battle.act.useSupporter")}
         </button>
