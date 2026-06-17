@@ -819,6 +819,8 @@
   "battle.unit.scoop": "To hand",
   "battle.unit.dmgPlus": "DMG+10",
   "battle.unit.dmgMinus": "DMG−10",
+  "battle.unit.ability": "Ability",
+  "battle.atk.abilityManual": "Resolve ability effects by the real card text (anything needing a choice/coin-flip isn't auto-run).",
   "battle.atk.title": "Battle (attack)",
   "battle.atk.vs": "{atk} attacks {def} (attacking ends your turn)",
   "battle.atk.noTargetHint": "No opposing Active Pokémon to attack yet.",

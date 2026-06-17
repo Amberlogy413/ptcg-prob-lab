@@ -34,7 +34,7 @@ import { ProofNumber, type Proof } from "../components/ProofNumber.tsx";
 import { buildExplain } from "../data/explain.ts";
 import { Modal } from "../components/Modal.tsx";
 
-type Resolve = (c: BattleCard) => { name: string; accent: string };
+type Resolve = (c: BattleCard) => { name: string; accent: string; types: string[]; ability: string | null };
 type Tr = (k: string, p?: Record<string, string | number>) => string;
 
 /** A pickable deck for the sandbox: a real meta archetype or a saved deck. */
@@ -215,9 +215,15 @@ export function BattleView() {
 
   const resolve = useCallback<Resolve>(
     (card) => {
-      if (catalog === null) return { name: card.name, accent: NEUTRAL_ACCENT };
+      if (catalog === null) return { name: card.name, accent: NEUTRAL_ACCENT, types: [], ability: null };
       const loc = localizeDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }, lang);
-      return { name: loc.name, accent: loc.card !== null ? cardAccent(loc.card) : NEUTRAL_ACCENT };
+      const cc = loc.card;
+      return {
+        name: loc.name,
+        accent: cc !== null ? cardAccent(cc) : NEUTRAL_ACCENT,
+        types: cc?.types ?? [],
+        ability: cc?.abilities?.[0]?.name ?? null,
+      };
     },
     [catalog, lang],
   );
@@ -534,11 +540,12 @@ export function BattleView() {
         t={t}
       />
 
-      {meBoard.active !== null && attackList.length > 0 && (
+      {meBoard.active !== null && (attackList.length > 0 || (meActiveCard?.abilities?.length ?? 0) > 0) && (
         <AttackPanel
           attacker={resolve(meBoard.active.card).name}
           defender={oppBoard.active !== null ? resolve(oppBoard.active.card).name : null}
           attacks={attackList}
+          abilities={(meActiveCard?.abilities ?? []).map((a) => a.name)}
           canAttack={!(turn === 1 && me === firstPlayer) && oppBoard.active !== null}
           onAttack={doAttack}
           t={t}
@@ -791,7 +798,7 @@ function UnitTile({
   onVisual: (c: BattleCard) => void;
   t: Tr;
 }) {
-  const { name, accent } = resolve(unit.card);
+  const { name, accent, types, ability } = resolve(unit.card);
   const hp = unit.card.hp;
   const remaining = hp !== undefined ? hp - unit.damage : undefined;
   const ko = remaining !== undefined && remaining <= 0;
@@ -809,7 +816,23 @@ function UnitTile({
         }
         title={name}
       >
-        <span className="block truncate text-xs font-medium">{name}</span>
+        <span className="flex items-center gap-1">
+          {types.length > 0 && (
+            <span className="flex shrink-0 items-center gap-0.5">
+              {types.map((ty) => (
+                <span key={ty} style={{ color: TYPE_COLORS[ty] ?? NEUTRAL_ACCENT }}>
+                  <TypeIcon type={ty} />
+                </span>
+              ))}
+            </span>
+          )}
+          <span className="truncate text-xs font-medium">{name}</span>
+          {ability !== null && (
+            <span className="shrink-0 rounded-full border border-pink/50 bg-pink/10 px-1 text-[9px] text-pink" title={ability}>
+              {t("battle.unit.ability")}
+            </span>
+          )}
+        </span>
         <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-ink2">
           {hp !== undefined && (
             <span className={ko || unit.damage > 0 ? "font-mono text-bad" : "font-mono"}>
@@ -941,11 +964,12 @@ interface AttackOpt {
 }
 
 function AttackPanel({
-  attacker, defender, attacks, canAttack, onAttack, t,
+  attacker, defender, attacks, abilities, canAttack, onAttack, t,
 }: {
   attacker: string;
   defender: string | null;
   attacks: AttackOpt[];
+  abilities: string[];
   canAttack: boolean;
   onAttack: (idx: number) => void;
   t: Tr;
@@ -956,6 +980,15 @@ function AttackPanel({
       <p className="mt-1 text-xs text-ink2">
         {defender !== null ? t("battle.atk.vs", { atk: attacker, def: defender }) : t("battle.atk.noTargetHint")}
       </p>
+      {abilities.length > 0 && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-1 text-xs">
+          <span className="rounded-full border border-pink/50 bg-pink/10 px-1.5 py-0.5 text-[10px] text-pink">{t("battle.unit.ability")}</span>
+          {abilities.map((a) => (
+            <span key={a} className="font-medium">{a}</span>
+          ))}
+          <span className="text-[10px] text-ink2">· {t("battle.atk.abilityManual")}</span>
+        </p>
+      )}
       <div className="mt-2 flex flex-wrap gap-1.5">
         {attacks.map((a) => {
           const ready = canAttack && a.canPay;

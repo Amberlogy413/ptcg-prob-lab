@@ -819,6 +819,8 @@
   "battle.unit.scoop": "收回手牌",
   "battle.unit.dmgPlus": "傷害+10",
   "battle.unit.dmgMinus": "傷害−10",
+  "battle.unit.ability": "特性",
+  "battle.atk.abilityManual": "特性效果請按真實卡面手動結算(需揀牌/擲銀嘅唔自動執行)。",
   "battle.atk.title": "戰鬥(攻擊)",
   "battle.atk.vs": "{atk} 攻擊 {def}(攻擊會結束你嘅回合)",
   "battle.atk.noTargetHint": "對手戰鬥場未有寶可夢,暫時無得攻擊。",
