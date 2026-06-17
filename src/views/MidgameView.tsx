@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/index.ts";
 import { PrecisionRuler } from "../components/PrecisionRuler.tsx";
 import { ProofNumber } from "../components/ProofNumber.tsx";
+import { CardInfoButton } from "../components/CardInfoButton.tsx";
 import { buildExplain } from "../data/explain.ts";
 import { computeMidgame, computeShuffleBack, computeScenario } from "../state/midgame.ts";
 import {
@@ -283,6 +284,7 @@ function ScenarioBuilder() {
               <option value="eq0">{t("scenario.eq", { n: 0 })}</option>
               <option value="le1">{t("scenario.le", { n: 1 })}</option>
             </select>
+            <CardInfoButton catalog={catalog} name={c.label} size="sm" />
             <button
               type="button"
               aria-label={t("deck.card.delete")}
@@ -317,15 +319,16 @@ function ScenarioBuilder() {
         {searchResults.length > 0 && (
           <ul className="mt-1 max-h-40 overflow-y-auto rounded-ctl border hairline bg-paper">
             {searchResults.map(({ rep }) => (
-              <li key={rep.id}>
+              <li key={rep.id} className="flex items-center gap-1 px-2 py-1 hover:bg-surface">
                 <button
                   type="button"
                   onClick={() => addCard(rep.name, 4)}
-                  className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-sm hover:bg-surface"
+                  className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left text-sm"
                 >
                   <span className="min-w-0 truncate">{rep.name}</span>
                   <span className="shrink-0 text-xs text-ink2">＋</span>
                 </button>
+                <CardInfoButton catalog={catalog} card={rep} size="xs" />
               </li>
             ))}
           </ul>
