@@ -67,14 +67,22 @@ const GUST_EFFECT = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互�
  *  YOUR OWN Benched Pokémon to swap with your Active (an Item, no Energy cost). */
 const SWITCH_EFFECT = "將自己的戰鬥寶可夢與備戰寶可夢互換";
 
-/** Is this card a canonical gust (Boss's Orders)? Exact effect match only. */
-export function isGustEffect(effect: string | undefined): boolean {
-  return effect !== undefined && effect.trim() === GUST_EFFECT;
+/** Normalise catalog effect text for an exact compare: trim + drop a single
+ *  trailing full-width 。 (every catalog effect ends with one; the canonical
+ *  strings above omit it). Conditional gust/switch cards carry EXTRA text, so
+ *  this never produces a false positive — verified against the full catalog. */
+function normEffect(effect: string | undefined): string {
+  return effect === undefined ? "" : effect.trim().replace(/。$/, "");
 }
 
-/** Is this card a canonical own-side Switch? Exact effect match only. */
+/** Is this card a canonical gust (Boss's Orders)? Exact (normalised) match only. */
+export function isGustEffect(effect: string | undefined): boolean {
+  return normEffect(effect) === GUST_EFFECT;
+}
+
+/** Is this card a canonical own-side Switch? Exact (normalised) match only. */
 export function isSwitchEffect(effect: string | undefined): boolean {
-  return effect !== undefined && effect.trim() === SWITCH_EFFECT;
+  return normEffect(effect) === SWITCH_EFFECT;
 }
 
 /**

@@ -263,8 +263,10 @@ describe("playSupporter (modeled)", () => {
 // --- targeted effects: the choice is part of the action space ---------------
 
 describe("targeted effects (Boss's Orders / Switch)", () => {
-  const GUST = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換";
-  const SWITCH = "將自己的戰鬥寶可夢與備戰寶可夢互換";
+  // The REAL catalog effect text ends with a full-width 。 — the detector must
+  // normalise it (regression guard for the trailing-period bug, fixed 2026-06-18).
+  const GUST = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換。";
+  const SWITCH = "將自己的戰鬥寶可夢與備戰寶可夢互換。";
   const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
     catalog: null,
     resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),

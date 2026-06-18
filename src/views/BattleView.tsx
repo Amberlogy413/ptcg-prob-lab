@@ -19,6 +19,8 @@ import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } fro
 import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
+import { engineStep } from "../state/battleBridge.ts";
+import { isGustEffect, isSwitchEffect } from "../engine/index.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -249,6 +251,20 @@ export function BattleView() {
     [catalog],
   );
 
+  // A targeted effect the engine models (detected by its verified catalog text):
+  // gust (Boss's Orders) or own-side Switch. Resolved through the engine bridge so
+  // there is ONE rules definition (owner 2026-06-18, "B").
+  const effectKind = useCallback(
+    (card: BattleCard): "gust" | "switch" | null => {
+      const cc = catalogOf(card);
+      if (cc === null) return null;
+      if (isGustEffect(cc.effect)) return "gust";
+      if (isSwitchEffect(cc.effect)) return "switch";
+      return null;
+    },
+    [catalogOf],
+  );
+
   function begin(useSeed: number) {
     const o1 = byId.get(p1Opt);
     const o2 = byId.get(p2Opt);
@@ -277,6 +293,15 @@ export function BattleView() {
     [catalog],
   );
   function play(card: BattleCard, action: PlayAction) {
+    // Capture a targeted effect's target name BEFORE the swap moves it.
+    let targetName = "";
+    if (action.type === "gust") {
+      const u = oppBoard.bench.find((x) => x.uid === action.targetUid);
+      targetName = u !== undefined ? resolve(u.card).name : "";
+    } else if (action.type === "switch") {
+      const u = meBoard.bench.find((x) => x.uid === action.benchUid);
+      targetName = u !== undefined ? resolve(u.card).name : "";
+    }
     const changed = act(() => {
       const s = store.getState();
       setMsg(null);
@@ -328,6 +353,14 @@ export function BattleView() {
         case "item":
           s.discardFromHand(me, card.iid);
           break;
+        case "gust":
+          // Boss's Orders — resolved by the engine (single rules source).
+          if (!engineStep({ type: "playGust", iid: card.iid, targetUid: action.targetUid }, catalog)) setMsg(t("battle.gate.gust"));
+          break;
+        case "switch":
+          // Switch — resolved by the engine (single rules source).
+          if (!engineStep({ type: "playSwitch", iid: card.iid, benchUid: action.benchUid }, catalog)) setMsg(t("battle.field.noActive"));
+          break;
         case "discard":
           s.discardFromHand(me, card.iid);
           break;
@@ -342,19 +375,25 @@ export function BattleView() {
     if (changed) {
       const cn = resolve(card).name;
       const who = names[me];
-      const key = {
-        toActive: "battle.log.active",
-        toBench: "battle.log.bench",
-        evolve: "battle.log.evolve",
-        energy: "battle.log.energy",
-        tool: "battle.log.tool",
-        stadium: "battle.log.stadium",
-        supporter: "battle.log.supporter",
-        item: "battle.log.item",
-        discard: "battle.log.discard",
-        toPile: "battle.log.toDeck",
-      }[action.type];
-      if (key !== undefined) note(t(key, { who, card: cn }));
+      if (action.type === "gust") {
+        note(t("battle.log.gust", { who, card: cn, target: targetName }));
+      } else if (action.type === "switch") {
+        note(t("battle.log.switch", { who, card: cn, target: targetName }));
+      } else {
+        const key = {
+          toActive: "battle.log.active",
+          toBench: "battle.log.bench",
+          evolve: "battle.log.evolve",
+          energy: "battle.log.energy",
+          tool: "battle.log.tool",
+          stadium: "battle.log.stadium",
+          supporter: "battle.log.supporter",
+          item: "battle.log.item",
+          discard: "battle.log.discard",
+          toPile: "battle.log.toDeck",
+        }[action.type];
+        if (key !== undefined) note(t(key, { who, card: cn }));
+      }
     }
     setSel(null);
   }
@@ -672,6 +711,9 @@ export function BattleView() {
       <HandRow
         board={meBoard}
         units={meUnits}
+        oppBench={oppBoard.bench}
+        oppHasActive={oppBoard.active !== null}
+        effectKind={effectKind}
         flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: turn === 1 && me === firstPlayer }}
         resolve={resolve}
         sel={sel}
@@ -708,6 +750,8 @@ type PlayAction =
   | { type: "stadium" }
   | { type: "supporter" }
   | { type: "item" }
+  | { type: "gust"; targetUid: string } // Boss's Orders → opponent bench Pokémon
+  | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
   | { type: "discard" }
   | { type: "toPile"; pile: Pile };
 
@@ -1182,10 +1226,13 @@ function AttackPanel({
 // The current player's hand — type-correct play actions.
 
 function HandRow({
-  board, units, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
+  board, units, oppBench, oppHasActive, effectKind, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
 }: {
   board: PlayerBoard;
   units: InPlay[];
+  oppBench: InPlay[];
+  oppHasActive: boolean;
+  effectKind: (c: BattleCard) => "gust" | "switch" | null;
   flags: HandFlags;
   resolve: Resolve;
   sel: Sel | null;
@@ -1219,7 +1266,7 @@ function HandRow({
                   {name}
                 </button>
                 {selected && (
-                  <HandActions card={c} board={board} units={units} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
+                  <HandActions card={c} board={board} units={units} oppBench={oppBench} oppHasActive={oppHasActive} effectKind={effectKind} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
                 )}
               </span>
             );
@@ -1232,11 +1279,14 @@ function HandRow({
 
 /** The type-correct action toolbar for a selected hand card. */
 function HandActions({
-  card, board, units, flags, resolve, onPlay, autoKey, onVisual, t,
+  card, board, units, oppBench, oppHasActive, effectKind, flags, resolve, onPlay, autoKey, onVisual, t,
 }: {
   card: BattleCard;
   board: PlayerBoard;
   units: InPlay[];
+  oppBench: InPlay[];
+  oppHasActive: boolean;
+  effectKind: (c: BattleCard) => "gust" | "switch" | null;
   flags: HandFlags;
   resolve: Resolve;
   onPlay: (card: BattleCard, action: PlayAction) => void;
@@ -1245,6 +1295,7 @@ function HandActions({
   t: Tr;
 }) {
   const auto = AUTO_EFFECTS[autoKey(card)];
+  const fx = effectKind(card); // a targeted engine effect (gust / switch), if any
   const btn = "rounded-ctl border border-blue px-1.5 text-[11px] font-medium text-blue hover:bg-blue/10";
   const sub = "rounded-ctl border hairline px-1.5 text-[11px] text-ink2 hover:text-ink";
   const targets = units; // in-play units to attach/evolve onto
@@ -1297,7 +1348,22 @@ function HandActions({
       {card.kind === "stadium" && (
         <button type="button" onClick={() => onPlay(card, { type: "stadium" })} className={btn}>{t("battle.act.playStadium")}</button>
       )}
-      {card.kind === "supporter" && (
+      {card.kind === "supporter" && fx === "gust" && (
+        <>
+          {/* Boss's Orders — choose which opponent Bench Pokémon to drag up (engine). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.gust")}→</span>
+          {oppHasActive && oppBench.length > 0 ? (
+            oppBench.map((u) => (
+              <button key={u.uid} type="button" onClick={() => onPlay(card, { type: "gust", targetUid: u.uid })} className={btn} title={resolve(u.card).name}>
+                {resolve(u.card).name}
+              </button>
+            ))
+          ) : (
+            <span className="text-[11px] text-ink2">{t("battle.act.needTarget")}</span>
+          )}
+        </>
+      )}
+      {card.kind === "supporter" && fx !== "gust" && (
         <button
           type="button"
           onClick={() => onPlay(card, { type: "supporter" })}
@@ -1307,7 +1373,22 @@ function HandActions({
           {t("battle.act.useSupporter")}
         </button>
       )}
-      {card.kind === "item" && (
+      {card.kind === "item" && fx === "switch" && (
+        <>
+          {/* Switch — choose which of your own Bench Pokémon to swap in (engine). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.switch")}→</span>
+          {board.active !== null && board.bench.length > 0 ? (
+            board.bench.map((u) => (
+              <button key={u.uid} type="button" onClick={() => onPlay(card, { type: "switch", benchUid: u.uid })} className={btn} title={resolve(u.card).name}>
+                {resolve(u.card).name}
+              </button>
+            ))
+          ) : (
+            <span className="text-[11px] text-ink2">{t("battle.act.needTarget")}</span>
+          )}
+        </>
+      )}
+      {card.kind === "item" && fx !== "switch" && (
         <button type="button" onClick={() => onPlay(card, { type: "item" })} className={btn}>{t("battle.act.useItem")}</button>
       )}
       {/* Always-available manual escape hatch (honest sandbox). */}
