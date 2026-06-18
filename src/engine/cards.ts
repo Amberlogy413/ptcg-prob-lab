@@ -151,7 +151,9 @@ export const COVERAGE = {
   simplifications: [
     "attacks resolve damage + weakness/resistance only; printed attack EFFECTS (status, draw, discard, heal, self-damage) are not applied",
     "variable / conditional attack damage ('50+', '60×') is APPROXIMATED by the printed base — the real multiplier/bonus is not in the data, so this value is never claimed as exact (see battleAttack.isVariableDamage)",
-    "Special Conditions: poison/burn checkup damage is applied, and an Asleep/Paralyzed Active is correctly barred from attacking; the asleep/paralyzed/confused RECOVERY coin flips are left to the caller",
+    "Special Conditions: poison/burn checkup damage is applied, and an Asleep/Paralyzed Active is correctly barred from attacking AND retreating (Confusion still allows both); the asleep/paralyzed/confused RECOVERY coin flips are left to the caller",
+    "mulligan IS performed (a no-Basic opening reshuffles + re-deals), but the opponent's extra-card-per-mulligan is NOT modeled",
+    "targeted/search effects are detected by exact zh effect TEXT; the call sites additionally gate by card kind (item vs supporter), which disambiguates the one known same-text pair (大師球 Item vs 寶可夢小朋友 Supporter)",
     "a Confused Active's attack is allowed WITHOUT the real coin flip (no fail / no 30 self-damage) — the flip is not modeled",
     "a Pokémon at/over its HP from checkup (poison/burn) is not auto-KO'd — matches the store; status-KO + prize is a later phase",
     "when an attack KOs the opponent's Active, the next player's mandatory start-of-turn draw is sequenced BEFORE the forced promotion (no observable effect today; no modeled effect depends on it)",

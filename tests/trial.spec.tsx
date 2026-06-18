@@ -12,6 +12,7 @@ import App from "../src/App.tsx";
 import { viewReady } from "./helpers.ts";
 import { useDeckStore } from "../src/state/deckStore.ts";
 import { useUiStore } from "../src/state/uiStore.ts";
+import { useTrainerStore } from "../src/state/trainerStore.ts";
 import { computeQ1 } from "../src/state/selectors.ts";
 import {
   physicalCopies,
@@ -139,6 +140,10 @@ describe("trial table UI", () => {
     await user.click(screen.getByRole("button", { name: "把這手變成訓練題" }));
     expect(useUiStore.getState().activeView).toBe("trainer");
     await viewReady();
+
+    const viewK = useTrainerStore.getState().pending?.q.promptParams.k;
+    // eslint-disable-next-line no-console
+    console.log(`DEBUG testK=${k} viewK=${viewK}`);
 
     // The injected question is on stage with the right k.
     expect(

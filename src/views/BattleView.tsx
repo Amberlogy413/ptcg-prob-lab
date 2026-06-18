@@ -17,7 +17,7 @@ import {
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "../state/battleAttack.ts";
-import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
+import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep, toEngineState } from "../state/battleBridge.ts";
@@ -282,6 +282,8 @@ export function BattleView() {
     history.current = []; // a fresh deal starts a fresh undo history
     setSel(null);
     setMsg(null);
+    setScrubIdx(null); // a fresh game returns to live (else a stale cursor flips it read-only)
+    setAiPlaying(false);
   }
   const start = () => begin(seed);
   function restart() {
@@ -293,7 +295,10 @@ export function BattleView() {
   // --- Replay: when scrubbing, the WHOLE board shows a past snapshot (read-only).
   // In live mode (scrubIdx === null) these equal the live store, so every handler
   // below behaves identically; in replay mode the interactive bits are gated off.
-  const frame: ReplayFrame | null = scrubIdx !== null ? (replay[scrubIdx] ?? null) : null;
+  // Clamp the cursor so a stale index (e.g. after the replay window rolls past 80)
+  // can never read out of range or show a nonsensical "80/10".
+  const safeScrub = scrubIdx === null ? null : Math.min(scrubIdx, replay.length - 1);
+  const frame: ReplayFrame | null = safeScrub !== null ? (replay[safeScrub] ?? null) : null;
   const replaying = frame !== null;
   const dTurn = frame ? frame.turn : turn;
   const dCurrent = frame ? frame.current : current;
@@ -626,14 +631,12 @@ export function BattleView() {
   function runBot() {
     if (gameResult(useBattleStore.getState()) !== null) return; // game already won
     const p = useBattleStore.getState().current;
-    let events: BotEvent[] = [];
+    // Log + snapshot EACH move as it happens (onEvent) so replay frames are
+    // per-move faithful — not all collapsed to the end-of-turn board.
     const changed = act(() => {
-      events = runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey });
+      runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: (e) => note(t(e.key, e.params)) });
     });
-    if (changed) {
-      events.forEach((e) => note(t(e.key, e.params)));
-      setSel(null);
-    }
+    if (changed) setSel(null);
   }
 
   // AI-vs-AI: let the heuristic bot play BOTH sides until someone wins (or a turn
@@ -644,12 +647,10 @@ export function BattleView() {
     let steps = 0;
     while (gameResult(useBattleStore.getState()) === null && steps < AI_MATCH_CAP) {
       const p = useBattleStore.getState().current;
-      let events: BotEvent[] = [];
       const changed = act(() => {
-        events = runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey });
+        runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: (e) => note(t(e.key, e.params)) });
       });
       if (!changed) break;
-      events.forEach((e) => note(t(e.key, e.params)));
       steps++;
     }
     const done = gameResult(useBattleStore.getState());
@@ -730,11 +731,11 @@ export function BattleView() {
           >
             {t("battle.undo")}
           </button>
-          <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); if (autoAi) runBot(); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+          <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); if (autoAi && !aiPlaying) runBot(); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
             </>
           )}
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
-          <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
+          <button type="button" onClick={() => { history.current = []; setScrubIdx(null); setAiPlaying(false); store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
         {!replaying && dTurn === 1 && me === firstPlayer && (
           <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
@@ -750,7 +751,7 @@ export function BattleView() {
               type="range"
               min={0}
               max={replay.length - 1}
-              value={scrubIdx ?? replay.length - 1}
+              value={safeScrub ?? replay.length - 1}
               onChange={(e) => {
                 const v = Number(e.target.value);
                 setAiPlaying(false); // viewing history pauses live playback
@@ -761,7 +762,7 @@ export function BattleView() {
               aria-label={t("battle.replay.scrub")}
             />
             <span className="whitespace-nowrap font-mono">
-              {(scrubIdx ?? replay.length - 1) + 1}/{replay.length}
+              {(safeScrub ?? replay.length - 1) + 1}/{replay.length}
               {replaying ? "" : ` · ${t("battle.replay.liveTag")}`}
             </span>
           </div>

@@ -88,6 +88,15 @@ export function newGame(input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; f
   };
   s = setup(s, "p1");
   s = setup(s, "p2");
+  // Mulligan: an opening hand with no Basic Pokémon is reshuffled + re-dealt (real
+  // rule). Capped so a deck that genuinely has no Basics can't loop forever (it
+  // just keeps its no-Basic hand — an illegal deck the builder already forbids).
+  // (The opponent's extra-card-per-mulligan is not modeled — a disclosed gap.)
+  const hasBasic = (b: PlayerBoard): boolean => b.hand.some((c) => c.kind === "basic");
+  const MULLIGAN_CAP = 20;
+  for (const pl of ["p1", "p2"] as const) {
+    for (let tries = 0; !hasBasic(s[pl]) && tries < MULLIGAN_CAP; tries++) s = setup(s, pl);
+  }
   // The going-first player draws at the start of turn 1. Under current official
   // rules only no-attack / no-Supporter apply on turn 1; the turn-1 draw DOES
   // happen (the opening DEAL is 7 — this mandatory draw then makes it 8).
@@ -95,10 +104,12 @@ export function newGame(input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; f
   return s;
 }
 
-/** An Active that is Asleep or Paralyzed cannot attack (real rule). */
+/** An Active that is Asleep or Paralyzed cannot attack OR retreat (real rule;
+ *  Confusion still permits both). */
 function canActiveAttack(unit: InPlay): boolean {
   return !unit.status.includes("asleep") && !unit.status.includes("paralyzed");
 }
+const canActiveRetreat = canActiveAttack;
 
 /** Is it the going-first player's turn 1? (no Supporter, no attack, no evolve.) */
 function firstTurnRestricted(s: GameState): boolean {
@@ -174,8 +185,8 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
     }
   }
 
-  // Retreat: once per turn, needs enough attached Energy to pay the cost.
-  if (!s.turnRetreated && me.active !== null) {
+  // Retreat: once per turn, needs enough attached Energy, and not while Asleep/Paralyzed.
+  if (!s.turnRetreated && me.active !== null && canActiveRetreat(me.active)) {
     const cost = retreatCost(me.active.card);
     if (me.active.energy.length >= cost) for (const b of me.bench) acts.push({ type: "retreat", benchUnitId: b.uid });
   }
@@ -340,7 +351,7 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       return ns;
     }
     case "retreat": {
-      if (s.turnRetreated || board.active === null) return s;
+      if (s.turnRetreated || board.active === null || !canActiveRetreat(board.active)) return s;
       const i = board.bench.findIndex((u) => u.uid === a.benchUnitId);
       if (i === -1) return s;
       const out = board.active;

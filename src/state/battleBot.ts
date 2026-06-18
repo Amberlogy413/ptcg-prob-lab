@@ -31,6 +31,10 @@ export interface BotCtx {
   nameOf: (c: BattleCard) => string;
   /** Resolve a card to the canonical zh name used to key AUTO_EFFECTS. */
   autoKey: (c: BattleCard) => string;
+  /** Called RIGHT AFTER each move applies, while the store holds that move's
+   *  state — so the caller can log + snapshot a faithful per-move replay frame
+   *  (without it, all of a turn's frames would capture the end-of-turn board). */
+  onEvent?: (e: BotEvent) => void;
 }
 
 const MAX_BOT_BENCH = 3; // the bot keeps a modest bench, not a full 5
@@ -50,8 +54,11 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
   const opp: PlayerId = player === "p1" ? "p2" : "p1";
   const catOf = (c: BattleCard): CatalogCard | null =>
     catalog === null ? null : resolveDeckRow(catalog, { name: c.name, ...(c.catalogId !== undefined ? { catalogId: c.catalogId } : {}) });
-  const push = (key: string, card?: BattleCard, extra: Record<string, string | number> = {}) =>
-    ev.push({ key, params: { who: ctx.who, ...(card !== undefined ? { card: ctx.nameOf(card) } : {}), ...extra } });
+  const push = (key: string, card?: BattleCard, extra: Record<string, string | number> = {}) => {
+    const e: BotEvent = { key, params: { who: ctx.who, ...(card !== undefined ? { card: ctx.nameOf(card) } : {}), ...extra } };
+    ev.push(e);
+    ctx.onEvent?.(e); // fire NOW, while the store reflects this move (faithful replay frame)
+  };
 
   // 1) Ensure an Active Pokémon (a Basic from hand).
   if (st()[player].active === null) {

@@ -80,6 +80,12 @@ describe("finalDamage — weakness / resistance", () => {
     expect(r.damage).toBe(70);
     expect(r.resistance).toBe(true);
   });
+  it("subtracts a resistance written with a full-width / subscript minus (catalog reality)", () => {
+    // 175+ catalog resistances use the full-width minus 「－30」; it must SUBTRACT.
+    expect(finalDamage(attacker, card({ resistances: [{ type: "Fire", value: "－30" }] }), 100).damage).toBe(70);
+    expect(finalDamage(attacker, card({ resistances: [{ type: "Fire", value: "₋30" }] }), 100).damage).toBe(70);
+    expect(finalDamage(attacker, card({ resistances: [{ type: "Fire", value: "−20" }] }), 100).damage).toBe(80);
+  });
   it("leaves damage unchanged with no weakness/resistance, and never goes negative", () => {
     expect(finalDamage(attacker, card({}), 50).damage).toBe(50);
     expect(finalDamage(attacker, card({ resistances: [{ type: "Fire", value: "-30" }] }), 20).damage).toBe(0);

@@ -175,7 +175,8 @@ describe("applyAction", () => {
   });
 
   it("retreat pays the cost by discarding Energy and swaps the Active", () => {
-    const active = { uid: "act", card: card("act", "basic", { hp: 90, retreat: 2 }), under: [], energy: [card("e1", "energy-basic"), card("e2", "energy-basic"), card("e3", "energy-basic")], tools: [], damage: 0, playedTurn: 1, status: ["asleep" as const] };
+    // Poison does NOT block retreat (only Asleep/Paralyzed do); it clears on leaving Active.
+    const active = { uid: "act", card: card("act", "basic", { hp: 90, retreat: 2 }), under: [], energy: [card("e1", "energy-basic"), card("e2", "energy-basic"), card("e3", "energy-basic")], tools: [], damage: 0, playedTurn: 1, status: ["poison" as const] };
     const bench = { uid: "bn", card: card("bn", "basic", { hp: 60 }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] };
     const s = baseState({ p1: { ...pb(), active, bench: [bench] } });
     const ns = applyAction(s, { type: "retreat", benchUnitId: "bn" }, nullCtx);
@@ -185,6 +186,19 @@ describe("applyAction", () => {
     const movedBack = ns.p1.bench.find((u) => u.uid === "act")!;
     expect(movedBack.energy.length).toBe(1); // 3 − 2 = 1 left
     expect(movedBack.status).toEqual([]); // conditions cleared leaving the Active
+  });
+
+  it("an Asleep or Paralyzed Active cannot retreat (only Confusion still allows it)", () => {
+    const mk = (status: ("asleep" | "paralyzed")[]) => ({
+      ...pb(),
+      active: { uid: "act", card: card("act", "basic", { hp: 90, retreat: 0 }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status },
+      bench: [{ uid: "bn", card: card("bn", "basic", { hp: 60 }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] }],
+    });
+    for (const cond of [["asleep"], ["paralyzed"]] as ("asleep" | "paralyzed")[][]) {
+      const s = baseState({ p1: mk(cond) });
+      expect(find(legalActions(s, nullCtx), "retreat").length).toBe(0);
+      expect(applyAction(s, { type: "retreat", benchUnitId: "bn" }, nullCtx)).toBe(s);
+    }
   });
 
   it("a too-poor Pokémon cannot retreat", () => {

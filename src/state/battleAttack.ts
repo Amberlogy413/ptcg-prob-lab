@@ -70,12 +70,16 @@ export function baseDamage(dmg: number | string | undefined): number {
 
 function applyMod(dmg: number, value: string | undefined, weak: boolean): number {
   if (value === undefined || value.trim() === "") return weak ? dmg * 2 : dmg;
-  const v = value.trim();
+  // Normalize every Unicode minus glyph to ASCII first — the catalog records many
+  // resistances with a FULL-WIDTH minus (－30) or subscript minus (₋30); without
+  // this the minus is stripped and a −30 reduction becomes a +30 BONUS (wrong).
+  const v = value.trim().replace(/[−－₋‐‑‒–—―]/g, "-");
   if (/^[×x*]/.test(v)) {
     const n = Number(v.slice(1));
     return Number.isFinite(n) ? Math.round(dmg * n) : weak ? dmg * 2 : dmg;
   }
-  const n = Number(v.replace(/[^\d-]/g, ""));
+  const m = v.match(/-?\d+/);
+  const n = m ? Number(m[0]) : NaN;
   return Number.isFinite(n) ? dmg + n : weak ? dmg * 2 : dmg;
 }
 
