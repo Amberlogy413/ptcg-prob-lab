@@ -797,6 +797,8 @@
   "battle.gate.energyUsed": "You already attached an Energy this turn (once per turn).",
   "battle.gate.stadiumUsed": "You already played a Stadium this turn (once per turn).",
   "battle.gate.retreatUsed": "You already retreated this turn (once per turn).",
+  "battle.prizes.take": "Take this Prize card (reveal into hand)",
+  "battle.prizes.face": "P",
   "battle.act.detail": "Details",
   "battle.act.toActive": "To Active",
   "battle.act.toBench": "To Bench",

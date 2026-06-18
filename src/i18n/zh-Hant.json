@@ -797,6 +797,8 @@
   "battle.gate.energyUsed": "今個回合已經附過能量(每回合限一次)。",
   "battle.gate.stadiumUsed": "今個回合已經放過競技場(每回合限一張)。",
   "battle.gate.retreatUsed": "今個回合已經退場過(每回合限一次)。",
+  "battle.prizes.take": "攞呢張獎賞卡(翻開入手牌)",
+  "battle.prizes.face": "獎",
   "battle.act.detail": "詳細",
   "battle.act.toActive": "上戰鬥場",
   "battle.act.toBench": "上備戰",

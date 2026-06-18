@@ -265,6 +265,23 @@ describe("per-turn limits (review fix)", () => {
   });
 });
 
+describe("prize cards", () => {
+  beforeEach(() => useBattleStore.getState().reset());
+
+  it("takePrizeAt reveals a specific face-down Prize into the hand", () => {
+    useBattleStore.getState().newGame({ p1: SPEC, p2: SPEC, seed: 7 });
+    const prize = useBattleStore.getState().p1.prizes[2]!;
+    const before = useBattleStore.getState().p1.hand.length;
+    useBattleStore.getState().takePrizeAt("p1", prize.iid);
+    const p1 = useBattleStore.getState().p1;
+    expect(p1.prizes.some((c) => c.iid === prize.iid)).toBe(false);
+    expect(p1.hand.some((c) => c.iid === prize.iid)).toBe(true);
+    expect(p1.prizes.length).toBe(5);
+    expect(p1.hand.length).toBe(before + 1);
+    expect(countAll(p1)).toBe(TOTAL); // nothing lost
+  });
+});
+
 describe("computeDrawOdds", () => {
   it("matches the exact hypergeometric (4 of 10, draw 1 = 2/5)", () => {
     const o = computeDrawOdds(10, 4, 1);

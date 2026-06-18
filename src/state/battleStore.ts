@@ -171,6 +171,8 @@ interface BattleState {
   knockOut: (player: PlayerId, unitId: string) => void;
   /** Take n Prize cards (into the hand) — after scoring a Knock-Out. */
   takePrize: (player: PlayerId, n: number) => void;
+  /** Take ONE specific (face-down) Prize card into the hand — manual prize pick. */
+  takePrizeAt: (player: PlayerId, iid: string) => void;
   /** Adjust a unit's damage (clamped ≥0). */
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
   /** Toggle a Special Condition on a unit (poison/burn/asleep/confused/paralyzed). */
@@ -483,6 +485,17 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       if (k === 0) return {} as Partial<BattleState>;
       return {
         [player]: { ...board, prizes: board.prizes.slice(k), hand: [...board.hand, ...board.prizes.slice(0, k)] },
+      } as Partial<BattleState>;
+    });
+  },
+
+  takePrizeAt: (player, iid) => {
+    set((s) => {
+      const board = s[player];
+      const card = board.prizes.find((c) => c.iid === iid);
+      if (card === undefined) return {} as Partial<BattleState>;
+      return {
+        [player]: { ...board, prizes: board.prizes.filter((c) => c.iid !== iid), hand: [...board.hand, card] },
       } as Partial<BattleState>;
     });
   },

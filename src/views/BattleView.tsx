@@ -760,10 +760,40 @@ function PlayerHalf({
       <PileChip label={t("battle.zone.lostzone")} cards={board.lostzone} player={player} resolve={resolve} sel={sel} setSel={setSel} onVisual={onVisual} />
     </div>
   );
+  // Prize cards as a face-down grid (real board, owner's tcgmasters reference).
+  // Your own prizes are click-to-take (reveal into hand); the opponent's are
+  // just shown face-down. IP-safe: our own neutral tile, never an official back.
+  const prizesRow = (
+    <div className="mb-1.5">
+      <p className="text-xs text-ink2">
+        {t("battle.zone.prizes")} <span className="font-mono">{board.prizes.length}</span>
+      </p>
+      {board.prizes.length > 0 && (
+        <div className="mt-0.5 flex flex-wrap gap-1">
+          {board.prizes.map((c) =>
+            isMe === true ? (
+              <button
+                key={c.iid}
+                type="button"
+                onClick={() => act(() => useBattleStore.getState().takePrizeAt(player, c.iid))}
+                aria-label={t("battle.prizes.take")}
+                title={t("battle.prizes.take")}
+                className="h-7 w-6 rounded-sm border border-blue/40 bg-blue/10 text-[9px] font-medium text-blue hover:bg-blue/20"
+              >
+                {t("battle.prizes.face")}
+              </button>
+            ) : (
+              <span key={c.iid} className="h-7 w-6 rounded-sm border hairline bg-paper" aria-hidden="true" />
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   // Active sits nearest the centre: your half = active on TOP; opponent mirror =
   // active at the BOTTOM (facing yours across the stadium band).
-  const body = mirror ? [piles, benchRow, activeRow] : [activeRow, benchRow, piles];
+  const body = mirror ? [prizesRow, piles, benchRow, activeRow] : [activeRow, benchRow, piles, prizesRow];
 
   return (
     <section className="rounded-card border hairline bg-surface p-3">
