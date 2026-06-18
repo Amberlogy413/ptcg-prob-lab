@@ -122,6 +122,27 @@ function specKind(s: CardSpec): PlayKind {
 
 export const MAX_BENCH = 5;
 
+/** A replay frame — the full game state right after a logged action, paired with
+ *  that log line, so the AI-sim view can scrub through history (owner 2026-06-18).
+ *  The store updates immutably, so these reference the (frozen-by-convention)
+ *  post-action objects — no deep clone needed. Shaped as the engine's GameState
+ *  (plus `line`) so `observe(frame, frame.current)` works directly. */
+export interface ReplayFrame {
+  line: string;
+  seed: number;
+  shuffleNonce: number;
+  turn: number;
+  current: PlayerId;
+  firstPlayer: PlayerId;
+  turnSupporterUsed: boolean;
+  turnEnergyAttached: boolean;
+  turnStadiumPlayed: boolean;
+  turnRetreated: boolean;
+  everInPlay: { p1: boolean; p2: boolean };
+  p1: PlayerBoard;
+  p2: PlayerBoard;
+}
+
 interface BattleState {
   started: boolean;
   seed: number;
@@ -145,6 +166,8 @@ interface BattleState {
   /** Human-readable action log (newest LAST), capped — the faithful "what
    *  happened" replay trail (owner 2026-06-18, AI-sim reference). */
   log: string[];
+  /** Per-log-line state snapshots for the replay scrubber (index-aligned to log). */
+  replay: ReplayFrame[];
 
   newGame: (input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; names?: { p1: string; p2: string }; first?: PlayerId }) => void;
   /** Append one localized line to the action log. */
@@ -282,8 +305,33 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   p2: emptyBoard(),
   names: { p1: "P1", p2: "P2" },
   log: [],
+  replay: [],
 
-  note: (msg) => set((s) => ({ log: [...s.log, msg].slice(-80) })),
+  // Append a log line AND snapshot the post-action state (index-aligned), so the
+  // AI-sim view can scrub history. `s` here is post-action (the action's set ran
+  // first), and the store is immutable, so referencing p1/p2 is a safe snapshot.
+  note: (msg) =>
+    set((s) => ({
+      log: [...s.log, msg].slice(-80),
+      replay: [
+        ...s.replay,
+        {
+          line: msg,
+          seed: s.seed,
+          shuffleNonce: s.shuffleNonce,
+          turn: s.turn,
+          current: s.current,
+          firstPlayer: s.firstPlayer,
+          turnSupporterUsed: s.turnSupporterUsed,
+          turnEnergyAttached: s.turnEnergyAttached,
+          turnStadiumPlayed: s.turnStadiumPlayed,
+          turnRetreated: s.turnRetreated,
+          everInPlay: s.everInPlay,
+          p1: s.p1,
+          p2: s.p2,
+        },
+      ].slice(-80),
+    })),
 
   newGame: ({ p1, p2, seed, names, first }) => {
     const firstPlayer = first ?? "p1";
@@ -303,6 +351,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       p2: { ...emptyBoard(), deck: instantiate(p2) },
       names: names ?? { p1: "P1", p2: "P2" },
       log: [],
+      replay: [],
     });
     get().setup("p1");
     get().setup("p2");
@@ -661,6 +710,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       turnRetreated: false,
       everInPlay: { p1: false, p2: false },
       log: [],
+      replay: [],
     });
   },
 }));

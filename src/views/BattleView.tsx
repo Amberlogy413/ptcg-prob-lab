@@ -12,6 +12,7 @@ import {
   type PlayerBoard,
   type CardSpec,
   type SpecialCondition,
+  type ReplayFrame,
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
@@ -114,6 +115,7 @@ export function BattleView() {
   const turnRetreated = useBattleStore((s) => s.turnRetreated);
   const everInPlay = useBattleStore((s) => s.everInPlay);
   const log = useBattleStore((s) => s.log);
+  const replay = useBattleStore((s) => s.replay);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
   const p2 = useBattleStore((s) => s.p2);
@@ -130,6 +132,8 @@ export function BattleView() {
   const [first, setFirst] = useState<PlayerId>("p1");
   const [msg, setMsg] = useState<string | null>(null);
   const [autoAi, setAutoAi] = useState(false); // AI auto-plays the opponent's turn
+  const [aiPlaying, setAiPlaying] = useState(false); // AI-vs-AI paced playback running
+  const [aiSpeedMs, setAiSpeedMs] = useState(700); // ms per bot turn during playback
 
   // Undo (P4): run a user gesture ATOMICALLY — one snapshot BEFORE the gesture,
   // kept only if the gesture actually changed the game. So a composite multi-step
@@ -447,6 +451,21 @@ export function BattleView() {
     setSel(null);
   }
 
+  // AI-vs-AI PACED playback: one bot turn per tick at the chosen speed, so you can
+  // watch the board evolve. Re-runs after each turn (turn dep) until the game ends
+  // or playback is paused. Honest: the same heuristic bot, just paced. (Declared
+  // BEFORE any early return so the hook order is stable.)
+  useEffect(() => {
+    if (!aiPlaying) return;
+    if (!started || gameResult(useBattleStore.getState()) !== null) {
+      setAiPlaying(false);
+      return;
+    }
+    const id = setTimeout(() => runBot(), aiSpeedMs);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiPlaying, aiSpeedMs, turn, started]);
+
   const MIN_DEAL = 13;
   const sel1 = byId.get(p1Opt);
   const sel2 = byId.get(p2Opt);
@@ -653,6 +672,23 @@ export function BattleView() {
           >
             🤖⚔️ {t("battle.ai.match")}
           </button>
+          <button
+            type="button"
+            onClick={() => setAiPlaying((p) => !p)}
+            title={t("battle.ai.playNote")}
+            className="rounded-ctl border border-blue px-3 py-1.5 text-xs font-medium text-blue hover:bg-blue/10"
+          >
+            {aiPlaying ? `⏸ ${t("battle.ai.pause")}` : `▶ ${t("battle.ai.play")}`}
+          </button>
+          <label className="flex items-center gap-1 text-xs text-ink2" title={t("battle.ai.speedNote")}>
+            {t("battle.ai.speed")}
+            <select value={aiSpeedMs} onChange={(e) => setAiSpeedMs(Number(e.target.value))} className="rounded-ctl border hairline bg-surface px-1 py-0.5">
+              <option value={1200}>×0.5</option>
+              <option value={700}>×1</option>
+              <option value={350}>×2</option>
+              <option value={150}>×4</option>
+            </select>
+          </label>
           <label className="flex items-center gap-1 text-xs text-ink2" title={t("battle.ai.note")}>
             <input type="checkbox" checked={autoAi} onChange={(e) => setAutoAi(e.target.checked)} />
             {t("battle.ai.auto")}
@@ -705,7 +741,9 @@ export function BattleView() {
         </details>
       )}
 
-      {started && result === null && <ObservationPanel obs={observe(toEngineState(useBattleStore.getState()), current)} t={t} />}
+      {started && result === null && (
+        <ObservationPanel frames={replay} liveObs={observe(toEngineState(useBattleStore.getState()), current)} t={t} />
+      )}
 
       {/* Opponent (top, mirrored): board only, hand hidden */}
       <PlayerHalf
@@ -1485,7 +1523,19 @@ function HandActions({
 // Mirrors the reference sim's "Observation" panel; the opponent's hand is a
 // COUNT only (public info), and the feature vector is encodeObservation().
 
-function ObservationPanel({ obs, t }: { obs: Observation; t: Tr }) {
+function ObservationPanel({ frames, liveObs, t }: { frames: ReplayFrame[]; liveObs: Observation; t: Tr }) {
+  // Scrub through recorded history; the slider edge = live. We follow the live
+  // edge as new frames arrive, unless the user has scrubbed back.
+  const [idx, setIdx] = useState(0);
+  const followLive = useRef(true);
+  const last = Math.max(0, frames.length - 1);
+  useEffect(() => {
+    if (followLive.current) setIdx(last);
+  }, [last]);
+  const pos = Math.min(idx, last);
+  const frame = frames.length > 0 ? frames[pos] : undefined;
+  const isLive = frames.length === 0 || pos === last;
+  const obs = frame !== undefined ? observe(frame, frame.current) : liveObs;
   const vec = encodeObservation(obs);
   const a = (s: SideView) =>
     s.active
@@ -1507,6 +1557,28 @@ function ObservationPanel({ obs, t }: { obs: Observation; t: Tr }) {
       <summary className="cursor-pointer text-xs font-medium text-ink2">
         {t("battle.obs.title")} <span className="text-ink2">· {t("battle.obs.pov")} {obs.pov.toUpperCase()}</span>
       </summary>
+      {frames.length > 1 && (
+        <div className="mt-1 flex items-center gap-2">
+          <span className="whitespace-nowrap">{t("battle.obs.scrub")}</span>
+          <input
+            type="range"
+            min={0}
+            max={last}
+            value={pos}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              followLive.current = v === last;
+              setIdx(v);
+            }}
+            className="flex-1"
+            aria-label={t("battle.obs.scrub")}
+          />
+          <span className="whitespace-nowrap font-mono">
+            {pos + 1}/{frames.length} {isLive ? `· ${t("battle.obs.live")}` : ""}
+          </span>
+        </div>
+      )}
+      {!isLive && frame !== undefined && <div className="mt-0.5 truncate font-mono text-[10px] text-ink">› {frame.line}</div>}
       <div className="mt-1 space-y-1 font-mono">
         <div>{t("battle.obs.turn")} {obs.turn} · {t("battle.obs.toMove")} {obs.toMove.toUpperCase()}</div>
         {row(t("battle.obs.me"), obs.me)}
