@@ -20,7 +20,7 @@ import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect } from "../engine/index.ts";
+import { isGustEffect, isSwitchEffect, searchSpecOf, makeCtx, type SearchSpec } from "../engine/index.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -251,19 +251,23 @@ export function BattleView() {
     [catalog],
   );
 
-  // A targeted effect the engine models (detected by its verified catalog text):
-  // gust (Boss's Orders) or own-side Switch. Resolved through the engine bridge so
-  // there is ONE rules definition (owner 2026-06-18, "B").
+  // Detection goes through the engine's own ctx (single rules source) — it resolves
+  // to the zh-Hant print so effect text matches even when the deck row points at a
+  // Japanese print (夜のタンカ / リーリエの決心). Used for the targeted/search pickers.
+  const ectx = useMemo(() => makeCtx(catalog), [catalog]);
   const effectKind = useCallback(
     (card: BattleCard): "gust" | "switch" | null => {
-      const cc = catalogOf(card);
-      if (cc === null) return null;
-      if (isGustEffect(cc.effect)) return "gust";
-      if (isSwitchEffect(cc.effect)) return "switch";
+      const eff = ectx.resolve(card)?.effect;
+      if (isGustEffect(eff)) return "gust";
+      if (isSwitchEffect(eff)) return "switch";
       return null;
     },
-    [catalogOf],
+    [ectx],
   );
+
+  // A modeled search Item (Nest/Master Ball, Night Stretcher) → its pile spec, or
+  // null. The pick (which card from deck/discard) is the action (engine bridge).
+  const searchSpec = useCallback((card: BattleCard): SearchSpec | null => searchSpecOf(ectx.resolve(card)?.effect), [ectx]);
 
   function begin(useSeed: number) {
     const o1 = byId.get(p1Opt);
@@ -301,6 +305,9 @@ export function BattleView() {
     } else if (action.type === "switch") {
       const u = meBoard.bench.find((x) => x.uid === action.benchUid);
       targetName = u !== undefined ? resolve(u.card).name : "";
+    } else if (action.type === "search") {
+      const c = [...meBoard.deck, ...meBoard.discard].find((x) => x.iid === action.foundIid);
+      targetName = c !== undefined ? resolve(c).name : "";
     }
     const changed = act(() => {
       const s = store.getState();
@@ -366,6 +373,10 @@ export function BattleView() {
           // Switch — resolved by the engine (single rules source).
           if (!engineStep({ type: "playSwitch", iid: card.iid, benchUid: action.benchUid }, catalog)) setMsg(t("battle.field.noActive"));
           break;
+        case "search":
+          // Nest/Master Ball, Night Stretcher — resolved by the engine.
+          if (!engineStep({ type: "search", iid: card.iid, foundIid: action.foundIid }, catalog)) setMsg(t("battle.field.benchFull"));
+          break;
         case "discard":
           s.discardFromHand(me, card.iid);
           break;
@@ -384,6 +395,8 @@ export function BattleView() {
         note(t("battle.log.gust", { who, card: cn, target: targetName }));
       } else if (action.type === "switch") {
         note(t("battle.log.switch", { who, card: cn, target: targetName }));
+      } else if (action.type === "search") {
+        note(t("battle.log.search", { who, card: cn, target: targetName }));
       } else {
         const key = {
           toActive: "battle.log.active",
@@ -719,6 +732,8 @@ export function BattleView() {
         oppBench={oppBoard.bench}
         oppHasActive={oppBoard.active !== null}
         effectKind={effectKind}
+        searchSpec={searchSpec}
+        resolveName={(c) => resolve(c).name}
         flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: turn === 1 && me === firstPlayer }}
         resolve={resolve}
         sel={sel}
@@ -757,6 +772,7 @@ type PlayAction =
   | { type: "item" }
   | { type: "gust"; targetUid: string } // Boss's Orders → opponent bench Pokémon
   | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
+  | { type: "search"; foundIid: string } // Nest/Master Ball, Night Stretcher → pick from a pile
   | { type: "discard" }
   | { type: "toPile"; pile: Pile };
 
@@ -1231,13 +1247,15 @@ function AttackPanel({
 // The current player's hand — type-correct play actions.
 
 function HandRow({
-  board, units, oppBench, oppHasActive, effectKind, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
+  board, units, oppBench, oppHasActive, effectKind, searchSpec, resolveName, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
 }: {
   board: PlayerBoard;
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
   effectKind: (c: BattleCard) => "gust" | "switch" | null;
+  searchSpec: (c: BattleCard) => SearchSpec | null;
+  resolveName: (c: BattleCard) => string;
   flags: HandFlags;
   resolve: Resolve;
   sel: Sel | null;
@@ -1271,7 +1289,7 @@ function HandRow({
                   {name}
                 </button>
                 {selected && (
-                  <HandActions card={c} board={board} units={units} oppBench={oppBench} oppHasActive={oppHasActive} effectKind={effectKind} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
+                  <HandActions card={c} board={board} units={units} oppBench={oppBench} oppHasActive={oppHasActive} effectKind={effectKind} searchSpec={searchSpec} resolveName={resolveName} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
                 )}
               </span>
             );
@@ -1284,7 +1302,7 @@ function HandRow({
 
 /** The type-correct action toolbar for a selected hand card. */
 function HandActions({
-  card, board, units, oppBench, oppHasActive, effectKind, flags, resolve, onPlay, autoKey, onVisual, t,
+  card, board, units, oppBench, oppHasActive, effectKind, searchSpec, resolveName, flags, resolve, onPlay, autoKey, onVisual, t,
 }: {
   card: BattleCard;
   board: PlayerBoard;
@@ -1292,6 +1310,8 @@ function HandActions({
   oppBench: InPlay[];
   oppHasActive: boolean;
   effectKind: (c: BattleCard) => "gust" | "switch" | null;
+  searchSpec: (c: BattleCard) => SearchSpec | null;
+  resolveName: (c: BattleCard) => string;
   flags: HandFlags;
   resolve: Resolve;
   onPlay: (card: BattleCard, action: PlayAction) => void;
@@ -1301,6 +1321,7 @@ function HandActions({
 }) {
   const auto = AUTO_EFFECTS[autoKey(card)];
   const fx = effectKind(card); // a targeted engine effect (gust / switch), if any
+  const search = card.kind === "item" && fx === null ? searchSpec(card) : null; // a modeled search Item
   const btn = "rounded-ctl border border-blue px-1.5 text-[11px] font-medium text-blue hover:bg-blue/10";
   const sub = "rounded-ctl border hairline px-1.5 text-[11px] text-ink2 hover:text-ink";
   const targets = units; // in-play units to attach/evolve onto
@@ -1393,7 +1414,32 @@ function HandActions({
           )}
         </>
       )}
-      {card.kind === "item" && fx !== "switch" && (
+      {card.kind === "item" && fx !== "switch" && search !== null && (
+        <>
+          {/* Search Item — choose which eligible card to pull from the pile (engine). */}
+          <span className="text-[11px] text-ink2">{t(search.from === "deck" ? "battle.act.searchDeck" : "battle.act.searchDiscard")}→</span>
+          {(() => {
+            const seen = new Set<string>();
+            const picks = board[search.from].filter(search.eligible).filter((c) => {
+              const n = resolveName(c);
+              if (seen.has(n)) return false; // dedupe by name — any instance is equivalent
+              seen.add(n);
+              return true;
+            });
+            if (picks.length === 0) return <span className="text-[11px] text-ink2">{t("battle.act.searchNone")}</span>;
+            return (
+              <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+                {picks.map((c) => (
+                  <button key={c.iid} type="button" onClick={() => onPlay(card, { type: "search", foundIid: c.iid })} className={btn} title={resolveName(c)}>
+                    {resolveName(c)}
+                  </button>
+                ))}
+              </span>
+            );
+          })()}
+        </>
+      )}
+      {card.kind === "item" && fx !== "switch" && search === null && (
         <button type="button" onClick={() => onPlay(card, { type: "item" })} className={btn}>{t("battle.act.useItem")}</button>
       )}
       {/* Always-available manual escape hatch (honest sandbox). */}

@@ -30,31 +30,42 @@ import {
   withBoard,
   drawN,
   discardFromHand,
+  shuffleDeck,
   addDamage,
   knockOut,
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, searchSpecOf } from "./cards.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
+
+/** Hiragana + katakana — a card's effect text containing kana means it's the
+ *  Japanese print (zh effect text has none), used to pick the zh-effect sibling. */
+const HAS_KANA = /[぀-ヿ]/;
 
 /** Build the pure lookup context from a catalog (null → no catalog facts). */
 export function makeCtx(catalog: Catalog | null): EngineCtx {
-  const resolve = (card: BattleCard): CatalogCard | null =>
-    catalog === null
-      ? null
-      : resolveDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) });
+  const idOf = (card: BattleCard) => ({ name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) });
+  // Resolve to a zh-Hant-EFFECT print. A newest-set card can resolve to a Japanese
+  // print whose effect text won't match our zh effect keys (e.g. 夜のタンカ /
+  // リーリエの決心) — and re-resolving by name doesn't help, because the name index
+  // maps the zh name to the JP print too (via its nameZh). So: take the resolved
+  // print, and if its effect contains kana (i.e. it's Japanese), swap to a sibling
+  // print of the SAME card (same nameZh) whose effect is kana-free (zh). Pokémon
+  // have no `effect`, so this only ever re-targets Trainer/Energy text.
+  const resolve = (card: BattleCard): CatalogCard | null => {
+    if (catalog === null) return null;
+    const direct = resolveDeckRow(catalog, idOf(card));
+    if (direct === null || direct.effect === undefined || !HAS_KANA.test(direct.effect)) return direct;
+    const key = direct.nameZh ?? direct.name;
+    const zh = catalog.cards.find((c) => (c.nameZh ?? c.name) === key && c.effect !== undefined && !HAS_KANA.test(c.effect));
+    return zh ?? direct;
+  };
   return {
     catalog,
     resolve,
-    // The modeled-effect registry is keyed by the zh DISPLAY name. The raw catalog
-    // storage name can be Japanese (a card with no zh release yet, e.g. リーリエ
-    // の決心) or carry a parenthetical character suffix (博士的研究(木蘭博士)), so
-    // we localize to zh exactly like the UI/bot — otherwise the key never matches.
-    autoKey: (card) =>
-      catalog === null
-        ? card.name
-        : localizeDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }, "zh").name,
+    // The modeled-effect registry is keyed by the zh DISPLAY name.
+    autoKey: (card) => (catalog === null ? card.name : localizeDeckRow(catalog, idOf(card), "zh").name),
   };
 }
 
@@ -149,9 +160,16 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
         }
       }
     } else if (c.kind === "item") {
-      if (isSwitchEffect(ctx.resolve(c)?.effect) && me.active !== null && me.bench.length > 0) {
+      const effect = ctx.resolve(c)?.effect;
+      if (isSwitchEffect(effect) && me.active !== null && me.bench.length > 0) {
         // Switch: the choice (which of your own bench) is the action (no Energy cost).
         for (const b of me.bench) acts.push({ type: "playSwitch", iid: c.iid, benchUid: b.uid });
+      } else {
+        const spec = searchSpecOf(effect);
+        // Search: the choice is WHICH eligible card in the from-pile (deck/discard).
+        if (spec !== null && !(spec.to === "bench" && me.bench.length >= MAX_BENCH)) {
+          for (const found of me[spec.from]) if (spec.eligible(found)) acts.push({ type: "search", iid: c.iid, foundIid: found.iid });
+        }
       }
     }
   }
@@ -297,6 +315,28 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const bench = board.bench.filter((u) => u.uid !== a.benchUid).concat(demoted);
       let ns = withBoard(s, me, { ...board, active: newActive, bench });
       ns = discardFromHand(ns, me, a.iid);
+      return ns;
+    }
+    case "search": {
+      // Pull a chosen card from a pile (deck/discard) to its destination.
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "item") return s;
+      const spec = searchSpecOf(ctx.resolve(card)?.effect);
+      if (spec === null) return s;
+      const found = board[spec.from].find((c) => c.iid === a.foundIid);
+      if (found === undefined || !spec.eligible(found)) return s;
+      if (spec.to === "bench" && board.bench.length >= MAX_BENCH) return s;
+      let ns = discardFromHand(s, me, a.iid); // the played Item → discard
+      const b = ns[me];
+      const pile = b[spec.from].filter((c) => c.iid !== a.foundIid);
+      if (spec.to === "hand") {
+        ns = withBoard(ns, me, { ...b, [spec.from]: pile, hand: [...b.hand, found] } as PlayerBoard);
+      } else {
+        ns = withBoard(ns, me, { ...b, [spec.from]: pile, bench: [...b.bench, newUnit(found, s.turn)] } as PlayerBoard);
+        ns = { ...ns, everInPlay: { ...ns.everInPlay, [me]: true } };
+      }
+      // Deck searches reshuffle so the exact-odds HUD stays uniform.
+      if (spec.shuffleAfter) ns = shuffleDeck(ns, me);
       return ns;
     }
     case "retreat": {

@@ -13,7 +13,7 @@
  */
 
 import { discardFromHand, discardHand, drawN, shuffleHandIntoDeck } from "./ops.ts";
-import type { GameState, PlayerId } from "./types.ts";
+import type { BattleCard, GameState, PlayerId } from "./types.ts";
 
 /** A modeled effect: resolves the played Supporter purely, returning new state.
  *  `iid` is the played card (already in hand); it is moved to discard here. */
@@ -85,6 +85,45 @@ export function isSwitchEffect(effect: string | undefined): boolean {
   return normEffect(effect) === SWITCH_EFFECT;
 }
 
+// --- Search effects: the choice is WHICH card from a pile (deck / discard). ----
+// Detected by exact verified catalog effect text; eligibility uses the card's own
+// kind/section so no extra catalog lookup is needed. Deck searches reshuffle, so
+// the exact-odds draw HUD stays uniform afterwards (honest).
+
+/** Where a search pulls from, where it puts the card, and what it may pull. */
+export interface SearchSpec {
+  from: "deck" | "discard";
+  to: "hand" | "bench";
+  /** Is this pile card a legal pick for the search? */
+  eligible: (card: BattleCard) => boolean;
+  /** Deck searches reshuffle (keeps the exact-odds HUD uniform). */
+  shuffleAfter: boolean;
+}
+
+const isBasicPokemon = (c: BattleCard): boolean => c.kind === "basic";
+const isPokemon = (c: BattleCard): boolean => c.section === "pokemon";
+const isBasicEnergy = (c: BattleCard): boolean => c.kind === "energy-basic";
+
+/** Modeled single-pick search Items, keyed by exact (normalised) catalog effect.
+ *  Verified 2026-06-18 in public/catalog/cards-zh-Hant.json. NOTE: 超級球 / Ultra
+ *  Ball is deliberately NOT modeled — its catalog effect text is anomalous
+ *  (reads "look at the top 7", which is not Ultra Ball's rule), so we do not
+ *  faithfully reproduce data we believe is wrong (flagged for a data fix). */
+const SEARCH_BY_EFFECT: Array<{ effect: string; spec: SearchSpec }> = [
+  // 巢穴球 (Nest Ball): deck → a Basic Pokémon → Bench, shuffle.
+  { effect: "從自己的牌庫選擇1張【基礎】寶可夢卡，放置於備戰區。並且重洗牌庫", spec: { from: "deck", to: "bench", eligible: isBasicPokemon, shuffleAfter: true } },
+  // 大師球 (Master Ball): deck → any Pokémon → hand, shuffle.
+  { effect: "從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isPokemon, shuffleAfter: true } },
+  // 夜間擔架 (Night Stretcher): discard → a Pokémon OR a basic Energy → hand (no shuffle).
+  { effect: "從自己的棄牌區選擇1張寶可夢卡或者基本能量卡，在給對手看過後加入手牌", spec: { from: "discard", to: "hand", eligible: (c) => isPokemon(c) || isBasicEnergy(c), shuffleAfter: false } },
+];
+
+/** The search spec for this card's effect text, or null if it isn't a modeled search. */
+export function searchSpecOf(effect: string | undefined): SearchSpec | null {
+  const n = normEffect(effect);
+  return SEARCH_BY_EFFECT.find((e) => e.effect === n)?.spec ?? null;
+}
+
 /**
  * Honest coverage ledger — what the engine models vs. what it does NOT yet. The
  * UI / docs surface this so no one mistakes the faithful SUBSET for the full game.
@@ -97,10 +136,15 @@ export const COVERAGE = {
   targeted: [
     "老大的指令 / Boss's Orders (gust: choose an opponent's Benched Pokémon → their Active)",
     "寶可夢交替 / Switch (choose your own Benched Pokémon ↔ your Active)",
+    "巢穴球 / Nest Ball (deck → choose a Basic → Bench, shuffle)",
+    "大師球 / Master Ball (deck → choose any Pokémon → hand, shuffle)",
+    "夜間擔架 / Night Stretcher (discard → choose a Pokémon or basic Energy → hand)",
   ],
-  /** Item / Tool active effects beyond Switch: not modeled yet (most need search /
-   *  discard choices over the deck). */
-  items: ["寶可夢交替 / Switch"],
+  /** Item active effects modeled (the choice is part of the action space). */
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher"],
+  /** Known NOT modeled despite high usage: 超級球 / Ultra Ball — its catalog effect
+   *  text is anomalous (not Ultra Ball's real rule), so we don't model wrong data. */
+  unmodeledKnown: ["超級球 / Ultra Ball (catalog effect text looks wrong — flagged)"],
   /** Pokémon Abilities: none modeled yet (most are triggered/optional choices). */
   abilities: [] as string[],
   /** Known simplifications carried for this phase (documented, never silent). */

@@ -16,6 +16,8 @@ import {
   BattleEnv,
   observe,
   encodeObservation,
+  makeCtx,
+  searchSpecOf,
   type GameState,
   type EngineCtx,
   type BattleCard,
@@ -23,7 +25,7 @@ import {
   type PlayerBoard,
   type Action,
 } from "../src/engine/index.ts";
-import type { CatalogCard } from "../src/data/catalog.ts";
+import type { Catalog, CatalogCard } from "../src/data/catalog.ts";
 
 // --- helpers ----------------------------------------------------------------
 
@@ -321,6 +323,91 @@ describe("targeted effects (Boss's Orders / Switch)", () => {
     expect(back.damage).toBe(20); // damage stays — it is the same Pokémon
     expect(ns.p1.discard.map((c) => c.iid)).toContain("Sw");
     expect(ns.turnSupporterUsed).toBe(false); // an Item, not a Supporter
+  });
+});
+
+// --- makeCtx resolves to the zh-effect print (kana-swap) --------------------
+
+describe("makeCtx — zh-effect resolution for Japanese-print cards", () => {
+  // A card that exists as a Japanese print (the deck points at it) AND a zh print.
+  const cat = {
+    v: 1,
+    lang: "zh-Hant",
+    source: "test",
+    fetchedAt: "",
+    count: 2,
+    cards: [
+      { id: "M1L-083", localId: "083", name: "夜のタンカ", nameZh: "夜間擔架", category: "Trainer", trainerType: "Item", set: "M1L", effect: "自分のトラッシュからポケモンまたは基本エネルギーを1枚選び、相手に見せて、手札に加える。" },
+      { id: "SV6a-056", localId: "056", name: "夜間擔架", category: "Trainer", trainerType: "Item", set: "SV6a", effect: "從自己的棄牌區選擇1張寶可夢卡或者基本能量卡，在給對手看過後加入手牌。" },
+    ],
+  } as unknown as Catalog;
+
+  it("swaps a Japanese (kana) effect for its zh-Hant sibling so effect detection works", () => {
+    const ctx = makeCtx(cat);
+    const jaCard: BattleCard = { iid: "n1", name: "夜間擔架", catalogId: "M1L-083", isBasic: false, section: "trainer", kind: "item" };
+    const eff = ctx.resolve(jaCard)?.effect;
+    expect(eff).toContain("從自己的棄牌區"); // the zh print's effect, not the Japanese one
+    expect(searchSpecOf(eff)).not.toBeNull(); // → Night Stretcher search is detected
+  });
+});
+
+// --- search effects (pile pick = action) ------------------------------------
+
+describe("search effects (Nest / Master Ball, Night Stretcher)", () => {
+  const NEST = "從自己的牌庫選擇1張【基礎】寶可夢卡，放置於備戰區。並且重洗牌庫。";
+  const MASTER = "從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const NIGHT = "從自己的棄牌區選擇1張寶可夢卡或者基本能量卡，在給對手看過後加入手牌。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+
+  it("Nest Ball offers only Basics, benches the chosen one, discards the Item, and reshuffles the deck", () => {
+    const ctx = fxCtx({ Nest: { effect: NEST } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Nest", "item", { name: "Nest" })],
+        deck: [card("basicA", "basic"), card("evoB", "evolution"), card("basicC", "basic"), card("energyD", "energy-basic")],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // only the two Basics are eligible
+    const ns = applyAction(s, { type: "search", iid: "Nest", foundIid: "basicA" }, ctx);
+    expect(ns.p1.bench.map((u) => u.card.iid)).toContain("basicA"); // benched
+    expect(ns.p1.deck.some((c) => c.iid === "basicA")).toBe(false); // removed from deck
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("Nest"); // Item discarded
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1); // deck reshuffled (HUD stays uniform)
+  });
+
+  it("Master Ball pulls any Pokémon from the deck to the hand", () => {
+    const ctx = fxCtx({ Master: { effect: MASTER } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("Master", "item", { name: "Master" })], deck: [card("evoX", "evolution"), card("energyY", "energy-basic")] },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(1); // the evolution Pokémon (energy not eligible)
+    const ns = applyAction(s, { type: "search", iid: "Master", foundIid: "evoX" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("evoX");
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
+  });
+
+  it("Night Stretcher pulls a Pokémon OR basic Energy from the discard (no reshuffle)", () => {
+    const ctx = fxCtx({ Night: { effect: NIGHT } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Night", "item", { name: "Night" })],
+        discard: [card("pkA", "basic"), card("enB", "energy-basic"), card("trN", "item")],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // the Pokémon + the basic Energy (not the Item)
+    const ns = applyAction(s, { type: "search", iid: "Night", foundIid: "enB" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("enB");
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("Night"); // the Item itself
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce); // discard retrieval does NOT reshuffle
   });
 });
 

@@ -30,7 +30,7 @@ export {
   type GameResult,
 } from "./game.ts";
 
-export { COVERAGE, SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect } from "./cards.ts";
+export { COVERAGE, SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, searchSpecOf, type SearchSpec } from "./cards.ts";
 
 export {
   BattleEnv,
