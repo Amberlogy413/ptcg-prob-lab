@@ -260,6 +260,68 @@ describe("playSupporter (modeled)", () => {
   });
 });
 
+// --- targeted effects: the choice is part of the action space ---------------
+
+describe("targeted effects (Boss's Orders / Switch)", () => {
+  const GUST = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換";
+  const SWITCH = "將自己的戰鬥寶可夢與備戰寶可夢互換";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+  const u = (uid: string, hp: number, status: ("poison" | "asleep")[] = []) => ({
+    uid,
+    card: card(uid, "basic", { hp }),
+    under: [] as BattleCard[],
+    energy: [] as BattleCard[],
+    tools: [] as BattleCard[],
+    damage: 0,
+    playedTurn: 1,
+    status,
+  });
+
+  it("Boss's Orders drags up a chosen opponent bench Pokémon (old Active → bench, conditions cleared)", () => {
+    const ctx = fxCtx({ Boss: { effect: GUST } });
+    const s = baseState({
+      p1: { ...pb(), active: u("m", 70), hand: [card("Boss", "supporter", { name: "Boss" })] },
+      p2: { ...pb(), active: u("oa", 100, ["asleep"]), bench: [u("ob", 60)] },
+    });
+    expect(find(legalActions(s, ctx), "playGust").length).toBe(1); // one per opp bench
+    const ns = applyAction(s, { type: "playGust", iid: "Boss", targetUid: "ob" }, ctx);
+    expect(ns.p2.active?.uid).toBe("ob"); // chosen bench is now their Active
+    expect(ns.p2.bench.map((x) => x.uid)).toContain("oa"); // old Active benched
+    expect(ns.p2.bench.find((x) => x.uid === "oa")!.status).toEqual([]); // conditions cleared
+    expect(ns.turnSupporterUsed).toBe(true);
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("Boss"); // the Supporter → MY discard
+  });
+
+  it("Boss's Orders is blocked on the going-first turn 1 (it is a Supporter)", () => {
+    const ctx = fxCtx({ Boss: { effect: GUST } });
+    const s = baseState({
+      turn: 1,
+      p1: { ...pb(), active: u("m", 70), hand: [card("Boss", "supporter", { name: "Boss" })] },
+      p2: { ...pb(), active: u("oa", 100), bench: [u("ob", 60)] },
+    });
+    expect(find(legalActions(s, ctx), "playGust").length).toBe(0);
+    expect(applyAction(s, { type: "playGust", iid: "Boss", targetUid: "ob" }, ctx)).toBe(s);
+  });
+
+  it("Switch swaps your own Active with a chosen bench (Item: no Energy cost, no turn limit)", () => {
+    const ctx = fxCtx({ Sw: { effect: SWITCH } });
+    const active = { ...u("a", 70), card: card("a", "basic", { hp: 70, retreat: 3 }), damage: 20, status: ["poison" as const] };
+    const s = baseState({ p1: { ...pb(), active, bench: [u("b", 60)], hand: [card("Sw", "item", { name: "Sw" })] } });
+    expect(find(legalActions(s, ctx), "playSwitch").length).toBe(1);
+    const ns = applyAction(s, { type: "playSwitch", iid: "Sw", benchUid: "b" }, ctx);
+    expect(ns.p1.active?.uid).toBe("b"); // swapped in despite a retreat cost of 3 + no Energy
+    const back = ns.p1.bench.find((x) => x.uid === "a")!;
+    expect(back.status).toEqual([]); // conditions cleared on leaving the Active
+    expect(back.damage).toBe(20); // damage stays — it is the same Pokémon
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("Sw");
+    expect(ns.turnSupporterUsed).toBe(false); // an Item, not a Supporter
+  });
+});
+
 // --- end of turn ------------------------------------------------------------
 
 describe("endTurn", () => {

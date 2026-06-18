@@ -29,12 +29,13 @@ import {
   mapUnit,
   withBoard,
   drawN,
+  discardFromHand,
   addDamage,
   knockOut,
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect } from "./cards.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
 /** Build the pure lookup context from a catalog (null → no catalog facts). */
@@ -133,8 +134,19 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
     } else if (c.kind === "stadium") {
       if (!s.turnStadiumPlayed) acts.push({ type: "playStadium", iid: c.iid });
     } else if (c.kind === "supporter") {
-      if (!s.turnSupporterUsed && !firstTurnRestricted(s) && isModeledSupporter(ctx.autoKey(c)))
-        acts.push({ type: "playSupporter", iid: c.iid });
+      if (!s.turnSupporterUsed && !firstTurnRestricted(s)) {
+        if (isModeledSupporter(ctx.autoKey(c))) {
+          acts.push({ type: "playSupporter", iid: c.iid });
+        } else if (isGustEffect(ctx.resolve(c)?.effect) && opp.active !== null && opp.bench.length > 0) {
+          // Boss's Orders: the choice (which opp bench Pokémon) is the action.
+          for (const b of opp.bench) acts.push({ type: "playGust", iid: c.iid, targetUid: b.uid });
+        }
+      }
+    } else if (c.kind === "item") {
+      if (isSwitchEffect(ctx.resolve(c)?.effect) && me.active !== null && me.bench.length > 0) {
+        // Switch: the choice (which of your own bench) is the action (no Energy cost).
+        for (const b of me.bench) acts.push({ type: "playSwitch", iid: c.iid, benchUid: b.uid });
+      }
     }
   }
 
@@ -248,6 +260,38 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const fx = SUPPORTER_EFFECTS[key];
       if (fx === undefined) return s; // unmodeled → not playable here (honest)
       return { ...fx(s, me, a.iid), turnSupporterUsed: true };
+    }
+    case "playGust": {
+      // Boss's Orders: choose an OPPONENT bench Pokémon → their new Active.
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "supporter" || s.turnSupporterUsed || firstTurnRestricted(s)) return s;
+      if (!isGustEffect(ctx.resolve(card)?.effect)) return s;
+      const oppId = other(me);
+      const opp = s[oppId];
+      if (opp.active === null) return s;
+      const i = opp.bench.findIndex((u) => u.uid === a.targetUid);
+      if (i === -1) return s;
+      const newActive = opp.bench[i]!;
+      const demoted: InPlay = { ...opp.active, status: [] }; // leaving Active clears conditions
+      const bench = opp.bench.filter((u) => u.uid !== a.targetUid).concat(demoted);
+      let ns = withBoard(s, oppId, { ...opp, active: newActive, bench });
+      ns = discardFromHand(ns, me, a.iid); // the Supporter goes to MY discard
+      return { ...ns, turnSupporterUsed: true };
+    }
+    case "playSwitch": {
+      // Switch (item): swap YOUR Active with one of your own bench (no Energy cost).
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "item") return s;
+      if (!isSwitchEffect(ctx.resolve(card)?.effect)) return s;
+      if (board.active === null) return s;
+      const i = board.bench.findIndex((u) => u.uid === a.benchUid);
+      if (i === -1) return s;
+      const newActive = board.bench[i]!;
+      const demoted: InPlay = { ...board.active, status: [] }; // leaving Active clears conditions
+      const bench = board.bench.filter((u) => u.uid !== a.benchUid).concat(demoted);
+      let ns = withBoard(s, me, { ...board, active: newActive, bench });
+      ns = discardFromHand(ns, me, a.iid);
+      return ns;
     }
     case "retreat": {
       if (s.turnRetreated || board.active === null) return s;

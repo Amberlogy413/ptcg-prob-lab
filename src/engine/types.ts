@@ -51,6 +51,10 @@ export type Action =
   | { type: "attachTool"; handIid: string; unitId: string }
   | { type: "playStadium"; iid: string }
   | { type: "playSupporter"; iid: string }
+  /** Boss's Orders (gust): drag an OPPONENT bench Pokémon up to their Active. */
+  | { type: "playGust"; iid: string; targetUid: string }
+  /** Switch (item): swap YOUR Active with one of your own bench Pokémon. */
+  | { type: "playSwitch"; iid: string; benchUid: string }
   | { type: "retreat"; benchUnitId: string }
   | { type: "attack"; index: number }
   | { type: "promote"; benchUnitId: string }

@@ -53,6 +53,30 @@ export function isModeledSupporter(key: string): boolean {
   return Object.prototype.hasOwnProperty.call(SUPPORTER_EFFECTS, key);
 }
 
+// --- Targeted effects: the choice IS part of the action space (AI step ① pattern).
+// Detected by the card's EXACT verified catalog effect text (zh-Hant) — never by a
+// fuzzy name match, so a card is modeled only when its mechanic is unambiguous.
+// (Verified 2026-06-18 in public/catalog/cards-zh-Hant.json.)
+
+/** Boss's Orders family (老大的指令 …): "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換"
+ *  — you pick one of the OPPONENT's Benched Pokémon to become their new Active.
+ *  Top-played gust Supporter in the H/I/J meta (老大的指令(坂木) usage ≈ 90%). */
+const GUST_EFFECT = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換";
+
+/** Switch family (寶可夢交替): "將自己的戰鬥寶可夢與備戰寶可夢互換" — you pick one of
+ *  YOUR OWN Benched Pokémon to swap with your Active (an Item, no Energy cost). */
+const SWITCH_EFFECT = "將自己的戰鬥寶可夢與備戰寶可夢互換";
+
+/** Is this card a canonical gust (Boss's Orders)? Exact effect match only. */
+export function isGustEffect(effect: string | undefined): boolean {
+  return effect !== undefined && effect.trim() === GUST_EFFECT;
+}
+
+/** Is this card a canonical own-side Switch? Exact effect match only. */
+export function isSwitchEffect(effect: string | undefined): boolean {
+  return effect !== undefined && effect.trim() === SWITCH_EFFECT;
+}
+
 /**
  * Honest coverage ledger — what the engine models vs. what it does NOT yet. The
  * UI / docs surface this so no one mistakes the faithful SUBSET for the full game.
@@ -60,8 +84,15 @@ export function isModeledSupporter(key: string): boolean {
 export const COVERAGE = {
   /** Supporters with an exact, choice-free model. */
   supporters: Object.keys(SUPPORTER_EFFECTS),
-  /** Item / Tool active effects: none modeled yet (most need a target choice). */
-  items: [] as string[],
+  /** Targeted effects modeled with the CHOICE as part of the action space
+   *  (the AI step ① pattern). Detected by exact verified catalog effect text. */
+  targeted: [
+    "老大的指令 / Boss's Orders (gust: choose an opponent's Benched Pokémon → their Active)",
+    "寶可夢交替 / Switch (choose your own Benched Pokémon ↔ your Active)",
+  ],
+  /** Item / Tool active effects beyond Switch: not modeled yet (most need search /
+   *  discard choices over the deck). */
+  items: ["寶可夢交替 / Switch"],
   /** Pokémon Abilities: none modeled yet (most are triggered/optional choices). */
   abilities: [] as string[],
   /** Known simplifications carried for this phase (documented, never silent). */
