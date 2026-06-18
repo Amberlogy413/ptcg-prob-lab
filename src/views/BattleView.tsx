@@ -16,6 +16,7 @@ import {
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue } from "../state/battleAttack.ts";
+import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
 import {
@@ -126,6 +127,7 @@ export function BattleView() {
   const [seed, setSeed] = useState<number>(1);
   const [first, setFirst] = useState<PlayerId>("p1");
   const [msg, setMsg] = useState<string | null>(null);
+  const [autoAi, setAutoAi] = useState(false); // AI auto-plays the opponent's turn
 
   // Undo (P4): run a user gesture ATOMICALLY — one snapshot BEFORE the gesture,
   // kept only if the gesture actually changed the game. So a composite multi-step
@@ -524,6 +526,22 @@ export function BattleView() {
     setMsg(result);
   }
 
+  // AI auto-player (owner 2026-06-18): run one deterministic heuristic turn for
+  // the CURRENT player through the same rules engine, as ONE atomic undo step,
+  // and append its log lines. Honest: a rule-based opponent, not a trained model.
+  function runBot() {
+    if (gameResult(useBattleStore.getState()) !== null) return; // game already won
+    const p = useBattleStore.getState().current;
+    let events: BotEvent[] = [];
+    const changed = act(() => {
+      events = runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey });
+    });
+    if (changed) {
+      events.forEach((e) => note(t(e.key, e.params)));
+      setSel(null);
+    }
+  }
+
   // Win detection (P3): all prizes taken, or a wiped board.
   const result = gameResult({ started, turn, p1, p2, everInPlay });
 
@@ -535,7 +553,19 @@ export function BattleView() {
           {t("battle.turn", { n: turn })} · <span className="font-medium">{names[me]}</span>{" "}
           <span className="text-ink2">{t("battle.actingNow")}</span>
         </span>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={runBot}
+            title={t("battle.ai.note")}
+            className="rounded-ctl border border-blue px-3 py-1.5 text-xs font-medium text-blue hover:bg-blue/10"
+          >
+            🤖 {t("battle.ai.act")}
+          </button>
+          <label className="flex items-center gap-1 text-xs text-ink2" title={t("battle.ai.note")}>
+            <input type="checkbox" checked={autoAi} onChange={(e) => setAutoAi(e.target.checked)} />
+            {t("battle.ai.auto")}
+          </label>
           <button
             type="button"
             onClick={undo}
@@ -544,7 +574,7 @@ export function BattleView() {
           >
             {t("battle.undo")}
           </button>
-          <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+          <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); if (autoAi) runBot(); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
           <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
