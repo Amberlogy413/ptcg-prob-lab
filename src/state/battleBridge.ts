@@ -20,8 +20,9 @@ import type { Catalog } from "../data/catalog.ts";
 
 type StoreState = ReturnType<typeof useBattleStore.getState>;
 
-/** Project the store's game fields into the engine's pure GameState. */
-function toEngineState(s: StoreState): GameState {
+/** Project the store's game fields into the engine's pure GameState. Exported so
+ *  the view can build an Observation for the state-inspector panel. */
+export function toEngineState(s: StoreState): GameState {
   return {
     seed: s.seed,
     shuffleNonce: s.shuffleNonce,

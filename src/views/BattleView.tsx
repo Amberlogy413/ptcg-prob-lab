@@ -19,8 +19,8 @@ import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } fro
 import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
-import { engineStep } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect, searchSpecOf, makeCtx, type SearchSpec } from "../engine/index.ts";
+import { engineStep, toEngineState } from "../state/battleBridge.ts";
+import { isGustEffect, isSwitchEffect, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -604,6 +604,27 @@ export function BattleView() {
     }
   }
 
+  // AI-vs-AI: let the heuristic bot play BOTH sides until someone wins (or a turn
+  // cap — the bots can stall, e.g. no payable attack, and the sandbox doesn't
+  // auto-decide deck-out). Honest: still the rule-based bot, not a trained model.
+  const AI_MATCH_CAP = 60;
+  function runBotMatch() {
+    let steps = 0;
+    while (gameResult(useBattleStore.getState()) === null && steps < AI_MATCH_CAP) {
+      const p = useBattleStore.getState().current;
+      let events: BotEvent[] = [];
+      const changed = act(() => {
+        events = runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey });
+      });
+      if (!changed) break;
+      events.forEach((e) => note(t(e.key, e.params)));
+      steps++;
+    }
+    const done = gameResult(useBattleStore.getState());
+    note(done !== null ? t("battle.ai.matchDone") : t("battle.ai.matchCapped", { n: AI_MATCH_CAP }));
+    setSel(null);
+  }
+
   // Win detection (P3): all prizes taken, or a wiped board.
   const result = gameResult({ started, turn, p1, p2, everInPlay });
 
@@ -623,6 +644,14 @@ export function BattleView() {
             className="rounded-ctl border border-blue px-3 py-1.5 text-xs font-medium text-blue hover:bg-blue/10"
           >
             🤖 {t("battle.ai.act")}
+          </button>
+          <button
+            type="button"
+            onClick={runBotMatch}
+            title={t("battle.ai.matchNote")}
+            className="rounded-ctl border border-blue px-3 py-1.5 text-xs font-medium text-blue hover:bg-blue/10"
+          >
+            🤖⚔️ {t("battle.ai.match")}
           </button>
           <label className="flex items-center gap-1 text-xs text-ink2" title={t("battle.ai.note")}>
             <input type="checkbox" checked={autoAi} onChange={(e) => setAutoAi(e.target.checked)} />
@@ -675,6 +704,8 @@ export function BattleView() {
           </ol>
         </details>
       )}
+
+      {started && result === null && <ObservationPanel obs={observe(toEngineState(useBattleStore.getState()), current)} t={t} />}
 
       {/* Opponent (top, mirrored): board only, hand hidden */}
       <PlayerHalf
@@ -1446,6 +1477,47 @@ function HandActions({
       <button type="button" onClick={() => onPlay(card, { type: "discard" })} className={sub}>{t("battle.act.discard")}</button>
       <button type="button" onClick={() => onPlay(card, { type: "toPile", pile: "deck" })} className={sub}>{t("battle.act.toDeck")}</button>
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// State inspector — the engine's RL Observation (what a learning agent sees).
+// Mirrors the reference sim's "Observation" panel; the opponent's hand is a
+// COUNT only (public info), and the feature vector is encodeObservation().
+
+function ObservationPanel({ obs, t }: { obs: Observation; t: Tr }) {
+  const vec = encodeObservation(obs);
+  const a = (s: SideView) =>
+    s.active
+      ? `${s.active.name} (${s.active.damage}/${s.active.hp ?? "?"}, E${s.active.energy}${s.active.status.length > 0 ? " " + s.active.status.join(",") : ""})`
+      : "—";
+  const row = (label: string, s: SideView) => (
+    <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+      <span className="w-10 font-medium text-ink">{label}</span>
+      <span>{t("battle.obs.hand")} {s.handCount}</span>
+      <span>{t("battle.obs.deck")} {s.deckCount}</span>
+      <span>{t("battle.obs.discard")} {s.discardCount}</span>
+      <span>{t("battle.obs.prizes")} {s.prizesLeft}</span>
+      <span>{t("battle.obs.bench")} {s.benchCount}</span>
+      <span>{t("battle.obs.active")} {a(s)}</span>
+    </div>
+  );
+  return (
+    <details className="rounded-ctl border hairline bg-paper px-3 py-2 text-[11px] text-ink2">
+      <summary className="cursor-pointer text-xs font-medium text-ink2">
+        {t("battle.obs.title")} <span className="text-ink2">· {t("battle.obs.pov")} {obs.pov.toUpperCase()}</span>
+      </summary>
+      <div className="mt-1 space-y-1 font-mono">
+        <div>{t("battle.obs.turn")} {obs.turn} · {t("battle.obs.toMove")} {obs.toMove.toUpperCase()}</div>
+        {row(t("battle.obs.me"), obs.me)}
+        {row(t("battle.obs.opp"), obs.opp)}
+        <details>
+          <summary className="cursor-pointer">{t("battle.obs.vector")} <span className="text-ink2">[{vec.length}]</span></summary>
+          <code className="mt-0.5 block break-all">[{vec.join(", ")}]</code>
+        </details>
+      </div>
+      <p className="mt-1 text-[10px] text-ink2">{t("battle.obs.note")}</p>
+    </details>
   );
 }
 
