@@ -75,12 +75,11 @@ describe("BattleView v2 — pick popular decks for each side", () => {
 
     const st = useBattleStore.getState();
     expect(st.started).toBe(true);
-    // Both sides got an independent, faithful 60-card opening: 6 prizes each, and
-    // the FIRST player (p1 by default) has already taken their turn-1 draw (8),
-    // the other still holds the opening 7 (current rules: going first DOES draw).
-    expect(st.p1.hand.length).toBe(8);
-    expect(st.p2.hand.length).toBe(7);
+    // Both sides got an independent, faithful 60-card OPENING hand of 7 (the
+    // going-first turn-1 draw is a turn action, not part of the opening — owner
+    // 2026-06-18: 起手手牌係 7,要同現實對齊).
     for (const side of [st.p1, st.p2]) {
+      expect(side.hand.length).toBe(7);
       expect(side.prizes.length).toBe(6);
       expect(side.hand.length + side.prizes.length + side.deck.length).toBe(60);
     }

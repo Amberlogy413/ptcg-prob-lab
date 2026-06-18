@@ -110,6 +110,7 @@ export function BattleView() {
   const turnStadiumPlayed = useBattleStore((s) => s.turnStadiumPlayed);
   const turnRetreated = useBattleStore((s) => s.turnRetreated);
   const everInPlay = useBattleStore((s) => s.everInPlay);
+  const log = useBattleStore((s) => s.log);
   const names = useBattleStore((s) => s.names);
   const p1 = useBattleStore((s) => s.p1);
   const p2 = useBattleStore((s) => s.p2);
@@ -132,11 +133,11 @@ export function BattleView() {
   // and a no-op / failed action never consumes a slot. (review fix 2026-06-17,
   // replacing the per-set subscription that desynced composite undos.)
   const history = useRef<BattleSnapshot[]>([]);
-  const act = useCallback((fn: () => void) => {
+  const act = useCallback((fn: () => void): boolean => {
     const s = useBattleStore.getState();
     if (!s.started) {
       fn();
-      return;
+      return false;
     }
     const before = snapOf(s);
     fn();
@@ -150,7 +151,9 @@ export function BattleView() {
       history.current.push(before);
       if (history.current.length > 40) history.current.shift();
     }
+    return changed;
   }, []);
+  const note = useCallback((msg: string) => useBattleStore.getState().note(msg), []);
   function undo() {
     const prev = history.current.pop();
     if (prev === undefined) return;
@@ -249,7 +252,6 @@ export function BattleView() {
     const o2 = byId.get(p2Opt);
     if (o1 === undefined || o2 === undefined) return;
     store.getState().newGame({ p1: o1.specs, p2: o2.specs, seed: useSeed >>> 0, names: { p1: o1.label, p2: o2.label }, first });
-    store.getState().draw(first, 1); // the first player's turn-1 draw (current rules: going first DOES draw)
     history.current = []; // a fresh deal starts a fresh undo history
     setSel(null);
     setMsg(null);
@@ -273,7 +275,7 @@ export function BattleView() {
     [catalog],
   );
   function play(card: BattleCard, action: PlayAction) {
-    act(() => {
+    const changed = act(() => {
       const s = store.getState();
       setMsg(null);
       switch (action.type) {
@@ -335,6 +337,23 @@ export function BattleView() {
           break;
       }
     });
+    if (changed) {
+      const cn = resolve(card).name;
+      const who = names[me];
+      const key = {
+        toActive: "battle.log.active",
+        toBench: "battle.log.bench",
+        evolve: "battle.log.evolve",
+        energy: "battle.log.energy",
+        tool: "battle.log.tool",
+        stadium: "battle.log.stadium",
+        supporter: "battle.log.supporter",
+        item: "battle.log.item",
+        discard: "battle.log.discard",
+        toPile: "battle.log.toDeck",
+      }[action.type];
+      if (key !== undefined) note(t(key, { who, card: cn }));
+    }
     setSel(null);
   }
 
@@ -344,7 +363,9 @@ export function BattleView() {
       setMsg(t("battle.gate.retreatUsed"));
       return;
     }
-    act(() => {
+    const board = player === "p1" ? p1 : p2;
+    const unitName = resolve((unitList(board).find((u) => u.uid === unitId) ?? { card: { name: "" } as BattleCard }).card).name;
+    const changed = act(() => {
       const s = store.getState();
       switch (kind) {
         case "retreat":
@@ -361,6 +382,9 @@ export function BattleView() {
           break;
       }
     });
+    if (changed) {
+      note(t(`battle.log.${kind}`, { who: names[player], card: unitName }));
+    }
     setSel(null);
   }
 
@@ -483,7 +507,7 @@ export function BattleView() {
     const prizes = ko ? prizeValue(oppCard) : 0;
     // One atomic gesture (damage → KO+prize → endTurn) so a single Undo reverses
     // the whole attack, not just the turn flip (review fix 2026-06-17).
-    act(() => {
+    const changed = act(() => {
       const s = store.getState();
       s.setDamage(oppId, oppActive.uid, newDamage);
       if (ko) {
@@ -495,6 +519,7 @@ export function BattleView() {
     const tags = [weakness ? t("battle.atk.weak") : "", resistance ? t("battle.atk.resist") : ""].filter(Boolean).join(" ");
     let result = t("battle.atk.result", { atk: atk.name, dmg: damage, tags });
     if (ko) result += " " + t("battle.atk.ko", { n: prizes });
+    if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);
   }
@@ -519,7 +544,7 @@ export function BattleView() {
           >
             {t("battle.undo")}
           </button>
-          <button type="button" onClick={() => { act(() => store.getState().endTurn()); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+          <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
           <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
@@ -541,6 +566,24 @@ export function BattleView() {
         </div>
       )}
 
+      {log.length > 0 && (
+        <details className="rounded-ctl border hairline bg-paper px-3 py-2" open>
+          <summary className="cursor-pointer text-xs font-medium text-ink2">
+            {t("battle.log.title")} <span className="font-mono">{log.length}</span>
+          </summary>
+          <ol className="mt-1 max-h-36 space-y-0.5 overflow-y-auto pr-1" aria-live="polite">
+            {log
+              .map((line, i) => ({ line, i }))
+              .reverse()
+              .map(({ line, i }) => (
+                <li key={i} className="font-mono text-[11px] leading-snug text-ink2">
+                  {line}
+                </li>
+              ))}
+          </ol>
+        </details>
+      )}
+
       {/* Opponent (top, mirrored): board only, hand hidden */}
       <PlayerHalf
         player={oppId}
@@ -555,6 +598,7 @@ export function BattleView() {
         onVisual={setVisual}
         store={store}
         act={act}
+        note={note}
         t={t}
       />
 
@@ -574,6 +618,7 @@ export function BattleView() {
         onVisual={setVisual}
         store={store}
         act={act}
+        note={note}
         t={t}
       />
 
@@ -685,7 +730,7 @@ function DeckSelect({
 // One player's half of the board.
 
 function PlayerHalf({
-  player, board, name, roleLabel, mirror, isMe, resolve, sel, setSel, onUnitAction, onVisual, store, act, t,
+  player, board, name, roleLabel, mirror, isMe, resolve, sel, setSel, onUnitAction, onVisual, store, act, note, t,
 }: {
   player: PlayerId;
   board: PlayerBoard;
@@ -699,8 +744,10 @@ function PlayerHalf({
   onUnitAction: (player: PlayerId, unitId: string, kind: UnitActionKind) => void;
   onVisual: (c: BattleCard) => void;
   store: typeof useBattleStore;
-  /** Run a mutating gesture atomically for undo. */
-  act: (fn: () => void) => void;
+  /** Run a mutating gesture atomically for undo; returns whether it changed. */
+  act: (fn: () => void) => boolean;
+  /** Append a line to the action log. */
+  note: (msg: string) => void;
   t: Tr;
 }) {
   const header = (
@@ -713,9 +760,9 @@ function PlayerHalf({
       </span>
       {isMe && (
         <div className="ml-auto flex flex-wrap gap-1.5">
-          <button type="button" onClick={() => act(() => store.getState().draw(player, 1))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
-          <button type="button" onClick={() => act(() => store.getState().shuffleDeck(player))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
-          <button type="button" onClick={() => act(() => store.getState().mulligan(player))} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
+          <button type="button" onClick={() => { if (act(() => store.getState().draw(player, 1))) note(t("battle.log.draw", { who: name, n: 1 })); }} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.draw1")}</button>
+          <button type="button" onClick={() => { if (act(() => store.getState().shuffleDeck(player))) note(t("battle.log.shuffle", { who: name })); }} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.shuffle")}</button>
+          <button type="button" onClick={() => { if (act(() => store.getState().mulligan(player))) note(t("battle.log.mulligan", { who: name })); }} className="rounded-ctl border hairline px-2 py-1 text-xs text-ink2 hover:text-ink">{t("battle.mulligan")}</button>
         </div>
       )}
     </div>
@@ -775,7 +822,7 @@ function PlayerHalf({
               <button
                 key={c.iid}
                 type="button"
-                onClick={() => act(() => useBattleStore.getState().takePrizeAt(player, c.iid))}
+                onClick={() => { if (act(() => useBattleStore.getState().takePrizeAt(player, c.iid))) note(t("battle.log.prize", { who: name })); }}
                 aria-label={t("battle.prizes.take")}
                 title={t("battle.prizes.take")}
                 className="h-7 w-6 rounded-sm border border-blue/40 bg-blue/10 text-[9px] font-medium text-blue hover:bg-blue/20"

@@ -142,8 +142,13 @@ interface BattleState {
   p1: PlayerBoard;
   p2: PlayerBoard;
   names: { p1: string; p2: string };
+  /** Human-readable action log (newest LAST), capped — the faithful "what
+   *  happened" replay trail (owner 2026-06-18, AI-sim reference). */
+  log: string[];
 
   newGame: (input: { p1: CardSpec[]; p2: CardSpec[]; seed: number; names?: { p1: string; p2: string }; first?: PlayerId }) => void;
+  /** Append one localized line to the action log. */
+  note: (msg: string) => void;
   /** Shuffle deck, draw the opening 7, set 6 prizes from the top. */
   setup: (player: PlayerId) => void;
   draw: (player: PlayerId, n: number) => void;
@@ -276,6 +281,9 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   p1: emptyBoard(),
   p2: emptyBoard(),
   names: { p1: "P1", p2: "P2" },
+  log: [],
+
+  note: (msg) => set((s) => ({ log: [...s.log, msg].slice(-80) })),
 
   newGame: ({ p1, p2, seed, names, first }) => {
     const firstPlayer = first ?? "p1";
@@ -294,6 +302,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       p1: { ...emptyBoard(), deck: instantiate(p1) },
       p2: { ...emptyBoard(), deck: instantiate(p2) },
       names: names ?? { p1: "P1", p2: "P2" },
+      log: [],
     });
     get().setup("p1");
     get().setup("p2");
@@ -649,6 +658,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       turnStadiumPlayed: false,
       turnRetreated: false,
       everInPlay: { p1: false, p2: false },
+      log: [],
     });
   },
 }));
