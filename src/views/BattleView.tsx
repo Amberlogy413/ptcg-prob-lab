@@ -134,6 +134,7 @@ export function BattleView() {
   const [autoAi, setAutoAi] = useState(false); // AI auto-plays the opponent's turn
   const [aiPlaying, setAiPlaying] = useState(false); // AI-vs-AI paced playback running
   const [aiSpeedMs, setAiSpeedMs] = useState(700); // ms per bot turn during playback
+  const [scrubIdx, setScrubIdx] = useState<number | null>(null); // null = live; n = viewing replay frame n
 
   // Undo (P4): run a user gesture ATOMICALLY — one snapshot BEFORE the gesture,
   // kept only if the gesture actually changed the game. So a composite multi-step
@@ -289,8 +290,19 @@ export function BattleView() {
     begin(ns);
   }
 
+  // --- Replay: when scrubbing, the WHOLE board shows a past snapshot (read-only).
+  // In live mode (scrubIdx === null) these equal the live store, so every handler
+  // below behaves identically; in replay mode the interactive bits are gated off.
+  const frame: ReplayFrame | null = scrubIdx !== null ? (replay[scrubIdx] ?? null) : null;
+  const replaying = frame !== null;
+  const dTurn = frame ? frame.turn : turn;
+  const dCurrent = frame ? frame.current : current;
+  const dP1 = frame ? frame.p1 : p1;
+  const dP2 = frame ? frame.p2 : p2;
+  const dEverInPlay = frame ? frame.everInPlay : everInPlay;
+
   // --- Play a hand card by its real type (the core faithful rules) ---------
-  const me = current; // the player whose turn it is acts; their hand is shown.
+  const me = dCurrent; // the player whose turn it is acts; their hand is shown.
   // Auto-effect lookup keys on the zh display name, so an English-named saved /
   // imported deck still resolves the supported Supporters (review fix 2026-06-17).
   const autoKey = useCallback(
@@ -544,9 +556,10 @@ export function BattleView() {
     );
   }
 
-  const meBoard: PlayerBoard = me === "p1" ? p1 : p2;
+  // Board display follows the displayed (live or replay) snapshot.
+  const meBoard: PlayerBoard = me === "p1" ? dP1 : dP2;
   const oppId: PlayerId = me === "p1" ? "p2" : "p1";
-  const oppBoard: PlayerBoard = oppId === "p1" ? p1 : p2;
+  const oppBoard: PlayerBoard = oppId === "p1" ? dP1 : dP2;
   const meUnits = unitList(meBoard);
 
   // --- Attack (P2): the Active Pokémon's real attacks vs the opponent's Active.
@@ -644,18 +657,34 @@ export function BattleView() {
     setSel(null);
   }
 
-  // Win detection (P3): all prizes taken, or a wiped board.
-  const result = gameResult({ started, turn, p1, p2, everInPlay });
+  // Win detection (P3): all prizes taken, or a wiped board — over the displayed state.
+  const result = gameResult({ started, turn: dTurn, p1: dP1, p2: dP2, everInPlay: dEverInPlay });
+
+  // In replay mode the board is READ-ONLY: interaction callbacks become no-ops, so
+  // the existing board components render the snapshot without driving the live game.
+  const noop = () => {};
+  const dSetSel = replaying ? () => {} : setSel;
+  const dAct = replaying ? () => false : act;
+  const dNote = replaying ? noop : note;
+  const dUnitAction = replaying ? noop : unitAction;
+  const dPlay = replaying ? noop : play;
 
   return (
     <div className="flex flex-col gap-3">
       {/* Control bar */}
       <div className="flex flex-wrap items-center gap-2 rounded-ctl border hairline bg-paper p-2.5 text-sm">
         <span className="font-mono">
-          {t("battle.turn", { n: turn })} · <span className="font-medium">{names[me]}</span>{" "}
-          <span className="text-ink2">{t("battle.actingNow")}</span>
+          {t("battle.turn", { n: dTurn })} · <span className="font-medium">{names[me]}</span>{" "}
+          <span className="text-ink2">{replaying ? t("battle.replay.viewing") : t("battle.actingNow")}</span>
         </span>
         <div className="ml-auto flex flex-wrap items-center gap-2">
+          {replaying && (
+            <button type="button" onClick={() => setScrubIdx(null)} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">
+              ⏏ {t("battle.replay.live")}
+            </button>
+          )}
+          {!replaying && (
+            <>
           <button
             type="button"
             onClick={runBot}
@@ -702,15 +731,40 @@ export function BattleView() {
             {t("battle.undo")}
           </button>
           <button type="button" onClick={() => { const who = names[me]; if (act(() => store.getState().endTurn())) note(t("battle.log.endTurn", { who })); setSel(null); setMsg(null); if (autoAi) runBot(); }} className="rounded-ctl bg-blue px-3 py-1.5 text-xs font-medium text-white">{t("battle.endTurn")}</button>
+            </>
+          )}
           <button type="button" onClick={restart} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.newGame")}</button>
           <button type="button" onClick={() => { history.current = []; store.getState().reset(); }} className="rounded-ctl border hairline px-3 py-1.5 text-xs text-ink2 hover:text-ink">{t("battle.pickAgain")}</button>
         </div>
-        {turn === 1 && me === firstPlayer && (
+        {!replaying && dTurn === 1 && me === firstPlayer && (
           <p className="w-full text-xs text-warn" role="note">{t("battle.firstTurnRestriction")}</p>
         )}
-        {msg !== null && <p className="w-full text-xs text-warn" role="alert">{msg}</p>}
-        {meBoard.deck.length === 0 && (
+        {!replaying && msg !== null && <p className="w-full text-xs text-warn" role="alert">{msg}</p>}
+        {!replaying && meBoard.deck.length === 0 && (
           <p className="w-full text-xs text-warn" role="note">{t("battle.win.deckOut", { name: names[me] })}</p>
+        )}
+        {replay.length > 1 && (
+          <div className="flex w-full items-center gap-2 text-xs text-ink2">
+            <span className="whitespace-nowrap">{t("battle.replay.scrub")}</span>
+            <input
+              type="range"
+              min={0}
+              max={replay.length - 1}
+              value={scrubIdx ?? replay.length - 1}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setAiPlaying(false); // viewing history pauses live playback
+                setSel(null);
+                setScrubIdx(v === replay.length - 1 ? null : v);
+              }}
+              className="flex-1"
+              aria-label={t("battle.replay.scrub")}
+            />
+            <span className="whitespace-nowrap font-mono">
+              {(scrubIdx ?? replay.length - 1) + 1}/{replay.length}
+              {replaying ? "" : ` · ${t("battle.replay.liveTag")}`}
+            </span>
+          </div>
         )}
       </div>
 
@@ -741,8 +795,8 @@ export function BattleView() {
         </details>
       )}
 
-      {started && result === null && (
-        <ObservationPanel frames={replay} liveObs={observe(toEngineState(useBattleStore.getState()), current)} t={t} />
+      {started && (
+        <ObservationPanel obs={frame !== null ? observe(frame, frame.current) : observe(toEngineState(useBattleStore.getState()), current)} t={t} />
       )}
 
       {/* Opponent (top, mirrored): board only, hand hidden */}
@@ -753,13 +807,13 @@ export function BattleView() {
         roleLabel={t("battle.opp")}
         mirror
         resolve={resolve}
-        sel={sel}
-        setSel={setSel}
-        onUnitAction={unitAction}
+        sel={replaying ? null : sel}
+        setSel={dSetSel}
+        onUnitAction={dUnitAction}
         onVisual={setVisual}
         store={store}
-        act={act}
-        note={note}
+        act={dAct}
+        note={dNote}
         t={t}
       />
 
@@ -773,23 +827,23 @@ export function BattleView() {
         roleLabel={t("battle.you")}
         isMe
         resolve={resolve}
-        sel={sel}
-        setSel={setSel}
-        onUnitAction={unitAction}
+        sel={replaying ? null : sel}
+        setSel={dSetSel}
+        onUnitAction={dUnitAction}
         onVisual={setVisual}
         store={store}
-        act={act}
-        note={note}
+        act={dAct}
+        note={dNote}
         t={t}
       />
 
-      {meBoard.active !== null && (attackList.length > 0 || (meActiveCard?.abilities?.length ?? 0) > 0) && (
+      {!replaying && meBoard.active !== null && (attackList.length > 0 || (meActiveCard?.abilities?.length ?? 0) > 0) && (
         <AttackPanel
           attacker={resolve(meBoard.active.card).name}
           defender={oppBoard.active !== null ? resolve(oppBoard.active.card).name : null}
           attacks={attackList}
           abilities={(meActiveCard?.abilities ?? []).map((a) => a.name)}
-          canAttack={!(turn === 1 && me === firstPlayer) && oppBoard.active !== null}
+          canAttack={!(dTurn === 1 && me === firstPlayer) && oppBoard.active !== null}
           onAttack={doAttack}
           t={t}
         />
@@ -803,11 +857,11 @@ export function BattleView() {
         effectKind={effectKind}
         searchSpec={searchSpec}
         resolveName={(c) => resolve(c).name}
-        flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: turn === 1 && me === firstPlayer }}
+        flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: dTurn === 1 && me === firstPlayer }}
         resolve={resolve}
-        sel={sel}
-        setSel={setSel}
-        onPlay={play}
+        sel={replaying ? null : sel}
+        setSel={dSetSel}
+        onPlay={dPlay}
         autoKey={autoKey}
         onVisual={setVisual}
         t={t}
@@ -1523,19 +1577,7 @@ function HandActions({
 // Mirrors the reference sim's "Observation" panel; the opponent's hand is a
 // COUNT only (public info), and the feature vector is encodeObservation().
 
-function ObservationPanel({ frames, liveObs, t }: { frames: ReplayFrame[]; liveObs: Observation; t: Tr }) {
-  // Scrub through recorded history; the slider edge = live. We follow the live
-  // edge as new frames arrive, unless the user has scrubbed back.
-  const [idx, setIdx] = useState(0);
-  const followLive = useRef(true);
-  const last = Math.max(0, frames.length - 1);
-  useEffect(() => {
-    if (followLive.current) setIdx(last);
-  }, [last]);
-  const pos = Math.min(idx, last);
-  const frame = frames.length > 0 ? frames[pos] : undefined;
-  const isLive = frames.length === 0 || pos === last;
-  const obs = frame !== undefined ? observe(frame, frame.current) : liveObs;
+function ObservationPanel({ obs, t }: { obs: Observation; t: Tr }) {
   const vec = encodeObservation(obs);
   const a = (s: SideView) =>
     s.active
@@ -1557,28 +1599,6 @@ function ObservationPanel({ frames, liveObs, t }: { frames: ReplayFrame[]; liveO
       <summary className="cursor-pointer text-xs font-medium text-ink2">
         {t("battle.obs.title")} <span className="text-ink2">· {t("battle.obs.pov")} {obs.pov.toUpperCase()}</span>
       </summary>
-      {frames.length > 1 && (
-        <div className="mt-1 flex items-center gap-2">
-          <span className="whitespace-nowrap">{t("battle.obs.scrub")}</span>
-          <input
-            type="range"
-            min={0}
-            max={last}
-            value={pos}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              followLive.current = v === last;
-              setIdx(v);
-            }}
-            className="flex-1"
-            aria-label={t("battle.obs.scrub")}
-          />
-          <span className="whitespace-nowrap font-mono">
-            {pos + 1}/{frames.length} {isLive ? `· ${t("battle.obs.live")}` : ""}
-          </span>
-        </div>
-      )}
-      {!isLive && frame !== undefined && <div className="mt-0.5 truncate font-mono text-[10px] text-ink">› {frame.line}</div>}
       <div className="mt-1 space-y-1 font-mono">
         <div>{t("battle.obs.turn")} {obs.turn} · {t("battle.obs.toMove")} {obs.toMove.toUpperCase()}</div>
         {row(t("battle.obs.me"), obs.me)}
