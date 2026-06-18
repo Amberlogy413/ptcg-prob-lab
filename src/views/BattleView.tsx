@@ -18,7 +18,7 @@ import { toBattleSpec } from "../state/battlePlay.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "../state/battleAttack.ts";
 import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
-import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
+import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep } from "../state/battleBridge.ts";
 import { isGustEffect, isSwitchEffect } from "../engine/index.ts";
 import {
@@ -306,13 +306,18 @@ export function BattleView() {
       const s = store.getState();
       setMsg(null);
       switch (action.type) {
+        // Placement / attach / stadium route through the engine (single rules
+        // source); the store's identical reducers remain only for tests + the bot.
         case "toActive":
-          if (!s.playToActive(me, card.iid)) setMsg(t("battle.field.activeFull"));
+          if (!engineStep({ type: "playToActive", iid: card.iid }, catalog)) setMsg(t("battle.field.activeFull"));
           break;
         case "toBench":
-          if (!s.playToBench(me, card.iid)) setMsg(t("battle.field.benchFull"));
+          if (!engineStep({ type: "playToBench", iid: card.iid }, catalog))
+            setMsg(t(meBoard.active === null ? "battle.field.noActive" : "battle.field.benchFull"));
           break;
         case "evolve":
+          // Kept store-side: the engine name-gates evolution, but zh/ja/en names
+          // are unreliable across decks, so the sandbox stays permissive (honest).
           s.evolve(me, card.iid, action.unitId);
           break;
         case "energy":
@@ -320,17 +325,17 @@ export function BattleView() {
             setMsg(t("battle.gate.energyUsed"));
             return;
           }
-          s.attachEnergy(me, card.iid, action.unitId);
+          engineStep({ type: "attachEnergy", handIid: card.iid, unitId: action.unitId }, catalog);
           break;
         case "tool":
-          s.attachTool(me, card.iid, action.unitId);
+          s.attachTool(me, card.iid, action.unitId); // store-side: sandbox allows >1 Tool
           break;
         case "stadium":
           if (turnStadiumPlayed) {
             setMsg(t("battle.gate.stadiumUsed"));
             return;
           }
-          s.playStadium(me, card.iid);
+          engineStep({ type: "playStadium", iid: card.iid }, catalog);
           break;
         case "supporter": {
           if (turn === 1 && me === firstPlayer) {
@@ -341,13 +346,13 @@ export function BattleView() {
             setMsg(t("battle.fx.supporterUsed"));
             return;
           }
-          const key = autoKey(card);
-          if (AUTO_EFFECTS[key] !== undefined) {
-            applyAutoEffect(me, card.iid, key); // resolves + discards faithfully
-          } else {
-            s.discardFromHand(me, card.iid); // unknown supporter: you resolve it by hand
+          // Modeled Supporters resolve through the engine (single rules source);
+          // anything else is discarded and resolved by hand (needs a choice we
+          // don't model — honest, never guessed).
+          if (!engineStep({ type: "playSupporter", iid: card.iid }, catalog)) {
+            s.discardFromHand(me, card.iid);
+            s.markSupporterUsed();
           }
-          s.markSupporterUsed();
           break;
         }
         case "item":

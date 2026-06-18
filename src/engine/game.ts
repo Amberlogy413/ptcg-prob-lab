@@ -15,7 +15,7 @@
 
 import { canPayCost, baseDamage, finalDamage, prizeValue } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
-import { resolveDeckRow } from "../data/catalog.ts";
+import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
   MAX_BENCH,
   MAX_TOOLS,
@@ -47,8 +47,14 @@ export function makeCtx(catalog: Catalog | null): EngineCtx {
   return {
     catalog,
     resolve,
-    // AUTO_EFFECTS is keyed by the catalog storage name (zh for the zh-Hant set).
-    autoKey: (card) => resolve(card)?.name ?? card.name,
+    // The modeled-effect registry is keyed by the zh DISPLAY name. The raw catalog
+    // storage name can be Japanese (a card with no zh release yet, e.g. リーリエ
+    // の決心) or carry a parenthetical character suffix (博士的研究(木蘭博士)), so
+    // we localize to zh exactly like the UI/bot — otherwise the key never matches.
+    autoKey: (card) =>
+      catalog === null
+        ? card.name
+        : localizeDeckRow(catalog, { name: card.name, ...(card.catalogId !== undefined ? { catalogId: card.catalogId } : {}) }, "zh").name,
   };
 }
 
