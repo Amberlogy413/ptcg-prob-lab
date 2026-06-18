@@ -397,6 +397,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   attachEnergy: (player, handIid, unitId) => {
     let ok = false;
     set((s) => {
+      if (s.turnEnergyAttached) return {} as Partial<BattleState>; // 1 Energy attachment per turn (real rule)
       const board = s[player];
       const card = handCard(board, handIid);
       if (card === undefined || (card.kind !== "energy-basic" && card.kind !== "energy-special")) return {} as Partial<BattleState>;
@@ -425,6 +426,7 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   playStadium: (player, handIid) => {
     let ok = false;
     set((s) => {
+      if (s.turnStadiumPlayed) return {} as Partial<BattleState>; // 1 Stadium per turn (real rule)
       const board = s[player];
       const card = handCard(board, handIid);
       if (card === undefined || card.kind !== "stadium") return {} as Partial<BattleState>;

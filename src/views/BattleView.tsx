@@ -15,7 +15,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "../state/battleAttack.ts";
 import { runBotTurn, type BotEvent } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS, applyAutoEffect } from "../state/battleEffects.ts";
@@ -518,8 +518,13 @@ export function BattleView() {
       }
       s.endTurn(); // attacking ends your turn (faithful)
     });
-    const tags = [weakness ? t("battle.atk.weak") : "", resistance ? t("battle.atk.resist") : ""].filter(Boolean).join(" ");
-    let result = t("battle.atk.result", { atk: atk.name, dmg: damage, tags });
+    // HONEST: a "+"/"×" attack's printed base is only an approximation — the real
+    // multiplier/bonus is not in the data — so we never present it as exact.
+    const approx = isVariableDamage(atk.damage);
+    const tags = [approx ? t("battle.atk.approx") : "", weakness ? t("battle.atk.weak") : "", resistance ? t("battle.atk.resist") : ""]
+      .filter(Boolean)
+      .join(" ");
+    let result = t("battle.atk.result", { atk: atk.name, dmg: approx ? `≈${damage}` : damage, tags });
     if (ko) result += " " + t("battle.atk.ko", { n: prizes });
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);

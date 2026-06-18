@@ -858,6 +858,7 @@
   "battle.atk.notEnough": "The attached Energy doesn't pay this attack's cost.",
   "battle.atk.weak": " (weakness ×2)",
   "battle.atk.resist": " (resisted)",
+  "battle.atk.approx": " (≈approx: variable +/× damage shown at printed base only)",
   "battle.atk.result": "{atk}: {dmg} damage to the opponent{tags}.",
   "battle.atk.ko": "Knock Out! Take {n} Prize card(s) (opponent promotes a Benched Pokémon).",
   "battle.win.banner": "🏆 {name} wins!",

@@ -858,6 +858,7 @@
   "battle.atk.notEnough": "附著嘅能量唔夠付呢個招式嘅費用。",
   "battle.atk.weak": "(弱點×2)",
   "battle.atk.resist": "(抵抗減傷)",
+  "battle.atk.approx": "(≈近似:變動傷害「+/×」只取印刷底值)",
   "battle.atk.result": "{atk}:對對手造成 {dmg} 點傷害{tags}。",
   "battle.atk.ko": "擊倒!攞 {n} 張獎賞卡(對手要由備戰區補一隻上戰鬥場)。",
   "battle.win.banner": "🏆 {name} 勝出!",

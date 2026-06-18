@@ -45,7 +45,20 @@ export function canPayCost(attached: BattleCard[], cost: string[] | undefined): 
   return true;
 }
 
-/** Parse an attack's printed base damage ("120+", "20×", 90 → 120 / 20 / 90). */
+/** Does the printed damage carry a variable / conditional modifier ("50+",
+ *  "60×")? For these the REAL value depends on a count the catalog text does not
+ *  expose in a machine-readable form (Energy attached, damage counters, heads…),
+ *  so it is NOT exactly resolvable here. Callers must treat baseDamage() of a
+ *  variable attack as the printed base only, and disclose the approximation —
+ *  never present it as the exact result (real-data-only mandate). */
+export function isVariableDamage(dmg: number | string | undefined): boolean {
+  return typeof dmg === "string" && /[+\-×x*]/.test(dmg);
+}
+
+/** Parse an attack's printed base damage ("120+", "20×", 90 → 120 / 20 / 90).
+ *  HONESTY: for a "+"/"×" attack this returns only the printed base — the
+ *  modifier is dropped because its true multiplier/bonus is not in the data.
+ *  Use isVariableDamage() to know when the result is an approximation, not exact. */
 export function baseDamage(dmg: number | string | undefined): number {
   if (typeof dmg === "number") return dmg;
   if (typeof dmg === "string") {

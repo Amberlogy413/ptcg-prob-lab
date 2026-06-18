@@ -86,7 +86,10 @@
   能量(或一張 wildcard);無色由餘下能量支付;特殊/未知能量為**誠實的
   wildcard**(不捏造其屬性)。
 * `finalDamage(attacker, defender, base)`:依**防守方**對**攻擊方屬性**的弱點
-  (預設 ×2)/ 抵抗調整;`baseDamage` 解析「120+」「20×」。
+  (預設 ×2)/ 抵抗調整;`baseDamage` 取印刷底值。**注意誠實邊界**:「120+」「20×」
+  這類變動傷害只取**印刷底值**(「+」/「×」修正不在資料內,無法精確還原),
+  故對戰沙盤對這類攻擊顯示的傷害/擊倒只屬**近似**,並非精確結算
+  (`isVariableDamage` 可判別;詳見 docs/11 §5)。
 * `prizeValue(card)`:ex / 超級 / V / VSTAR = 2,VMAX = 3,其餘 = 1。
 
 流程(`BattleView.doAttack`):核對回合/目標/付費 → 對對手戰鬥場施加傷害 →

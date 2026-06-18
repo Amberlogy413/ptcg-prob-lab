@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -113,7 +113,8 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
         const { damage } = finalDamage(ac, oc, baseDamage(best.damage));
         const newDamage = oppActive.damage + damage;
         st().setDamage(opp, oppActive.uid, newDamage);
-        push("battle.log.attack", undefined, { atk: best.name, dmg: damage });
+        // Variable "+"/"×" damage is only the printed base — mark it ≈ (honest).
+        push("battle.log.attack", undefined, { atk: best.name, dmg: isVariableDamage(best.damage) ? `≈${damage}` : damage });
         const hp = oppActive.card.hp;
         if (hp !== undefined && newDamage >= hp) {
           const prizes = prizeValue(oc);

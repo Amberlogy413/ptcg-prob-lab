@@ -148,6 +148,7 @@ describe("type-correct play (the core faithful rules)", () => {
     seedHand([bc("stadiumA", "stadium"), bc("stadiumB", "stadium")]);
     expect(useBattleStore.getState().playStadium("p1", "stadiumA")).toBe(true);
     expect(useBattleStore.getState().p1.stadium?.iid).toBe("stadiumA");
+    useBattleStore.setState({ turnStadiumPlayed: false }); // a later turn (1 Stadium per turn)
     useBattleStore.getState().playStadium("p1", "stadiumB");
     const { p1 } = useBattleStore.getState();
     expect(p1.stadium?.iid).toBe("stadiumB");
@@ -160,6 +161,7 @@ describe("type-correct play (the core faithful rules)", () => {
     useBattleStore.getState().playToActive("p1", "pikachu");
     const unitId = useBattleStore.getState().p1.active!.uid;
     useBattleStore.getState().attachEnergy("p1", "e1", unitId);
+    useBattleStore.setState({ turnEnergyAttached: false }); // a later turn (1 Energy per turn)
     useBattleStore.getState().attachEnergy("p1", "e2", unitId);
     useBattleStore.getState().knockOut("p1", unitId);
     const { p1 } = useBattleStore.getState();
