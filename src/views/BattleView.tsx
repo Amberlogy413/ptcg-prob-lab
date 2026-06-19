@@ -21,7 +21,7 @@ import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep, toEngineState } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
+import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -261,10 +261,11 @@ export function BattleView() {
   // Japanese print (夜のタンカ / リーリエの決心). Used for the targeted/search pickers.
   const ectx = useMemo(() => makeCtx(catalog), [catalog]);
   const effectKind = useCallback(
-    (card: BattleCard): "gust" | "switch" | null => {
+    (card: BattleCard): "gust" | "switch" | "energyMove" | null => {
       const eff = ectx.resolve(card)?.effect;
       if (isGustEffect(eff)) return "gust";
       if (isSwitchEffect(eff)) return "switch";
+      if (isEnergySwitchEffect(eff)) return "energyMove";
       return null;
     },
     [ectx],
@@ -320,6 +321,7 @@ export function BattleView() {
   function play(card: BattleCard, action: PlayAction) {
     // Capture a targeted effect's target name BEFORE the swap moves it.
     let targetName = "";
+    let esFrom = "", esTo = "", esEnergy = ""; // Energy Switch: source / target / moved Energy
     if (action.type === "gust") {
       const u = oppBoard.bench.find((x) => x.uid === action.targetUid);
       targetName = u !== undefined ? resolve(u.card).name : "";
@@ -329,6 +331,13 @@ export function BattleView() {
     } else if (action.type === "search") {
       const c = [...meBoard.deck, ...meBoard.discard].find((x) => x.iid === action.foundIid);
       targetName = c !== undefined ? resolve(c).name : "";
+    } else if (action.type === "energySwitch") {
+      const from = meUnits.find((x) => x.uid === action.fromUid);
+      const to = meUnits.find((x) => x.uid === action.toUid);
+      const e = from?.energy.find((x) => x.iid === action.energyIid);
+      esFrom = from !== undefined ? resolve(from.card).name : "";
+      esTo = to !== undefined ? resolve(to.card).name : "";
+      esEnergy = e !== undefined ? resolve(e).name : "";
     }
     const changed = act(() => {
       const s = store.getState();
@@ -398,6 +407,11 @@ export function BattleView() {
           // Nest/Master Ball, Night Stretcher — resolved by the engine.
           if (!engineStep({ type: "search", iid: card.iid, foundIid: action.foundIid }, catalog)) setMsg(t("battle.field.benchFull"));
           break;
+        case "energySwitch":
+          // Energy Switch — resolved by the engine (single rules source).
+          if (!engineStep({ type: "energySwitch", iid: card.iid, fromUid: action.fromUid, energyIid: action.energyIid, toUid: action.toUid }, catalog))
+            setMsg(t("battle.gate.energySwitch"));
+          break;
         case "discard":
           s.discardFromHand(me, card.iid);
           break;
@@ -418,6 +432,8 @@ export function BattleView() {
         note(t("battle.log.switch", { who, card: cn, target: targetName }));
       } else if (action.type === "search") {
         note(t("battle.log.search", { who, card: cn, target: targetName }));
+      } else if (action.type === "energySwitch") {
+        note(t("battle.log.energySwitch", { who, card: cn, energy: esEnergy, from: esFrom, to: esTo }));
       } else {
         const key = {
           toActive: "battle.log.active",
@@ -906,6 +922,7 @@ type PlayAction =
   | { type: "gust"; targetUid: string } // Boss's Orders → opponent bench Pokémon
   | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
   | { type: "search"; foundIid: string } // Nest/Master Ball, Night Stretcher → pick from a pile
+  | { type: "energySwitch"; fromUid: string; energyIid: string; toUid: string } // Energy Switch → move a basic Energy between your Pokémon
   | { type: "discard" }
   | { type: "toPile"; pile: Pile };
 
@@ -1386,7 +1403,7 @@ function HandRow({
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
@@ -1442,7 +1459,7 @@ function HandActions({
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
@@ -1547,6 +1564,44 @@ function HandActions({
           )}
         </>
       )}
+      {card.kind === "item" && fx === "energyMove" && (
+        <>
+          {/* Energy Switch — move a basic Energy from one of your Pokémon to another (engine). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.energySwitch")}→</span>
+          {(() => {
+            // Each pick = (a basic Energy on a source Pokémon) → (another in-play
+            // Pokémon). Identical-named Energy on the same source is deduped (same
+            // resulting board), matching the engine's element dedupe.
+            const pairs: { from: InPlay; e: BattleCard; to: InPlay }[] = [];
+            for (const src of units) {
+              const seen = new Set<string>();
+              for (const e of src.energy) {
+                if (e.kind !== "energy-basic") continue;
+                const elem = resolveName(e);
+                if (seen.has(elem)) continue;
+                seen.add(elem);
+                for (const to of units) if (to.uid !== src.uid) pairs.push({ from: src, e, to });
+              }
+            }
+            if (pairs.length === 0) return <span className="text-[11px] text-ink2">{t("battle.act.needTarget")}</span>;
+            return (
+              <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+                {pairs.map(({ from, e, to }) => (
+                  <button
+                    key={from.uid + e.iid + to.uid}
+                    type="button"
+                    onClick={() => onPlay(card, { type: "energySwitch", fromUid: from.uid, energyIid: e.iid, toUid: to.uid })}
+                    className={btn}
+                    title={`${resolve(from.card).name} · ${resolveName(e)} → ${resolve(to.card).name}`}
+                  >
+                    {resolveName(e)}▸{resolve(from.card).name}→{resolve(to.card).name}
+                  </button>
+                ))}
+              </span>
+            );
+          })()}
+        </>
+      )}
       {card.kind === "item" && fx !== "switch" && search !== null && (
         <>
           {/* Search Item — choose which eligible card to pull from the pile (engine). */}
@@ -1572,7 +1627,7 @@ function HandActions({
           })()}
         </>
       )}
-      {card.kind === "item" && fx !== "switch" && search === null && (
+      {card.kind === "item" && fx === null && search === null && (
         <button type="button" onClick={() => onPlay(card, { type: "item" })} className={btn}>{t("battle.act.useItem")}</button>
       )}
       {/* Always-available manual escape hatch (honest sandbox). */}

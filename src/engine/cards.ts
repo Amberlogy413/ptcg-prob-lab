@@ -67,6 +67,14 @@ const GUST_EFFECT = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互�
  *  YOUR OWN Benched Pokémon to swap with your Active (an Item, no Energy cost). */
 const SWITCH_EFFECT = "將自己的戰鬥寶可夢與備戰寶可夢互換";
 
+/** Energy Switch family (能量轉移): "選擇1個自己的場上寶可夢身上附加的基本能量，改附於
+ *  自己的其他寶可夢身上" — move ONE basic Energy already attached to one of your
+ *  Pokémon onto another of your Pokémon. An Item; it relocates an existing Energy,
+ *  so it does NOT spend the turn's from-hand Energy attachment. The choice (which
+ *  Energy, source → target) IS the action. (Verified 2026-06-19: 9 prints, all
+ *  trainerType "Item", this exact unique effect text — no same-text collision.) */
+const ENERGY_SWITCH_EFFECT = "選擇1個自己的場上寶可夢身上附加的基本能量，改附於自己的其他寶可夢身上";
+
 /** Normalise catalog effect text for an exact compare: trim + drop a single
  *  trailing full-width 。 (every catalog effect ends with one; the canonical
  *  strings above omit it). Conditional gust/switch cards carry EXTRA text, so
@@ -83,6 +91,11 @@ export function isGustEffect(effect: string | undefined): boolean {
 /** Is this card a canonical own-side Switch? Exact (normalised) match only. */
 export function isSwitchEffect(effect: string | undefined): boolean {
   return normEffect(effect) === SWITCH_EFFECT;
+}
+
+/** Is this card a canonical Energy Switch? Exact (normalised) match only. */
+export function isEnergySwitchEffect(effect: string | undefined): boolean {
+  return normEffect(effect) === ENERGY_SWITCH_EFFECT;
 }
 
 // --- Search effects: the choice is WHICH card from a pile (deck / discard). ----
@@ -139,9 +152,10 @@ export const COVERAGE = {
     "巢穴球 / Nest Ball (deck → choose a Basic → Bench, shuffle)",
     "大師球 / Master Ball (deck → choose any Pokémon → hand, shuffle)",
     "夜間擔架 / Night Stretcher (discard → choose a Pokémon or basic Energy → hand)",
+    "能量轉移 / Energy Switch (move one basic Energy from one of your Pokémon → another)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher"],
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch"],
   /** Known NOT modeled despite high usage: 超級球 / Ultra Ball — its catalog effect
    *  text is anomalous (not Ultra Ball's real rule), so we don't model wrong data. */
   unmodeledKnown: ["超級球 / Ultra Ball (catalog effect text looks wrong — flagged)"],

@@ -58,6 +58,9 @@ export type Action =
   /** Search item (Nest/Master Ball, Night Stretcher): pull a chosen card from a
    *  pile (deck/discard) to its destination; `foundIid` is the chosen card. */
   | { type: "search"; iid: string; foundIid: string }
+  /** Energy Switch (item): move one BASIC Energy already attached to one of YOUR
+   *  Pokémon onto another of YOUR Pokémon; `energyIid` is the moved Energy. */
+  | { type: "energySwitch"; iid: string; fromUid: string; energyIid: string; toUid: string }
   | { type: "retreat"; benchUnitId: string }
   | { type: "attack"; index: number }
   | { type: "promote"; benchUnitId: string }

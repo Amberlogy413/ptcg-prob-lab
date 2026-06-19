@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -36,7 +36,7 @@ import {
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, searchSpecOf } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, searchSpecOf } from "./cards.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
 /** Hiragana + katakana — a card's effect text containing kana means it's the
@@ -172,9 +172,24 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
       }
     } else if (c.kind === "item") {
       const effect = ctx.resolve(c)?.effect;
-      if (isSwitchEffect(effect) && me.active !== null && me.bench.length > 0) {
+      if (isSwitchEffect(effect)) {
         // Switch: the choice (which of your own bench) is the action (no Energy cost).
-        for (const b of me.bench) acts.push({ type: "playSwitch", iid: c.iid, benchUid: b.uid });
+        if (me.active !== null && me.bench.length > 0)
+          for (const b of me.bench) acts.push({ type: "playSwitch", iid: c.iid, benchUid: b.uid });
+      } else if (isEnergySwitchEffect(effect)) {
+        // Energy Switch: move one basic Energy between two of your own Pokémon. The
+        // (source Energy → target) pair IS the action; identical-element Energy on
+        // the same source is deduped (same resulting board) to keep the space minimal.
+        for (const src of inPlay) {
+          const seen = new Set<string>();
+          for (const e of src.energy) {
+            if (e.kind !== "energy-basic") continue;
+            const elem = energyProvides(e) ?? e.name;
+            if (seen.has(elem)) continue;
+            seen.add(elem);
+            for (const dst of inPlay) if (dst.uid !== src.uid) acts.push({ type: "energySwitch", iid: c.iid, fromUid: src.uid, energyIid: e.iid, toUid: dst.uid });
+          }
+        }
       } else {
         const spec = searchSpecOf(effect);
         // Search: the choice is WHICH eligible card in the from-pile (deck/discard).
@@ -325,6 +340,24 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const demoted: InPlay = { ...board.active, status: [] }; // leaving Active clears conditions
       const bench = board.bench.filter((u) => u.uid !== a.benchUid).concat(demoted);
       let ns = withBoard(s, me, { ...board, active: newActive, bench });
+      ns = discardFromHand(ns, me, a.iid);
+      return ns;
+    }
+    case "energySwitch": {
+      // Energy Switch (item): move one basic Energy from one of YOUR Pokémon onto
+      // another of YOUR Pokémon. It relocates an already-attached Energy, so it
+      // does NOT consume the turn's from-hand Energy attachment.
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "item") return s;
+      if (!isEnergySwitchEffect(ctx.resolve(card)?.effect) || a.fromUid === a.toUid) return s;
+      const src = units(board).find((u) => u.uid === a.fromUid);
+      const dst = units(board).find((u) => u.uid === a.toUid);
+      if (src === undefined || dst === undefined) return s;
+      const e = src.energy.find((x) => x.iid === a.energyIid);
+      if (e === undefined || e.kind !== "energy-basic") return s;
+      let nb: PlayerBoard = mapUnit(board, a.fromUid, (u) => ({ ...u, energy: u.energy.filter((x) => x.iid !== a.energyIid) }));
+      nb = mapUnit(nb, a.toUid, (u) => ({ ...u, energy: [...u.energy, e] }));
+      let ns = withBoard(s, me, nb);
       ns = discardFromHand(ns, me, a.iid);
       return ns;
     }

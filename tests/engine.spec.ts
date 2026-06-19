@@ -445,6 +445,70 @@ describe("search effects (Nest / Master Ball, Night Stretcher)", () => {
   });
 });
 
+// --- Energy Switch (move a basic Energy between your own Pokémon) ------------
+
+describe("Energy Switch (能量轉移)", () => {
+  // Real catalog text ends with a full-width 。 — the detector normalises it.
+  const ES = "選擇1個自己的場上寶可夢身上附加的基本能量，改附於自己的其他寶可夢身上。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+  const energy = (iid: string, name: string): BattleCard => card(iid, "energy-basic", { name });
+  const unit = (uid: string, energyCards: BattleCard[]) => ({
+    uid,
+    card: card(uid, "basic", { hp: 100 }),
+    under: [] as BattleCard[],
+    energy: energyCards,
+    tools: [] as BattleCard[],
+    damage: 0,
+    playedTurn: 1,
+    status: [],
+  });
+
+  it("moves a chosen basic Energy source→target, discards the Item, does NOT spend the turn's attachment, and dedupes identical Energy", () => {
+    const ctx = fxCtx({ ES: { effect: ES } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        active: unit("a", [energy("f1", "基本火能量"), energy("f2", "基本火能量"), energy("w1", "基本水能量")]),
+        bench: [unit("b", [])],
+        hand: [card("ES", "item", { name: "ES" })],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "energySwitch");
+    expect(acts.length).toBe(2); // {Fire→b, Water→b}; the duplicate Fire is deduped to one
+    const ns = applyAction(s, { type: "energySwitch", iid: "ES", fromUid: "a", energyIid: "f1", toUid: "b" }, ctx);
+    expect(ns.p1.active!.energy.map((e) => e.iid).sort()).toEqual(["f2", "w1"]); // source lost f1
+    expect(ns.p1.bench.find((u) => u.uid === "b")!.energy.map((e) => e.iid)).toEqual(["f1"]); // target gained it
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("ES"); // Item → discard
+    expect(ns.turnEnergyAttached).toBe(false); // relocating attached Energy is NOT a from-hand attach
+  });
+
+  it("offers nothing with only one Pokémon in play (needs a distinct target); a same-source/target action is a no-op", () => {
+    const ctx = fxCtx({ ES: { effect: ES } });
+    const s = baseState({
+      p1: { ...pb(), active: unit("a", [energy("f1", "基本火能量")]), bench: [], hand: [card("ES", "item", { name: "ES" })] },
+    });
+    expect(find(legalActions(s, ctx), "energySwitch").length).toBe(0);
+    expect(applyAction(s, { type: "energySwitch", iid: "ES", fromUid: "a", energyIid: "f1", toUid: "a" }, ctx)).toBe(s);
+  });
+
+  it("never offers special Energy (only basic Energy can be moved)", () => {
+    const ctx = fxCtx({ ES: { effect: ES } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        active: unit("a", [card("sp", "energy-special", { name: "二重彩虹能量" })]),
+        bench: [unit("b", [])],
+        hand: [card("ES", "item", { name: "ES" })],
+      },
+    });
+    expect(find(legalActions(s, ctx), "energySwitch").length).toBe(0);
+  });
+});
+
 // --- end of turn ------------------------------------------------------------
 
 describe("endTurn", () => {
