@@ -335,6 +335,17 @@ describe("attack", () => {
     expect(isTerminal(ns)).toBe(true);
     expect(winner(ns)).toBe("p2");
   });
+
+  it("a self-lock attack bars the attacker from attacking on its NEXT turn (auto-expires after)", () => {
+    const lockCtx = fxAtk("在下個自己的回合，這隻寶可夢無法使用招式。");
+    const s = { ...attackState(200), p2: { ...attackState(200).p2, deck: [card("od", "basic")] } };
+    const ns = applyAction(s, { type: "attack", index: 0 }, lockCtx); // attack on turn 2
+    expect(ns.p1.active?.noAttackTurn).toBe(4); // p1's next turn
+    const turn4 = { ...ns, current: "p1" as const, turn: 4 };
+    expect(find(legalActions(turn4, lockCtx), "attack").length).toBe(0); // locked
+    const turn6 = { ...ns, current: "p1" as const, turn: 6 };
+    expect(find(legalActions(turn6, lockCtx), "attack").length).toBeGreaterThan(0); // lock expired
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

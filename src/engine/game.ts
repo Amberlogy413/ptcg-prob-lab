@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -232,7 +232,7 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
 
   // Attack: needs an Active vs. an Active, not turn-1-first, not Asleep/Paralyzed,
   // and payable Energy.
-  if (me.active !== null && opp.active !== null && !firstTurnRestricted(s) && canActiveAttack(me.active)) {
+  if (me.active !== null && opp.active !== null && !firstTurnRestricted(s) && canActiveAttack(me.active) && me.active.noAttackTurn !== s.turn) {
     const ac = ctx.resolve(me.active.card);
     const attacks = ac?.attacks ?? [];
     attacks.forEach((a, i) => {
@@ -465,7 +465,7 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
     case "attack": {
       const oppId = other(me);
       const opp = s[oppId];
-      if (board.active === null || opp.active === null || firstTurnRestricted(s) || !canActiveAttack(board.active)) return s;
+      if (board.active === null || opp.active === null || firstTurnRestricted(s) || !canActiveAttack(board.active) || board.active.noAttackTurn === s.turn) return s;
       const ac = ctx.resolve(board.active.card);
       const atk = ac?.attacks?.[a.index];
       if (atk === undefined || !canPayCost(board.active.energy, atk.cost)) return s;
@@ -506,6 +506,11 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
           ns = knockOut(ns, me, self.uid);
           ns = takePrize(ns, oppId, prizeValue(ctx.resolve(self.card))); // opponent takes the Prize for MY KO'd Pokémon
         }
+      }
+      // Self-lock: an attack that bars the attacker next turn marks it for that turn
+      // (the player's next turn = s.turn + 2). Auto-expires (only blocks that turn).
+      if (locksAttackerNextTurn(atk.effect) && ns[me].active !== null) {
+        ns = withBoard(ns, me, mapUnit(ns[me], board.active.uid, (u) => ({ ...u, noAttackTurn: s.turn + 2 })));
       }
       // Attacking ends the turn (unless a self-KO just won/lost the game).
       if (isTerminal(ns)) return ns;

@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -112,7 +112,7 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
     const s = st();
     const active = s[player].active;
     const oppActive = s[opp].active;
-    const atkBlock = s.turn === 1 && player === s.firstPlayer;
+    const atkBlock = (s.turn === 1 && player === s.firstPlayer) || (active !== null && active.noAttackTurn === s.turn);
     if (active !== null && oppActive !== null && !atkBlock) {
       const ac = catOf(active.card);
       const attacks = ac?.attacks ?? [];
@@ -163,6 +163,11 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             st().takePrize(opp, prizeValue(ac));
             push("battle.atk.selfKo");
           }
+        }
+        // Self-lock: barred from attacking on the bot's next turn (s.turn + 2).
+        if (locksAttackerNextTurn(best.effect) && st()[player].active !== null) {
+          st().markNoAttack(player, active.uid, s.turn + 2);
+          push("battle.atk.selfLock");
         }
       }
     }

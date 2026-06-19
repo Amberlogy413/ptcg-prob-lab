@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -150,6 +150,20 @@ describe("selfDamageAmount — unconditional attacker recoil only", () => {
     expect(selfDamageAmount("擲1次硬幣若為反面，這隻寶可夢也受到30點傷害。")).toBe(0);
     expect(selfDamageAmount("造成30點傷害。")).toBe(0);
     expect(selfDamageAmount(undefined)).toBe(0);
+  });
+});
+
+describe("locksAttackerNextTurn — unconditional attacker self-lock only", () => {
+  it("matches 在下個自己的回合，這隻寶可夢無法使用招式", () => {
+    expect(locksAttackerNextTurn("在下個自己的回合，這隻寶可夢無法使用招式。")).toBe(true);
+    expect(locksAttackerNextTurn("造成90點傷害。在下個自己的回合，這隻寶可夢無法使用招式。")).toBe(true);
+  });
+  it("does NOT fire on a coin-flip / conditional lock, the DEFENDER-side lock, or a plain attack", () => {
+    expect(locksAttackerNextTurn("擲1次硬幣若為反面，則在下個自己的回合，這隻寶可夢無法使用招式。")).toBe(false);
+    expect(locksAttackerNextTurn("若希望，增加100點傷害。這個情況下，在下個自己的回合，這隻寶可夢無法使用招式。")).toBe(false);
+    expect(locksAttackerNextTurn("在下個對手的回合，受到這個招式的進化寶可夢無法使用招式。")).toBe(false);
+    expect(locksAttackerNextTurn("造成30點傷害。")).toBe(false);
+    expect(locksAttackerNextTurn(undefined)).toBe(false);
   });
 });
 

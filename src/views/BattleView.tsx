@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -644,6 +644,10 @@ export function BattleView() {
       setMsg(t("battle.atk.firstTurnNoAttack"));
       return;
     }
+    if (active.noAttackTurn === turn) {
+      setMsg(t("battle.atk.locked"));
+      return;
+    }
     if (oppActive === null) {
       setMsg(t("battle.atk.noTarget"));
       return;
@@ -670,6 +674,7 @@ export function BattleView() {
     const recoil = selfDamageAmount(atk.effect);
     const selfNew = Math.max(0, active.damage - heal) + recoil; // post-heal, then recoil
     const selfKo = recoil > 0 && active.card.hp !== undefined && selfNew >= active.card.hp;
+    const locks = locksAttackerNextTurn(atk.effect); // attacker can't attack next turn
     // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
     // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
     const changed = act(() => {
@@ -690,6 +695,7 @@ export function BattleView() {
           s.takePrize(oppId, prizeValue(meActiveCard)); // opponent takes the Prize for your KO'd Pokémon
         }
       }
+      if (locks && !selfKo) s.markNoAttack(me, active.uid, turn + 2); // can't attack on your next turn
       s.endTurn(); // attacking ends your turn (faithful)
     });
     // HONEST: a "+"/"×" attack's printed base is only an approximation — the real
@@ -705,6 +711,7 @@ export function BattleView() {
     if (draw > 0) result += " " + t("battle.atk.selfDraw", { n: draw });
     if (recoil > 0) result += " " + t("battle.atk.selfDamage", { n: recoil });
     if (selfKo) result += " " + t("battle.atk.selfKo");
+    if (locks && !selfKo) result += " " + t("battle.atk.selfLock");
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);
@@ -933,7 +940,7 @@ export function BattleView() {
           defender={oppBoard.active !== null ? resolve(oppBoard.active.card).name : null}
           attacks={attackList}
           abilities={(meActiveCard?.abilities ?? []).map((a) => a.name)}
-          canAttack={!(dTurn === 1 && me === firstPlayer) && oppBoard.active !== null}
+          canAttack={!(dTurn === 1 && me === firstPlayer) && oppBoard.active !== null && meBoard.active?.noAttackTurn !== dTurn}
           onAttack={doAttack}
           t={t}
         />

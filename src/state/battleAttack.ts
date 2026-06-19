@@ -159,6 +159,15 @@ export function selfDamageAmount(effect: string | undefined): number {
   return m ? Number(m[1]) : 0;
 }
 
+/** Does the attack UNCONDITIONALLY lock the ATTACKER out of attacking on its
+ *  next turn ("在下個自己的回合，這隻寶可夢無法使用招式")? 0/false on 若 / 擲 (so a
+ *  coin-flip / optional lock is never applied) — high-precision like inflictedStatus.
+ *  The DEFENDER-lock wording ("受到這個招式的…無法使用招式") is intentionally NOT matched. */
+export function locksAttackerNextTurn(effect: string | undefined): boolean {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return false;
+  return effect.includes("在下個自己的回合，這隻寶可夢無法使用招式");
+}
+
 /** Prize cards taken when this Pokémon is Knocked Out (rule-box → 2, VMAX → 3). */
 export function prizeValue(card: CatalogCard | null): number {
   if (card === null) return 1;

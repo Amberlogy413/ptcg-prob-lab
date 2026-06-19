@@ -76,6 +76,10 @@ export interface InPlay {
   /** Special Conditions on this Pokémon (only meaningful on the Active). Cleared
    *  when it leaves the Active spot or evolves. */
   status: SpecialCondition[];
+  /** Turn number on which this Pokémon may NOT use an attack (set by an attack
+   *  whose effect locks the attacker next turn, e.g. 在下個自己的回合…無法使用招式).
+   *  Auto-expires: it only ever blocks the exact turn it names. */
+  noAttackTurn?: number;
 }
 
 export type SpecialCondition = "poison" | "burn" | "asleep" | "confused" | "paralyzed";
@@ -203,6 +207,8 @@ interface BattleState {
   takePrizeAt: (player: PlayerId, iid: string) => void;
   /** Adjust a unit's damage (clamped ≥0). */
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
+  /** Mark a unit unable to attack on a given turn number (attacker self-lock). */
+  markNoAttack: (player: PlayerId, unitId: string, turn: number) => void;
   /** Toggle a Special Condition on a unit (poison/burn/asleep/confused/paralyzed). */
   toggleStatus: (player: PlayerId, unitId: string, cond: SpecialCondition) => void;
   /** Scoop a whole unit back to hand (board correction / Scoop Up effects). */
@@ -565,6 +571,10 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
       const board = s[player];
       return { [player]: mapUnit(board, unitId, (u) => ({ ...u, damage: Math.max(0, Math.trunc(damage)) })) } as Partial<BattleState>;
     });
+  },
+
+  markNoAttack: (player, unitId, turn) => {
+    set((s) => ({ [player]: mapUnit(s[player], unitId, (u) => ({ ...u, noAttackTurn: turn })) }) as Partial<BattleState>);
   },
 
   toggleStatus: (player, unitId, cond) => {

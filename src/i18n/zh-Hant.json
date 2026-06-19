@@ -915,6 +915,8 @@
   "battle.atk.selfDraw": "(抽 {n} 張卡)",
   "battle.atk.selfDamage": "(自己也受到 {n} 點傷害)",
   "battle.atk.selfKo": "(這隻寶可夢因此昏厥,對手攞獎賞卡)",
+  "battle.atk.selfLock": "(下個自己回合呢隻寶可夢無法使用招式)",
+  "battle.atk.locked": "呢隻寶可夢今個回合無法使用招式(上次攻擊嘅後果)。",
   "battle.win.banner": "🏆 {name} 勝出!",
   "battle.win.byPrizes": "攞晒 6 張獎賞卡,達成勝利條件。",
   "battle.win.byWipe": "{loser} 場上已無寶可夢可戰。",

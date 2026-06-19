@@ -915,6 +915,8 @@
   "battle.atk.selfDraw": "(drew {n})",
   "battle.atk.selfDamage": "(took {n} recoil damage)",
   "battle.atk.selfKo": "(the attacker was Knocked Out — opponent takes a Prize)",
+  "battle.atk.selfLock": "(can't attack on your next turn)",
+  "battle.atk.locked": "This Pokémon can't use an attack this turn (from its last attack).",
   "battle.win.banner": "🏆 {name} wins!",
   "battle.win.byPrizes": "Took all 6 Prize cards — the win condition is met.",
   "battle.win.byWipe": "{loser} has no Pokémon left in play.",
