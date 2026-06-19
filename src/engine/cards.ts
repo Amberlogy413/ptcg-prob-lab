@@ -13,6 +13,7 @@
  */
 
 import { discardFromHand, discardHand, drawN, shuffleHandIntoDeck } from "./ops.ts";
+import { energyProvides } from "../state/battleAttack.ts";
 import type { BattleCard, GameState, PlayerId } from "./types.ts";
 
 /** A modeled effect: resolves the played Supporter purely, returning new state.
@@ -98,6 +99,48 @@ export function isEnergySwitchEffect(effect: string | undefined): boolean {
   return normEffect(effect) === ENERGY_SWITCH_EFFECT;
 }
 
+/** Energy Retrieval family (能量回收): "從自己的棄牌區選擇最多2張基本能量卡，在給對手看過後
+ *  加入手牌" — take UP TO 2 basic Energy from your discard into your hand. An Item;
+ *  the choice (which 1–2 Energy) IS the action. (Verified 2026-06-19: 7 prints, all
+ *  trainerType "Item", this exact unique effect text — no same-text collision.) */
+const ENERGY_RETRIEVE_EFFECT = "從自己的棄牌區選擇最多2張基本能量卡，在給對手看過後加入手牌";
+
+/** Is this card a canonical Energy Retrieval? Exact (normalised) match only. */
+export function isEnergyRetrieveEffect(effect: string | undefined): boolean {
+  return normEffect(effect) === ENERGY_RETRIEVE_EFFECT;
+}
+
+/** The distinct, meaningful Energy Retrieval picks from a discard pile, as arrays
+ *  of 1–2 card iids. Same-element basic Energy is interchangeable, so picks are
+ *  deduped by element: one representative per element (×1), one per element with
+ *  ≥2 copies (×2 of that type), and one per unordered pair of distinct elements.
+ *  Order favours the useful two-card picks first. Empty when no basic Energy is in
+ *  the discard (the card is then not offered — honest: we only model it when it
+ *  retrieves something). Shared by the engine's action space AND the UI picker. */
+export function energyRetrieveCombos(discard: BattleCard[]): string[][] {
+  const byElem = new Map<string, string[]>(); // element key → iids, in discard order
+  for (const e of discard) {
+    if (e.kind !== "energy-basic") continue;
+    const k = energyProvides(e) ?? e.name;
+    const arr = byElem.get(k);
+    if (arr) arr.push(e.iid);
+    else byElem.set(k, [e.iid]);
+  }
+  const elems = [...byElem.keys()];
+  const combos: string[][] = [];
+  // ×2 of one element (the common case: get two of your type back)
+  for (const k of elems) {
+    const ids = byElem.get(k)!;
+    if (ids.length >= 2) combos.push([ids[0]!, ids[1]!]);
+  }
+  // one of each of two distinct elements
+  for (let i = 0; i < elems.length; i++)
+    for (let j = i + 1; j < elems.length; j++) combos.push([byElem.get(elems[i]!)![0]!, byElem.get(elems[j]!)![0]!]);
+  // a single Energy ("up to 2" allows taking just one)
+  for (const k of elems) combos.push([byElem.get(k)![0]!]);
+  return combos;
+}
+
 // --- Search effects: the choice is WHICH card from a pile (deck / discard). ----
 // Detected by exact verified catalog effect text; eligibility uses the card's own
 // kind/section so no extra catalog lookup is needed. Deck searches reshuffle, so
@@ -153,9 +196,10 @@ export const COVERAGE = {
     "大師球 / Master Ball (deck → choose any Pokémon → hand, shuffle)",
     "夜間擔架 / Night Stretcher (discard → choose a Pokémon or basic Energy → hand)",
     "能量轉移 / Energy Switch (move one basic Energy from one of your Pokémon → another)",
+    "能量回收 / Energy Retrieval (take up to 2 basic Energy from your discard → hand)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch"],
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval"],
   /** Known NOT modeled despite high usage: 超級球 / Ultra Ball — its catalog effect
    *  text is anomalous (not Ultra Ball's real rule), so we don't model wrong data. */
   unmodeledKnown: ["超級球 / Ultra Ball (catalog effect text looks wrong — flagged)"],

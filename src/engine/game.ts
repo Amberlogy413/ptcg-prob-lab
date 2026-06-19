@@ -36,7 +36,7 @@ import {
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, searchSpecOf } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, energyRetrieveCombos, searchSpecOf } from "./cards.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
 /** Hiragana + katakana — a card's effect text containing kana means it's the
@@ -190,6 +190,10 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
             for (const dst of inPlay) if (dst.uid !== src.uid) acts.push({ type: "energySwitch", iid: c.iid, fromUid: src.uid, energyIid: e.iid, toUid: dst.uid });
           }
         }
+      } else if (isEnergyRetrieveEffect(effect)) {
+        // Energy Retrieval: take up to 2 basic Energy from your discard. Each
+        // distinct, meaningful 1–2 card pick is one legal action (deduped by element).
+        for (const ids of energyRetrieveCombos(me.discard)) acts.push({ type: "energyRetrieve", iid: c.iid, foundIids: ids });
       } else {
         const spec = searchSpecOf(effect);
         // Search: the choice is WHICH eligible card in the from-pile (deck/discard).
@@ -359,6 +363,22 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       nb = mapUnit(nb, a.toUid, (u) => ({ ...u, energy: [...u.energy, e] }));
       let ns = withBoard(s, me, nb);
       ns = discardFromHand(ns, me, a.iid);
+      return ns;
+    }
+    case "energyRetrieve": {
+      // Energy Retrieval (item): take 1–2 basic Energy from YOUR discard → hand.
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "item") return s;
+      if (!isEnergyRetrieveEffect(ctx.resolve(card)?.effect)) return s;
+      const ids = a.foundIids;
+      if (ids.length < 1 || ids.length > 2 || new Set(ids).size !== ids.length) return s;
+      const found = ids.map((id) => board.discard.find((c) => c.iid === id));
+      if (found.some((c) => c === undefined || c.kind !== "energy-basic")) return s;
+      const foundCards = found as BattleCard[];
+      let ns = discardFromHand(s, me, a.iid); // the played Item → discard
+      const b = ns[me];
+      const pile = b.discard.filter((c) => !ids.includes(c.iid));
+      ns = withBoard(ns, me, { ...b, discard: pile, hand: [...b.hand, ...foundCards] });
       return ns;
     }
     case "search": {

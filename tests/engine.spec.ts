@@ -18,6 +18,7 @@ import {
   encodeObservation,
   makeCtx,
   searchSpecOf,
+  energyRetrieveCombos,
   type GameState,
   type EngineCtx,
   type BattleCard,
@@ -506,6 +507,63 @@ describe("Energy Switch (能量轉移)", () => {
       },
     });
     expect(find(legalActions(s, ctx), "energySwitch").length).toBe(0);
+  });
+});
+
+// --- Energy Retrieval (take up to 2 basic Energy from your discard) ----------
+
+describe("Energy Retrieval (能量回收)", () => {
+  const ER = "從自己的棄牌區選擇最多2張基本能量卡，在給對手看過後加入手牌。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+  const energy = (iid: string, name: string): BattleCard => card(iid, "energy-basic", { name });
+
+  it("enumerates the deduped 1–2 card picks (×2 of a type, one-of-each pair, single)", () => {
+    const discard = [energy("f1", "基本火能量"), energy("f2", "基本火能量"), energy("w1", "基本水能量"), card("pk", "basic"), card("it", "item")];
+    const combos = energyRetrieveCombos(discard);
+    // {火,火}, {火,水}, {火}, {水} — the Pokémon / Item are not basic Energy
+    expect(combos.map((c) => c.slice().sort().join("+")).sort()).toEqual(["f1+f2", "f1+w1", "f1", "w1"].sort());
+  });
+
+  it("legalActions offers one action per pick, and applyAction moves the chosen Energy to hand + discards the Item", () => {
+    const ctx = fxCtx({ ER: { effect: ER } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        active: { uid: "a", card: card("a", "basic", { hp: 100 }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] },
+        hand: [card("ER", "item", { name: "ER" })],
+        discard: [energy("f1", "基本火能量"), energy("f2", "基本火能量"), energy("w1", "基本水能量")],
+      },
+    });
+    expect(find(legalActions(s, ctx), "energyRetrieve").length).toBe(4); // {火火},{火水},{火},{水}
+    const ns = applyAction(s, { type: "energyRetrieve", iid: "ER", foundIids: ["f1", "f2"] }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid).sort()).toEqual(["f1", "f2"]); // both pulled into hand
+    expect(ns.p1.discard.map((c) => c.iid).sort()).toEqual(["ER", "w1"]); // Item went to discard; w1 untouched
+    expect(ns.turnEnergyAttached).toBe(false); // a discard retrieval, not a from-hand attach
+  });
+
+  it("rejects an illegal pick: >2 cards, a non-basic-Energy card, a card not in the discard, or a duplicate", () => {
+    const ctx = fxCtx({ ER: { effect: ER } });
+    const base = {
+      ...pb(),
+      hand: [card("ER", "item", { name: "ER" })],
+      discard: [energy("f1", "基本火能量"), energy("f2", "基本火能量"), card("pk", "basic")],
+    };
+    const s = baseState({ p1: base });
+    expect(applyAction(s, { type: "energyRetrieve", iid: "ER", foundIids: ["f1", "f2", "f1"] }, ctx)).toBe(s); // >2 (and dup)
+    expect(applyAction(s, { type: "energyRetrieve", iid: "ER", foundIids: ["f1", "pk"] }, ctx)).toBe(s); // pk is a Pokémon
+    expect(applyAction(s, { type: "energyRetrieve", iid: "ER", foundIids: ["nope"] }, ctx)).toBe(s); // not in discard
+    expect(applyAction(s, { type: "energyRetrieve", iid: "ER", foundIids: ["f1", "f1"] }, ctx)).toBe(s); // duplicate iid
+  });
+
+  it("offers nothing when the discard holds no basic Energy", () => {
+    const ctx = fxCtx({ ER: { effect: ER } });
+    const s = baseState({ p1: { ...pb(), hand: [card("ER", "item", { name: "ER" })], discard: [card("pk", "basic"), card("it", "item")] } });
+    expect(find(legalActions(s, ctx), "energyRetrieve").length).toBe(0);
+    expect(energyRetrieveCombos(s.p1.discard).length).toBe(0);
   });
 });
 

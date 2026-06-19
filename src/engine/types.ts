@@ -61,6 +61,9 @@ export type Action =
   /** Energy Switch (item): move one BASIC Energy already attached to one of YOUR
    *  Pokémon onto another of YOUR Pokémon; `energyIid` is the moved Energy. */
   | { type: "energySwitch"; iid: string; fromUid: string; energyIid: string; toUid: string }
+  /** Energy Retrieval (item): take up to 2 basic Energy from YOUR discard into
+   *  your hand; `foundIids` is the 1–2 chosen Energy cards. */
+  | { type: "energyRetrieve"; iid: string; foundIids: string[] }
   | { type: "retreat"; benchUnitId: string }
   | { type: "attack"; index: number }
   | { type: "promote"; benchUnitId: string }

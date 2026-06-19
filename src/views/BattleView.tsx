@@ -21,7 +21,7 @@ import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep, toEngineState } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
+import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, energyRetrieveCombos, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -261,11 +261,12 @@ export function BattleView() {
   // Japanese print (夜のタンカ / リーリエの決心). Used for the targeted/search pickers.
   const ectx = useMemo(() => makeCtx(catalog), [catalog]);
   const effectKind = useCallback(
-    (card: BattleCard): "gust" | "switch" | "energyMove" | null => {
+    (card: BattleCard): "gust" | "switch" | "energyMove" | "energyRetrieve" | null => {
       const eff = ectx.resolve(card)?.effect;
       if (isGustEffect(eff)) return "gust";
       if (isSwitchEffect(eff)) return "switch";
       if (isEnergySwitchEffect(eff)) return "energyMove";
+      if (isEnergyRetrieveEffect(eff)) return "energyRetrieve";
       return null;
     },
     [ectx],
@@ -338,6 +339,12 @@ export function BattleView() {
       esFrom = from !== undefined ? resolve(from.card).name : "";
       esTo = to !== undefined ? resolve(to.card).name : "";
       esEnergy = e !== undefined ? resolve(e).name : "";
+    } else if (action.type === "energyRetrieve") {
+      targetName = action.foundIids
+        .map((id) => meBoard.discard.find((x) => x.iid === id))
+        .filter((c): c is BattleCard => c !== undefined)
+        .map((c) => resolve(c).name)
+        .join("、");
     }
     const changed = act(() => {
       const s = store.getState();
@@ -412,6 +419,10 @@ export function BattleView() {
           if (!engineStep({ type: "energySwitch", iid: card.iid, fromUid: action.fromUid, energyIid: action.energyIid, toUid: action.toUid }, catalog))
             setMsg(t("battle.gate.energySwitch"));
           break;
+        case "energyRetrieve":
+          // Energy Retrieval — resolved by the engine (single rules source).
+          if (!engineStep({ type: "energyRetrieve", iid: card.iid, foundIids: action.foundIids }, catalog)) setMsg(t("battle.gate.energyRetrieve"));
+          break;
         case "discard":
           s.discardFromHand(me, card.iid);
           break;
@@ -434,6 +445,8 @@ export function BattleView() {
         note(t("battle.log.search", { who, card: cn, target: targetName }));
       } else if (action.type === "energySwitch") {
         note(t("battle.log.energySwitch", { who, card: cn, energy: esEnergy, from: esFrom, to: esTo }));
+      } else if (action.type === "energyRetrieve") {
+        note(t("battle.log.energyRetrieve", { who, card: cn, target: targetName }));
       } else {
         const key = {
           toActive: "battle.log.active",
@@ -923,6 +936,7 @@ type PlayAction =
   | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
   | { type: "search"; foundIid: string } // Nest/Master Ball, Night Stretcher → pick from a pile
   | { type: "energySwitch"; fromUid: string; energyIid: string; toUid: string } // Energy Switch → move a basic Energy between your Pokémon
+  | { type: "energyRetrieve"; foundIids: string[] } // Energy Retrieval → take up to 2 basic Energy from discard
   | { type: "discard" }
   | { type: "toPile"; pile: Pile };
 
@@ -1403,7 +1417,7 @@ function HandRow({
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
@@ -1459,7 +1473,7 @@ function HandActions({
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
@@ -1597,6 +1611,32 @@ function HandActions({
                     {resolveName(e)}▸{resolve(from.card).name}→{resolve(to.card).name}
                   </button>
                 ))}
+              </span>
+            );
+          })()}
+        </>
+      )}
+      {card.kind === "item" && fx === "energyRetrieve" && (
+        <>
+          {/* Energy Retrieval — take up to 2 basic Energy from your discard (engine). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.energyRetrieve")}→</span>
+          {(() => {
+            const combos = energyRetrieveCombos(board.discard);
+            if (combos.length === 0) return <span className="text-[11px] text-ink2">{t("battle.act.searchNone")}</span>;
+            return (
+              <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+                {combos.map((ids) => {
+                  const names = ids
+                    .map((id) => board.discard.find((c) => c.iid === id))
+                    .filter((c): c is BattleCard => c !== undefined)
+                    .map((c) => resolveName(c));
+                  const label = names.length === 2 && names[0] === names[1] ? `${names[0]} ×2` : names.join(" + ");
+                  return (
+                    <button key={ids.join("+")} type="button" onClick={() => onPlay(card, { type: "energyRetrieve", foundIids: ids })} className={btn} title={label}>
+                      {label}
+                    </button>
+                  );
+                })}
               </span>
             );
           })()}
