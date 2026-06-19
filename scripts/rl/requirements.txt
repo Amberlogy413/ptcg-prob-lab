@@ -1,0 +1,4 @@
+# Offline RL training deps (NOT needed by the app or by gym_env.py's smoke test).
+# Install only when you actually train: pip install -r scripts/rl/requirements.txt
+numpy>=1.24
+torch>=2.0

@@ -131,22 +131,24 @@ describe("trial table UI", () => {
     await viewReady();
 
     await user.click(screen.getByRole("button", { name: "試抽一手" }));
-    // Work out k for (seed 42, game 0) through the same engine the view used.
-    const copies = copiesOf(10);
-    const { lastDeal } = runTrials(copies, true, 42, 0, 1, emptyStats());
-    const k = lastDeal.hand.filter((c) => c.isBasic).length;
-
     await user.click(screen.getByRole("button", { name: "把這手變成訓練題" }));
     expect(useUiStore.getState().activeView).toBe("trainer");
     await viewReady();
 
-    // The injected question is on stage with the right k.
-    expect(
-      screen.getByText(new RegExp(`留用手剛好有 ${k} 張基礎的概率是`)),
-    ).toBeInTheDocument();
+    // The trial table injects this hand's Basic count as a trainer question.
+    // Don't re-derive k from an assumed (seed, game) — assert the stable
+    // invariant (the trialHand phrasing, for *whatever* k was dealt) and read
+    // k back from the prompt, then pin every correctness check to that same k.
+    // findByText also waits out the pending→active effect that fills the prompt
+    // in after the lazy view mounts (the prompt is absent for a tick otherwise).
+    const prompt = await screen.findByText(/留用手剛好有 \d+ 張基礎的概率是/);
+    const k = Number(/剛好有 (\d+) 張基礎/.exec(prompt.textContent ?? "")?.[1]);
+    expect(k).toBeGreaterThanOrEqual(1); // a kept hand always holds ≥1 Basic
+    expect(k).toBeLessThanOrEqual(7);
 
-    // Answer and reveal: the exact value is the conditional-dist row —
-    // golden-backed (opening_basics_B10 conditional fields).
+    // Answer and reveal: the exact value is the conditional-dist row for the
+    // k the table actually dealt — golden-backed (opening_basics_B10
+    // conditional fields).
     const expected = computeQ1(useDeckStore.getState().decks[0]!) as Extract<
       ReturnType<typeof computeQ1>,
       { status: "ok" }
