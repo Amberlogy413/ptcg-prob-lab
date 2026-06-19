@@ -183,8 +183,8 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
         for (const src of inPlay) {
           const seen = new Set<string>();
           for (const e of src.energy) {
-            if (e.kind !== "energy-basic") continue;
-            const elem = energyProvides(e) ?? e.name;
+            const elem = energyProvides(e); // basic Energy by name; special → null (not movable)
+            if (elem === null) continue;
             if (seen.has(elem)) continue;
             seen.add(elem);
             for (const dst of inPlay) if (dst.uid !== src.uid) acts.push({ type: "energySwitch", iid: c.iid, fromUid: src.uid, energyIid: e.iid, toUid: dst.uid });
@@ -358,7 +358,7 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const dst = units(board).find((u) => u.uid === a.toUid);
       if (src === undefined || dst === undefined) return s;
       const e = src.energy.find((x) => x.iid === a.energyIid);
-      if (e === undefined || e.kind !== "energy-basic") return s;
+      if (e === undefined || energyProvides(e) === null) return s; // basic Energy only (by name)
       let nb: PlayerBoard = mapUnit(board, a.fromUid, (u) => ({ ...u, energy: u.energy.filter((x) => x.iid !== a.energyIid) }));
       nb = mapUnit(nb, a.toUid, (u) => ({ ...u, energy: [...u.energy, e] }));
       let ns = withBoard(s, me, nb);
@@ -373,7 +373,7 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const ids = a.foundIids;
       if (ids.length < 1 || ids.length > 2 || new Set(ids).size !== ids.length) return s;
       const found = ids.map((id) => board.discard.find((c) => c.iid === id));
-      if (found.some((c) => c === undefined || c.kind !== "energy-basic")) return s;
+      if (found.some((c) => c === undefined || energyProvides(c) === null)) return s; // basic Energy only (by name)
       const foundCards = found as BattleCard[];
       let ns = discardFromHand(s, me, a.iid); // the played Item → discard
       const b = ns[me];

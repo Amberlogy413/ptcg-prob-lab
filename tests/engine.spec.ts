@@ -388,10 +388,12 @@ describe("makeCtx — zh-effect resolution for Japanese-print cards", () => {
 
 // --- search effects (pile pick = action) ------------------------------------
 
-describe("search effects (Nest / Master Ball, Night Stretcher)", () => {
+describe("search effects (Nest / Master Ball, Night Stretcher, Energy Search, Evolution Incense)", () => {
   const NEST = "從自己的牌庫選擇1張【基礎】寶可夢卡，放置於備戰區。並且重洗牌庫。";
   const MASTER = "從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
   const NIGHT = "從自己的棄牌區選擇1張寶可夢卡或者基本能量卡，在給對手看過後加入手牌。";
+  const ENERGY_SEARCH = "從自己的牌庫選擇1張基本能量卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const EVO_INCENSE = "從自己的牌庫選擇1張進化寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
   const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
     catalog: null,
     resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
@@ -434,7 +436,7 @@ describe("search effects (Nest / Master Ball, Night Stretcher)", () => {
       p1: {
         ...pb(),
         hand: [card("Night", "item", { name: "Night" })],
-        discard: [card("pkA", "basic"), card("enB", "energy-basic"), card("trN", "item")],
+        discard: [card("pkA", "basic"), card("enB", "energy-basic", { name: "基本火能量" }), card("trN", "item")],
       },
     });
     const acts = find(legalActions(s, ctx), "search");
@@ -443,6 +445,41 @@ describe("search effects (Nest / Master Ball, Night Stretcher)", () => {
     expect(ns.p1.hand.map((c) => c.iid)).toContain("enB");
     expect(ns.p1.discard.map((c) => c.iid)).toContain("Night"); // the Item itself
     expect(ns.shuffleNonce).toBe(s.shuffleNonce); // discard retrieval does NOT reshuffle
+  });
+
+  it("Energy Search offers only basic Energy from the deck → hand, and reshuffles", () => {
+    const ctx = fxCtx({ ES: { effect: ENERGY_SEARCH } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("ES", "item", { name: "ES" })],
+        // enA = a real basic Energy (by name); spC = a special Energy whose catalog
+        // entry is missing so its kind WRONGLY defaulted to "energy-basic" — it must
+        // still be EXCLUDED (basic-vs-special is decided by name, not kind).
+        deck: [card("enA", "energy-basic", { name: "基本火能量" }), card("pkB", "basic"), card("spC", "energy-basic", { name: "新星增幅能量" })],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(1); // only the genuine basic Energy
+    const ns = applyAction(s, { type: "search", iid: "ES", foundIid: "enA" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("enA");
+    expect(ns.p1.deck.some((c) => c.iid === "enA")).toBe(false);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
+    // The mis-kinded special Energy is NOT pulled (would be a false positive).
+    expect(applyAction(s, { type: "search", iid: "ES", foundIid: "spC" }, ctx)).toBe(s);
+  });
+
+  it("Evolution Incense offers only Evolution Pokémon from the deck → hand, and reshuffles", () => {
+    const ctx = fxCtx({ EI: { effect: EVO_INCENSE } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("EI", "item", { name: "EI" })], deck: [card("evoA", "evolution"), card("basicB", "basic"), card("enC", "energy-basic")] },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(1); // only the Evolution Pokémon (Basic / Energy not eligible)
+    const ns = applyAction(s, { type: "search", iid: "EI", foundIid: "evoA" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("evoA");
+    expect(ns.p1.deck.some((c) => c.iid === "evoA")).toBe(false);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
   });
 });
 
@@ -564,6 +601,13 @@ describe("Energy Retrieval (能量回收)", () => {
     const s = baseState({ p1: { ...pb(), hand: [card("ER", "item", { name: "ER" })], discard: [card("pk", "basic"), card("it", "item")] } });
     expect(find(legalActions(s, ctx), "energyRetrieve").length).toBe(0);
     expect(energyRetrieveCombos(s.p1.discard).length).toBe(0);
+  });
+
+  it("excludes a special Energy whose kind WRONGLY defaulted to energy-basic (basic-vs-special is by name)", () => {
+    // 新星增幅能量 is a special Energy absent from the catalog, so its kind defaulted
+    // to "energy-basic" — it must NOT be retrievable; only the genuine basic Energy is.
+    const discard = [energy("f1", "基本火能量"), energy("sp", "新星增幅能量")];
+    expect(energyRetrieveCombos(discard)).toEqual([["f1"]]); // just the real basic Energy, single pick
   });
 });
 

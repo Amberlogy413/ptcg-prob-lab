@@ -120,8 +120,8 @@ export function isEnergyRetrieveEffect(effect: string | undefined): boolean {
 export function energyRetrieveCombos(discard: BattleCard[]): string[][] {
   const byElem = new Map<string, string[]>(); // element key → iids, in discard order
   for (const e of discard) {
-    if (e.kind !== "energy-basic") continue;
-    const k = energyProvides(e) ?? e.name;
+    const k = energyProvides(e); // basic Energy by name; special / non-Energy → null
+    if (k === null) continue;
     const arr = byElem.get(k);
     if (arr) arr.push(e.iid);
     else byElem.set(k, [e.iid]);
@@ -158,7 +158,15 @@ export interface SearchSpec {
 
 const isBasicPokemon = (c: BattleCard): boolean => c.kind === "basic";
 const isPokemon = (c: BattleCard): boolean => c.section === "pokemon";
-const isBasicEnergy = (c: BattleCard): boolean => c.kind === "energy-basic";
+const isEvolution = (c: BattleCard): boolean => c.kind === "evolution"; // any non-Basic Pokémon (Stage 1/2)
+/** A "basic Energy" — identified by its NAME (the standard type Energies), NOT by
+ *  `kind` or catalog `energyType`, both of which are unreliable (verified
+ *  2026-06-19): a catalog-absent special Energy from a newest set falls through to
+ *  kind "energy-basic", and the catalog even tags the real basic Energies as
+ *  energyType "Special". `energyProvides` (the type-colour name map) returns a
+ *  non-null element only for the genuine basic Energies, so it is the one
+ *  trustworthy basic-vs-special test. Used by every basic-Energy-only effect. */
+const isBasicEnergy = (c: BattleCard): boolean => energyProvides(c) !== null;
 
 /** Modeled single-pick search Items, keyed by exact (normalised) catalog effect.
  *  Verified 2026-06-18 in public/catalog/cards-zh-Hant.json. NOTE: 超級球 / Ultra
@@ -172,6 +180,10 @@ const SEARCH_BY_EFFECT: Array<{ effect: string; spec: SearchSpec }> = [
   { effect: "從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isPokemon, shuffleAfter: true } },
   // 夜間擔架 (Night Stretcher): discard → a Pokémon OR a basic Energy → hand (no shuffle).
   { effect: "從自己的棄牌區選擇1張寶可夢卡或者基本能量卡，在給對手看過後加入手牌", spec: { from: "discard", to: "hand", eligible: (c) => isPokemon(c) || isBasicEnergy(c), shuffleAfter: false } },
+  // 能量輸送 (Energy Search): deck → a basic Energy → hand, shuffle. (Verified 2026-06-19.)
+  { effect: "從自己的牌庫選擇1張基本能量卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isBasicEnergy, shuffleAfter: true } },
+  // 進化薰香 (Evolution Incense): deck → an Evolution Pokémon (Stage 1/2) → hand, shuffle. (Verified 2026-06-19.)
+  { effect: "從自己的牌庫選擇1張進化寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isEvolution, shuffleAfter: true } },
 ];
 
 /** The search spec for this card's effect text, or null if it isn't a modeled search. */
@@ -197,12 +209,16 @@ export const COVERAGE = {
     "夜間擔架 / Night Stretcher (discard → choose a Pokémon or basic Energy → hand)",
     "能量轉移 / Energy Switch (move one basic Energy from one of your Pokémon → another)",
     "能量回收 / Energy Retrieval (take up to 2 basic Energy from your discard → hand)",
+    "能量輸送 / Energy Search (deck → choose a basic Energy → hand, shuffle)",
+    "進化薰香 / Evolution Incense (deck → choose an Evolution Pokémon → hand, shuffle)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval"],
-  /** Known NOT modeled despite high usage: 超級球 / Ultra Ball — its catalog effect
-   *  text is anomalous (not Ultra Ball's real rule), so we don't model wrong data. */
-  unmodeledKnown: ["超級球 / Ultra Ball (catalog effect text looks wrong — flagged)"],
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense"],
+  /** Known NOT modeled despite high usage, with the honest reason. */
+  unmodeledKnown: [
+    "超級球 / Ultra Ball (catalog effect text looks wrong — flagged for a data fix)",
+    "神奇糖果 / Rare Candy (Stage-2 jump-evolve) — BLOCKED by data, not modeled: a faithful 'this Stage 2 can evolve from this Basic' check needs the full Basic→Stage 1→Stage 2 line, but the catalog encodes evolveFrom on only ~16% of Stage 2 cards (and not on the std-legal lines), so the chain cannot be verified without GUESSING it. We refuse to offer a jump we can't prove legal. Unblock = enrich the catalog with real evolution-chain data (see docs/DECISIONS.md 2026-06-19); normal step-by-step evolution stays available in the sandbox.",
+  ],
   /** Pokémon Abilities: none modeled yet (most are triggered/optional choices). */
   abilities: [] as string[],
   /** Known simplifications carried for this phase (documented, never silent). */
@@ -217,5 +233,6 @@ export const COVERAGE = {
     "when an attack KOs the opponent's Active, the next player's mandatory start-of-turn draw is sequenced BEFORE the forced promotion (no observable effect today; no modeled effect depends on it)",
     "Stadium uses a per-side slot (matches the sandbox); the real SINGLE shared-Stadium zone and the same-name-replacement ban are not modeled",
     "special / unknown Energy pays any single cost symbol as a wildcard (its element is never fabricated)",
+    "basic-Energy-only effects (Energy Search/Switch/Retrieval, Night Stretcher) decide 'is this a basic Energy' by NAME (energyProvides), NOT by kind or catalog energyType — both are unreliable: catalog-absent special Energy defaults to kind 'energy-basic', and the catalog tags real basic Energies as energyType 'Special' (verified 2026-06-19)",
   ],
 } as const;
