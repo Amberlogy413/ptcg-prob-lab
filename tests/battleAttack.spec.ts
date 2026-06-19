@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -89,6 +89,30 @@ describe("finalDamage — weakness / resistance", () => {
   it("leaves damage unchanged with no weakness/resistance, and never goes negative", () => {
     expect(finalDamage(attacker, card({}), 50).damage).toBe(50);
     expect(finalDamage(attacker, card({ resistances: [{ type: "Fire", value: "-30" }] }), 20).damage).toBe(0);
+  });
+});
+
+describe("inflictedStatus — high-precision, unconditional only", () => {
+  it("reads the bare 將對手的戰鬥寶可夢【X】 inflict for each condition", () => {
+    expect(inflictedStatus("將對手的戰鬥寶可夢【中毒】。")).toBe("poison");
+    expect(inflictedStatus("將對手的戰鬥寶可夢【灼傷】。")).toBe("burn");
+    expect(inflictedStatus("將對手的戰鬥寶可夢【睡眠】。")).toBe("asleep");
+    expect(inflictedStatus("將對手的戰鬥寶可夢【混亂】。")).toBe("confused");
+    expect(inflictedStatus("將對手的戰鬥寶可夢【麻痺】。")).toBe("paralyzed");
+  });
+  it("applies the status even alongside other (unmodeled) clauses", () => {
+    expect(inflictedStatus("對手的所有寶可夢各受到20點傷害。將對手的戰鬥寶可夢【中毒】。")).toBe("poison");
+  });
+  it("does NOT fire on a coin-flip (擲) or conditional (若) status", () => {
+    expect(inflictedStatus("擲1次硬幣若為正面，則將對手的戰鬥寶可夢【麻痺】。")).toBeNull();
+    expect(inflictedStatus("查看對手的手牌，若其中有能量卡，則將對手的戰鬥寶可夢【麻痺】。")).toBeNull();
+  });
+  it("does NOT mistake a READ-for-damage (若…【中毒】則增加傷害) for an inflict", () => {
+    expect(inflictedStatus("若對手的戰鬥寶可夢【中毒】，則增加90點傷害。")).toBeNull();
+  });
+  it("returns null for a plain damage attack", () => {
+    expect(inflictedStatus("造成30點傷害。")).toBeNull();
+    expect(inflictedStatus(undefined)).toBeNull();
   });
 });
 

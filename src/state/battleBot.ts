@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -128,6 +128,13 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
           st().knockOut(opp, oppActive.uid);
           st().takePrize(player, prizes);
           push("battle.log.koTake", undefined, { n: prizes });
+        } else {
+          // Surviving defender: apply an unconditional attack-inflicted condition.
+          const cond = inflictedStatus(best.effect);
+          if (cond !== null && !oppActive.status.includes(cond)) {
+            st().toggleStatus(opp, oppActive.uid, cond);
+            push("battle.log.inflict", undefined, { cond });
+          }
         }
       }
     }

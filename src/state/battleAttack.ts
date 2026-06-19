@@ -9,7 +9,7 @@
 
 import { energyType } from "../data/typeColors.ts";
 import { cardTier, type CatalogCard } from "../data/catalog.ts";
-import type { BattleCard } from "./battleStore.ts";
+import type { BattleCard, SpecialCondition } from "./battleStore.ts";
 
 /** The element an attached Energy provides; null = special / no element → a
  *  wildcard that can pay any single cost symbol (we never fabricate its type). */
@@ -108,6 +108,25 @@ export function finalDamage(
     }
   }
   return { damage: Math.max(0, dmg), weakness, resistance };
+}
+
+/** The Special Condition an attack UNCONDITIONALLY inflicts on the defender, from
+ *  the attack's zh effect text — or null. HIGH-PRECISION on purpose: only the bare
+ *  "將對手的戰鬥寶可夢【X】" phrasing, and only when the effect has no 「若」
+ *  (conditional) and no 「擲」 (coin flip), so we never apply a status that is
+ *  actually gated on a flip/condition, nor mistake a "若…【中毒】則增加傷害" READ for
+ *  an inflict. Coin-flip / conditional statuses stay unmodeled (disclosed). */
+const STATUS_TEXT: ReadonlyArray<readonly [string, SpecialCondition]> = [
+  ["中毒", "poison"],
+  ["灼傷", "burn"],
+  ["睡眠", "asleep"],
+  ["混亂", "confused"],
+  ["麻痺", "paralyzed"],
+];
+export function inflictedStatus(effect: string | undefined): SpecialCondition | null {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return null;
+  for (const [zh, cond] of STATUS_TEXT) if (effect.includes(`將對手的戰鬥寶可夢【${zh}】`)) return cond;
+  return null;
 }
 
 /** Prize cards taken when this Pokémon is Knocked Out (rule-box → 2, VMAX → 3). */

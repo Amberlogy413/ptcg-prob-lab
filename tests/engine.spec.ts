@@ -249,6 +249,26 @@ describe("attack", () => {
     expect(applyAction(asleep, { type: "attack", index: 0 }, ctx)).toBe(asleep);
   });
 
+  it("applies an UNCONDITIONAL attack status to a surviving defender (not on KO, not when conditional)", () => {
+    const mk = (effect: string): EngineCtx => ({
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Pikachu"
+          ? ({ name: "Pikachu", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Venoshock", cost: ["Lightning"], damage: 30, effect }] } as CatalogCard)
+          : ({ name: c.name, category: "Pokemon" } as CatalogCard),
+      autoKey: (c) => c.name,
+    });
+    // survives (200 HP, 30 dmg) → poison applied
+    let ns = applyAction(attackState(200), { type: "attack", index: 0 }, mk("將對手的戰鬥寶可夢【中毒】。"));
+    expect(ns.p2.active?.status).toContain("poison");
+    // KO (20 HP, 30 dmg) → no active, no status
+    ns = applyAction(attackState(20), { type: "attack", index: 0 }, mk("將對手的戰鬥寶可夢【中毒】。"));
+    expect(ns.p2.active).toBeNull();
+    // conditional (若…) → NOT applied (it reads the status, doesn't inflict it)
+    ns = applyAction(attackState(200), { type: "attack", index: 0 }, mk("若對手的戰鬥寶可夢【中毒】，則增加90點傷害。"));
+    expect(ns.p2.active?.status ?? []).not.toContain("poison");
+  });
+
   it("taking the last Prize wins the game (no turn pass)", () => {
     const s = baseState({
       p1: { ...pb(), active: { uid: "atk", card: card("Pikachu", "basic", { hp: 70, name: "Pikachu" }), under: [], energy: [card("le", "energy-basic", { name: "Lightning Energy" })], tools: [], damage: 0, playedTurn: 1, status: [] }, prizes: [card("last", "basic")] },

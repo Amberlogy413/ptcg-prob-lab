@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -390,6 +390,13 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
         const prizes = prizeValue(oc);
         ns = knockOut(ns, oppId, defenderUid);
         ns = takePrize(ns, me, prizes);
+      } else {
+        // Surviving defender: apply an unconditional attack-inflicted Special
+        // Condition (poison/burn/etc.); the upcoming checkup ticks poison/burn.
+        const cond = inflictedStatus(atk.effect);
+        if (cond !== null) {
+          ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
+        }
       }
       // Attacking ends the turn (unless it just won the game).
       if (isTerminal(ns)) return ns;

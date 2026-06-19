@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -601,14 +601,18 @@ export function BattleView() {
     const hp = oppActive.card.hp;
     const ko = hp !== undefined && newDamage >= hp;
     const prizes = ko ? prizeValue(oppCard) : 0;
-    // One atomic gesture (damage → KO+prize → endTurn) so a single Undo reverses
-    // the whole attack, not just the turn flip (review fix 2026-06-17).
+    // An unconditional attack-inflicted Special Condition on a SURVIVING defender.
+    const cond = ko ? null : inflictedStatus(atk.effect);
+    // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
+    // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
     const changed = act(() => {
       const s = store.getState();
       s.setDamage(oppId, oppActive.uid, newDamage);
       if (ko) {
         s.knockOut(oppId, oppActive.uid);
         s.takePrize(me, prizes);
+      } else if (cond !== null && !oppActive.status.includes(cond)) {
+        s.toggleStatus(oppId, oppActive.uid, cond);
       }
       s.endTurn(); // attacking ends your turn (faithful)
     });
@@ -620,6 +624,7 @@ export function BattleView() {
       .join(" ");
     let result = t("battle.atk.result", { atk: atk.name, dmg: approx ? `≈${damage}` : damage, tags });
     if (ko) result += " " + t("battle.atk.ko", { n: prizes });
+    if (cond !== null) result += " " + t("battle.atk.inflict", { cond: t(`battle.cond.${cond}`) });
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);
@@ -628,13 +633,17 @@ export function BattleView() {
   // AI auto-player (owner 2026-06-18): run one deterministic heuristic turn for
   // the CURRENT player through the same rules engine, as ONE atomic undo step,
   // and append its log lines. Honest: a rule-based opponent, not a trained model.
+  // Localize a bot event line; the inflict event carries a raw condition key.
+  const botNote = (e: { key: string; params: Record<string, string | number> }) =>
+    note(t(e.key, e.key === "battle.log.inflict" ? { ...e.params, cond: t(`battle.cond.${e.params.cond}`) } : e.params));
+
   function runBot() {
     if (gameResult(useBattleStore.getState()) !== null) return; // game already won
     const p = useBattleStore.getState().current;
     // Log + snapshot EACH move as it happens (onEvent) so replay frames are
     // per-move faithful — not all collapsed to the end-of-turn board.
     const changed = act(() => {
-      runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: (e) => note(t(e.key, e.params)) });
+      runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: botNote });
     });
     if (changed) setSel(null);
   }
@@ -648,7 +657,7 @@ export function BattleView() {
     while (gameResult(useBattleStore.getState()) === null && steps < AI_MATCH_CAP) {
       const p = useBattleStore.getState().current;
       const changed = act(() => {
-        runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: (e) => note(t(e.key, e.params)) });
+        runBotTurn(p, catalog, { who: names[p], nameOf: (c) => resolve(c).name, autoKey, onEvent: botNote });
       });
       if (!changed) break;
       steps++;
