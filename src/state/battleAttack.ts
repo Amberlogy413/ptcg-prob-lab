@@ -149,6 +149,16 @@ export function attackDrawCount(effect: string | undefined): number {
   return m ? Number(m[1]) : 0;
 }
 
+/** Recoil: damage the attack UNCONDITIONALLY deals to the ATTACKER itself
+ *  ("這隻寶可夢也受到N點傷害") — 0 if absent or gated on a 若 / 擲. Unlike heal/draw,
+ *  recoil CAN Knock the attacker Out (the opponent then takes the Prize), so the
+ *  caller must handle a possible self-KO. */
+export function selfDamageAmount(effect: string | undefined): number {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  const m = effect.match(/這隻寶可夢也受到(\d+)點傷害/);
+  return m ? Number(m[1]) : 0;
+}
+
 /** Prize cards taken when this Pokémon is Knocked Out (rule-box → 2, VMAX → 3). */
 export function prizeValue(card: CatalogCard | null): number {
   if (card === null) return 1;

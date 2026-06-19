@@ -307,6 +307,34 @@ describe("attack", () => {
     expect(ns.p1.hand.length).toBe(2);
     expect(ns.p1.deck.length).toBe(1);
   });
+
+  const bench = () => ({ uid: "b", card: card("Bench", "basic", { hp: 60, name: "Bench" }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] });
+
+  it("recoil self-damage hurts the attacker but it survives → the turn still passes", () => {
+    const s = attackState(200); // attacker Pikachu hp 70, damage 0; defender survives
+    const withDeck = { ...s, p2: { ...s.p2, deck: [card("od", "basic")] } };
+    const ns = applyAction(withDeck, { type: "attack", index: 0 }, fxAtk("這隻寶可夢也受到30點傷害。"));
+    expect(ns.p1.active?.damage).toBe(30);
+    expect(ns.current).toBe("p2");
+  });
+
+  it("recoil that reaches the attacker's HP self-KOs it; the OPPONENT takes the Prize (game continues with a Bench)", () => {
+    const s = attackState(200);
+    const hurt = { ...s, p1: { ...s.p1, active: { ...s.p1.active!, damage: 50 }, bench: [bench()] }, p2: { ...s.p2, deck: [card("od", "basic")] } };
+    const before = hurt.p2.prizes.length;
+    const ns = applyAction(hurt, { type: "attack", index: 0 }, fxAtk("這隻寶可夢也受到30點傷害。")); // 50 + 30 ≥ 70
+    expect(ns.p1.active).toBeNull(); // the attacker KO'd itself
+    expect(ns.p2.prizes.length).toBe(before - 1); // opponent took the Prize for it
+    expect(ns.current).toBe("p2");
+  });
+
+  it("a recoil self-KO with no Bench loses the game (no Pokémon left)", () => {
+    const s = attackState(200);
+    const hurt = { ...s, everInPlay: { p1: true, p2: true }, p1: { ...s.p1, active: { ...s.p1.active!, damage: 50 }, bench: [] } };
+    const ns = applyAction(hurt, { type: "attack", index: 0 }, fxAtk("這隻寶可夢也受到30點傷害。"));
+    expect(isTerminal(ns)).toBe(true);
+    expect(winner(ns)).toBe("p2");
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

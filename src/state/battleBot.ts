@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -60,10 +60,15 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
     ctx.onEvent?.(e); // fire NOW, while the store reflects this move (faithful replay frame)
   };
 
-  // 1) Ensure an Active Pokémon (a Basic from hand).
+  // 1) Ensure an Active Pokémon — a Basic from hand, else promote a Benched one
+  //    (so a self-KO'd bot recovers instead of stalling with an empty Active).
   if (st()[player].active === null) {
     const basic = st()[player].hand.find((c) => c.kind === "basic");
     if (basic !== undefined && st().playToActive(player, basic.iid)) push("battle.log.active", basic);
+    else if (st()[player].bench.length > 0) {
+      const benched = st()[player].bench[0];
+      if (benched !== undefined && st().promote(player, benched.uid)) push("battle.log.promote", benched.card);
+    }
   }
 
   // 2) Bench up to a modest number of Basics.
@@ -136,7 +141,8 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             push("battle.log.inflict", undefined, { cond });
           }
         }
-        // Unconditional attacker-only effects (never cause a KO): self-heal / draw.
+        // Unconditional attacker-only effects: self-heal / draw (never KO) + recoil
+        // (can self-KO the attacker → the opponent takes the Prize).
         const heal = selfHealAmount(best.effect);
         if (heal > 0) {
           st().setDamage(player, active.uid, Math.max(0, active.damage - heal));
@@ -146,6 +152,17 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
         if (draw > 0) {
           st().draw(player, draw);
           push("battle.atk.selfDraw", undefined, { n: draw });
+        }
+        const recoil = selfDamageAmount(best.effect);
+        if (recoil > 0) {
+          const selfNew = Math.max(0, active.damage - heal) + recoil;
+          st().setDamage(player, active.uid, selfNew);
+          push("battle.atk.selfDamage", undefined, { n: recoil });
+          if (active.card.hp !== undefined && selfNew >= active.card.hp) {
+            st().knockOut(player, active.uid);
+            st().takePrize(opp, prizeValue(ac));
+            push("battle.atk.selfKo");
+          }
         }
       }
     }

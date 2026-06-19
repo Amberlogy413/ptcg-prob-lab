@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -487,14 +487,27 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
           ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
         }
       }
-      // Unconditional attacker-only effects (resolve regardless of the defender's
-      // fate, never cause a KO): self-heal reduces the attacker's own damage; draw
-      // adds cards to the attacker's hand. Both apply before the turn ends.
+      // The attack may already have won (last Prize taken / opponent wiped) — stop
+      // before any attacker-only effect resolves.
+      if (isTerminal(ns)) return ns;
+      // Unconditional attacker-only effects. self-heal (reduce own damage) and draw
+      // never cause a KO; recoil CAN self-KO the attacker (the OPPONENT then takes
+      // the Prize). All resolve after the defender, before the turn ends.
       const heal = selfHealAmount(atk.effect);
       if (heal > 0) ns = withBoard(ns, me, mapUnit(ns[me], board.active.uid, (u) => ({ ...u, damage: Math.max(0, u.damage - heal) })));
       const draw = attackDrawCount(atk.effect);
       if (draw > 0) ns = drawN(ns, me, draw);
-      // Attacking ends the turn (unless it just won the game).
+      const recoil = selfDamageAmount(atk.effect);
+      if (recoil > 0 && ns[me].active !== null) {
+        const self = ns[me].active;
+        const selfNew = self.damage + recoil;
+        ns = addDamage(ns, me, self.uid, recoil);
+        if (self.card.hp !== undefined && selfNew >= self.card.hp) {
+          ns = knockOut(ns, me, self.uid);
+          ns = takePrize(ns, oppId, prizeValue(ctx.resolve(self.card))); // opponent takes the Prize for MY KO'd Pokémon
+        }
+      }
+      // Attacking ends the turn (unless a self-KO just won/lost the game).
       if (isTerminal(ns)) return ns;
       return endTurnTransition(ns);
     }

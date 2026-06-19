@@ -239,7 +239,8 @@ export const COVERAGE = {
   abilities: [] as string[],
   /** Known simplifications carried for this phase (documented, never silent). */
   simplifications: [
-    "attacks resolve damage + weakness/resistance, an UNCONDITIONAL Special Condition on the defender (將對手的戰鬥寶可夢【X】, no 若/擲), AND two unconditional attacker-only effects — self-heal (將這隻寶可夢恢復「N」HP) and draw (從自己的牌庫抽出N張卡); coin-flip/conditional effects and recoil self-damage (這隻寶可夢也受到N點傷害, deferred — can self-KO) / energy-discard are still not modeled",
+    "attacks resolve damage + weakness/resistance, an UNCONDITIONAL Special Condition on the defender (將對手的戰鬥寶可夢【X】, no 若/擲), AND three unconditional attacker-only effects — self-heal (將這隻寶可夢恢復「N」HP), draw (從自己的牌庫抽出N張卡), and recoil self-damage (這隻寶可夢也受到N點傷害, which CAN self-KO the attacker → opponent takes the Prize); coin-flip/conditional effects and attack energy-discard are still not modeled",
+    "after a recoil SELF-KO the attacker's player promotes a new Active only at the START of their next turn (the engine's forced-promote), so during the opponent's immediately-following turn that player's Active can be empty — the opponent can't attack into the empty slot for that one window (a disclosed sequencing gap; the bot promotes a Benched Pokémon at its own turn start, the manual sandbox promotes by hand)",
     "variable / conditional attack damage ('50+', '60×') is APPROXIMATED by the printed base — the real multiplier/bonus is not in the data, so this value is never claimed as exact (see battleAttack.isVariableDamage)",
     "Special Conditions: poison/burn checkup damage is applied, and an Asleep/Paralyzed Active is correctly barred from attacking AND retreating (Confusion still allows both); the asleep/paralyzed/confused RECOVERY coin flips are left to the caller",
     "mulligan IS performed (a no-Basic opening reshuffles + re-deals), but the opponent's extra-card-per-mulligan is NOT modeled",

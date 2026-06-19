@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -138,6 +138,18 @@ describe("attackDrawCount — unconditional attacker draw only", () => {
     expect(attackDrawCount("擲1次硬幣若為正面，從自己的牌庫抽出2張卡。")).toBe(0);
     expect(attackDrawCount("造成30點傷害。")).toBe(0);
     expect(attackDrawCount(undefined)).toBe(0);
+  });
+});
+
+describe("selfDamageAmount — unconditional attacker recoil only", () => {
+  it("reads 這隻寶可夢也受到N點傷害", () => {
+    expect(selfDamageAmount("造成120點傷害。這隻寶可夢也受到30點傷害。")).toBe(30);
+    expect(selfDamageAmount("這隻寶可夢也受到10點傷害。")).toBe(10);
+  });
+  it("does NOT fire on a coin-flip / conditional recoil, or a plain attack", () => {
+    expect(selfDamageAmount("擲1次硬幣若為反面，這隻寶可夢也受到30點傷害。")).toBe(0);
+    expect(selfDamageAmount("造成30點傷害。")).toBe(0);
+    expect(selfDamageAmount(undefined)).toBe(0);
   });
 });
 
