@@ -6,3 +6,5 @@ dist/
 *.tsbuildinfo
 coverage/
 scripts/.catalog-cache/
+__pycache__/
+scripts/rl/agent.pt
