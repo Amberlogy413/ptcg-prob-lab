@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -236,7 +236,13 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
     const ac = ctx.resolve(me.active.card);
     const attacks = ac?.attacks ?? [];
     attacks.forEach((a, i) => {
-      if (canPayCost(me.active!.energy, a.cost)) acts.push({ type: "attack", index: i });
+      if (!canPayCost(me.active!.energy, a.cost)) return;
+      // An attack that discards the attacker's own Energy: WHICH Energy is the
+      // choice, so each distinct discard combo is its own legal action.
+      const dN = discardEnergyCount(a.effect);
+      const combos = dN > 0 ? energyDiscardCombos(me.active!.energy, dN) : [];
+      if (combos.length === 0) acts.push({ type: "attack", index: i });
+      else for (const iids of combos) acts.push({ type: "attack", index: i, discardEnergyIids: iids });
     });
   }
 
@@ -511,6 +517,15 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       // (the player's next turn = s.turn + 2). Auto-expires (only blocks that turn).
       if (locksAttackerNextTurn(atk.effect) && ns[me].active !== null) {
         ns = withBoard(ns, me, mapUnit(ns[me], board.active.uid, (u) => ({ ...u, noAttackTurn: s.turn + 2 })));
+      }
+      // Energy discard: the chosen attached Energy leaves the attacker → discard pile.
+      if (a.discardEnergyIids !== undefined && a.discardEnergyIids.length > 0 && ns[me].active !== null) {
+        const ids = new Set(a.discardEnergyIids);
+        const discarded = ns[me].active.energy.filter((e) => ids.has(e.iid));
+        if (discarded.length > 0) {
+          ns = withBoard(ns, me, mapUnit(ns[me], board.active.uid, (u) => ({ ...u, energy: u.energy.filter((e) => !ids.has(e.iid)) })));
+          ns = withBoard(ns, me, { ...ns[me], discard: [...ns[me].discard, ...discarded] });
+        }
       }
       // Attacking ends the turn (unless a self-KO just won/lost the game).
       if (isTerminal(ns)) return ns;

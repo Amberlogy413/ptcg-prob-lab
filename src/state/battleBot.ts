@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -168,6 +168,16 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
         if (locksAttackerNextTurn(best.effect) && st()[player].active !== null) {
           st().markNoAttack(player, active.uid, s.turn + 2);
           push("battle.atk.selfLock");
+        }
+        // Energy discard: the bot picks the first valid combo (a heuristic choice).
+        const dN = discardEnergyCount(best.effect);
+        if (dN > 0 && st()[player].active !== null) {
+          const combos = energyDiscardCombos(active.energy, dN);
+          if (combos[0] !== undefined && combos[0].length > 0) {
+            const names = combos[0].map((id) => active.energy.find((e) => e.iid === id)).filter((e): e is BattleCard => e !== undefined).map((e) => ctx.nameOf(e)).join("+");
+            st().discardEnergy(player, active.uid, combos[0]);
+            push("battle.atk.discardEnergy", undefined, { e: names });
+          }
         }
       }
     }

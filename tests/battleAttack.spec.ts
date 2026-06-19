@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -164,6 +164,32 @@ describe("locksAttackerNextTurn — unconditional attacker self-lock only", () =
     expect(locksAttackerNextTurn("在下個對手的回合，受到這個招式的進化寶可夢無法使用招式。")).toBe(false);
     expect(locksAttackerNextTurn("造成30點傷害。")).toBe(false);
     expect(locksAttackerNextTurn(undefined)).toBe(false);
+  });
+});
+
+describe("discardEnergyCount / energyDiscardCombos — attacker Energy discard", () => {
+  it("counts 選擇N個這隻寶可夢身上附加的能量，將其丟棄 (unconditional only)", () => {
+    expect(discardEnergyCount("選擇1個這隻寶可夢身上附加的能量，將其丟棄。")).toBe(1);
+    expect(discardEnergyCount("造成120點傷害。選擇2個這隻寶可夢身上附加的能量，將其丟棄。")).toBe(2);
+    expect(discardEnergyCount("擲1次硬幣若為正面，選擇1個這隻寶可夢身上附加的能量，將其丟棄。")).toBe(0);
+    expect(discardEnergyCount("造成30點傷害。")).toBe(0);
+  });
+  it("enumerates distinct discard-1 choices by element", () => {
+    const e = [energy("基本火能量"), energy("基本水能量")];
+    const combos = energyDiscardCombos(e, 1);
+    expect(combos.length).toBe(2); // {火} or {水}
+    expect(combos.flat().sort()).toEqual(e.map((x) => x.iid).sort());
+  });
+  it("dedupes same-element Energy for discard-2 (火火 / 火水, never 水水 with one 水)", () => {
+    const e = [energy("基本火能量"), energy("基本火能量"), energy("基本水能量")];
+    const combos = energyDiscardCombos(e, 2);
+    expect(combos.length).toBe(2);
+    expect(combos.every((c) => c.length === 2)).toBe(true);
+  });
+  it("discards all when fewer Energy are attached than asked; empty when none", () => {
+    const one = energy("基本火能量");
+    expect(energyDiscardCombos([one], 2)).toEqual([[one.iid]]);
+    expect(energyDiscardCombos([], 1)).toEqual([]);
   });
 });
 

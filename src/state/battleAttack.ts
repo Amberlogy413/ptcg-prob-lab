@@ -159,6 +159,47 @@ export function selfDamageAmount(effect: string | undefined): number {
   return m ? Number(m[1]) : 0;
 }
 
+/** How many of the ATTACKER's OWN attached Energy the attack UNCONDITIONALLY
+ *  discards ("選擇N個這隻寶可夢身上附加的能量，將其丟棄") — 0 if absent or gated on a
+ *  若 / 擲. WHICH Energy to discard is a real player choice → modeled as part of the
+ *  attack action (see energyDiscardCombos), never auto-picked. */
+export function discardEnergyCount(effect: string | undefined): number {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  const m = effect.match(/選擇(\d+)個這隻寶可夢身上附加的能量，將其丟棄/);
+  return m ? Number(m[1]) : 0;
+}
+
+/** The distinct ways to discard exactly `n` of `energy` (the attacker's attached
+ *  Energy), as arrays of iids. Deduped by element (same-element / same-name Energy
+ *  is interchangeable), so e.g. discarding 1 of [火,火,水] is just {火} or {水}. If
+ *  fewer than `n` are attached, the only "choice" is to discard them all. */
+export function energyDiscardCombos(energy: BattleCard[], n: number): string[][] {
+  if (n <= 0) return [];
+  if (energy.length <= n) return energy.length === 0 ? [] : [energy.map((e) => e.iid)];
+  const groups = new Map<string, string[]>(); // element/name key → iids
+  for (const e of energy) {
+    const k = energyProvides(e) ?? e.name;
+    const arr = groups.get(k);
+    if (arr) arr.push(e.iid);
+    else groups.set(k, [e.iid]);
+  }
+  const keys = [...groups.keys()];
+  const combos: string[][] = [];
+  const rec = (start: number, chosen: string[], remaining: number): void => {
+    if (remaining === 0) {
+      combos.push(chosen);
+      return;
+    }
+    for (let i = start; i < keys.length; i++) {
+      const avail = groups.get(keys[i]!)!;
+      const max = Math.min(avail.length, remaining);
+      for (let cnt = 1; cnt <= max; cnt++) rec(i + 1, [...chosen, ...avail.slice(0, cnt)], remaining - cnt);
+    }
+  };
+  rec(0, [], n);
+  return combos;
+}
+
 /** Does the attack UNCONDITIONALLY lock the ATTACKER out of attacking on its
  *  next turn ("在下個自己的回合，這隻寶可夢無法使用招式")? 0/false on 若 / 擲 (so a
  *  coin-flip / optional lock is never applied) — high-precision like inflictedStatus.

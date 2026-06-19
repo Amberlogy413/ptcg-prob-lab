@@ -346,6 +346,26 @@ describe("attack", () => {
     const turn6 = { ...ns, current: "p1" as const, turn: 6 };
     expect(find(legalActions(turn6, lockCtx), "attack").length).toBeGreaterThan(0); // lock expired
   });
+
+  it("an Energy-discard attack enumerates one action per discard choice and discards the chosen Energy", () => {
+    const dc: EngineCtx = {
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Pikachu"
+          ? ({ name: "Pikachu", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Dump", cost: ["Colorless"], damage: 20, effect: "選擇1個這隻寶可夢身上附加的能量，將其丟棄。" }] } as CatalogCard)
+          : ({ name: c.name, category: "Pokemon" } as CatalogCard),
+      autoKey: (c) => c.name,
+    };
+    const s = attackState(200);
+    const twoE = { ...s.p1.active!, energy: [card("ef", "energy-basic", { name: "基本火能量" }), card("ew", "energy-basic", { name: "基本水能量" })] };
+    const st = { ...s, p1: { ...s.p1, active: twoE }, p2: { ...s.p2, deck: [card("od", "basic")] } };
+    const acts = find(legalActions(st, dc), "attack");
+    expect(acts.length).toBe(2); // discard 火 or discard 水
+    const fireAct = acts.find((a) => a.discardEnergyIids?.includes("ef"))!;
+    const ns = applyAction(st, fireAct, dc);
+    expect(ns.p1.active?.energy.map((e) => e.iid)).toEqual(["ew"]); // 火 discarded, 水 kept
+    expect(ns.p1.discard.some((c) => c.iid === "ef")).toBe(true);
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

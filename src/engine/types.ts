@@ -68,7 +68,9 @@ export type Action =
    *  the Stage 2 hand card `stage2HandIid`, skipping Stage 1. */
   | { type: "rareCandy"; iid: string; basicUid: string; stage2HandIid: string }
   | { type: "retreat"; benchUnitId: string }
-  | { type: "attack"; index: number }
+  /** Attack with the Active's attack `index`. `discardEnergyIids` is the chosen
+   *  attached Energy to discard when the attack's effect demands it (選擇N個…丟棄). */
+  | { type: "attack"; index: number; discardEnergyIids?: string[] }
   | { type: "promote"; benchUnitId: string }
   | { type: "endTurn" };
 

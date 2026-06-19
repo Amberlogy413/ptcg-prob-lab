@@ -209,6 +209,8 @@ interface BattleState {
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
   /** Mark a unit unable to attack on a given turn number (attacker self-lock). */
   markNoAttack: (player: PlayerId, unitId: string, turn: number) => void;
+  /** Discard specific attached Energy (by iid) from a unit to the discard pile. */
+  discardEnergy: (player: PlayerId, unitId: string, iids: string[]) => void;
   /** Toggle a Special Condition on a unit (poison/burn/asleep/confused/paralyzed). */
   toggleStatus: (player: PlayerId, unitId: string, cond: SpecialCondition) => void;
   /** Scoop a whole unit back to hand (board correction / Scoop Up effects). */
@@ -575,6 +577,17 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
 
   markNoAttack: (player, unitId, turn) => {
     set((s) => ({ [player]: mapUnit(s[player], unitId, (u) => ({ ...u, noAttackTurn: turn })) }) as Partial<BattleState>);
+  },
+
+  discardEnergy: (player, unitId, iids) => {
+    set((s) => {
+      const ids = new Set(iids);
+      const board = s[player];
+      const unit = board.active?.uid === unitId ? board.active : board.bench.find((u) => u.uid === unitId);
+      const discarded = unit ? unit.energy.filter((e) => ids.has(e.iid)) : [];
+      const nb = mapUnit(board, unitId, (u) => ({ ...u, energy: u.energy.filter((e) => !ids.has(e.iid)) }));
+      return { [player]: { ...nb, discard: [...nb.discard, ...discarded] } } as Partial<BattleState>;
+    });
   },
 
   toggleStatus: (player, unitId, cond) => {

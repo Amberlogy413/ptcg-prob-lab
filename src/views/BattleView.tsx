@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -628,14 +628,28 @@ export function BattleView() {
 
   // --- Attack (P2): the Active Pokémon's real attacks vs the opponent's Active.
   const meActiveCard = meBoard.active !== null ? catalogOf(meBoard.active.card) : null;
-  const attackList = (meActiveCard?.attacks ?? []).map((a, i) => ({
-    idx: i,
-    name: a.name,
-    cost: a.cost ?? [],
-    damage: a.damage,
-    canPay: meBoard.active !== null && canPayCost(meBoard.active.energy, a.cost),
-  }));
-  function doAttack(idx: number) {
+  const attackList = (meActiveCard?.attacks ?? []).map((a, i) => {
+    // An attack that discards the attacker's own Energy: each distinct discard
+    // choice becomes its own button (WHICH Energy is a real choice, never auto-picked).
+    const dN = discardEnergyCount(a.effect);
+    const energy = meBoard.active?.energy ?? [];
+    const discardCombos =
+      dN > 0
+        ? energyDiscardCombos(energy, dN).map((iids) => ({
+            iids,
+            label: iids.map((id) => resolve(energy.find((e) => e.iid === id) ?? ({ name: "" } as BattleCard)).name).join("+"),
+          }))
+        : undefined;
+    return {
+      idx: i,
+      name: a.name,
+      cost: a.cost ?? [],
+      damage: a.damage,
+      canPay: meBoard.active !== null && canPayCost(meBoard.active.energy, a.cost),
+      discardCombos,
+    };
+  });
+  function doAttack(idx: number, discardIids?: string[]) {
     setMsg(null);
     const active = meBoard.active;
     const oppActive = oppBoard.active;
@@ -675,6 +689,11 @@ export function BattleView() {
     const selfNew = Math.max(0, active.damage - heal) + recoil; // post-heal, then recoil
     const selfKo = recoil > 0 && active.card.hp !== undefined && selfNew >= active.card.hp;
     const locks = locksAttackerNextTurn(atk.effect); // attacker can't attack next turn
+    const discardNames = (discardIids ?? [])
+      .map((id) => active.energy.find((e) => e.iid === id))
+      .filter((e): e is BattleCard => e !== undefined)
+      .map((e) => resolve(e).name)
+      .join("+");
     // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
     // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
     const changed = act(() => {
@@ -696,6 +715,7 @@ export function BattleView() {
         }
       }
       if (locks && !selfKo) s.markNoAttack(me, active.uid, turn + 2); // can't attack on your next turn
+      if (discardIids !== undefined && discardIids.length > 0 && !selfKo) s.discardEnergy(me, active.uid, discardIids);
       s.endTurn(); // attacking ends your turn (faithful)
     });
     // HONEST: a "+"/"×" attack's printed base is only an approximation — the real
@@ -712,6 +732,7 @@ export function BattleView() {
     if (recoil > 0) result += " " + t("battle.atk.selfDamage", { n: recoil });
     if (selfKo) result += " " + t("battle.atk.selfKo");
     if (locks && !selfKo) result += " " + t("battle.atk.selfLock");
+    if (discardNames !== "" && !selfKo) result += " " + t("battle.atk.discardEnergy", { e: discardNames });
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);
@@ -1408,6 +1429,9 @@ interface AttackOpt {
   cost: string[];
   damage: number | string | undefined;
   canPay: boolean;
+  /** One entry per distinct "which Energy to discard" choice (attacks that discard
+   *  the attacker's own Energy). Undefined / empty = no discard choice. */
+  discardCombos?: { iids: string[]; label: string }[];
 }
 
 function AttackPanel({
@@ -1418,7 +1442,7 @@ function AttackPanel({
   attacks: AttackOpt[];
   abilities: string[];
   canAttack: boolean;
-  onAttack: (idx: number) => void;
+  onAttack: (idx: number, discardIids?: string[]) => void;
   t: Tr;
 }) {
   return (
@@ -1437,19 +1461,13 @@ function AttackPanel({
         </p>
       )}
       <div className="mt-2 flex flex-wrap gap-1.5">
-        {attacks.map((a) => {
+        {attacks.flatMap((a) => {
           const ready = canAttack && a.canPay;
-          return (
-            <button
-              key={a.idx}
-              type="button"
-              disabled={!ready}
-              onClick={() => onAttack(a.idx)}
-              className={
-                "flex items-center gap-1 rounded-ctl border px-2 py-1 text-xs " +
-                (ready ? "border-blue text-blue hover:bg-blue/10" : "hairline text-ink2 opacity-60")
-              }
-            >
+          const btnClass =
+            "flex items-center gap-1 rounded-ctl border px-2 py-1 text-xs " +
+            (ready ? "border-blue text-blue hover:bg-blue/10" : "hairline text-ink2 opacity-60");
+          const inner = (discardLabel?: string) => (
+            <>
               {a.cost.length > 0 && (
                 <span className="flex items-center gap-0.5">
                   {a.cost.map((c, i) => (
@@ -1461,9 +1479,22 @@ function AttackPanel({
               )}
               <span className="font-medium">{a.name}</span>
               {a.damage !== undefined && a.damage !== "" && <span className="font-mono">{a.damage}</span>}
+              {discardLabel !== undefined && <span className="text-[10px] text-ink2">{t("battle.atk.discardTag", { e: discardLabel })}</span>}
               {!a.canPay && <span className="text-[10px] text-warn">{t("battle.atk.short")}</span>}
-            </button>
+            </>
           );
+          if (a.discardCombos && a.discardCombos.length > 0) {
+            return a.discardCombos.map((c, ci) => (
+              <button key={`${a.idx}-${ci}`} type="button" disabled={!ready} onClick={() => onAttack(a.idx, c.iids)} className={btnClass}>
+                {inner(c.label)}
+              </button>
+            ));
+          }
+          return [
+            <button key={a.idx} type="button" disabled={!ready} onClick={() => onAttack(a.idx)} className={btnClass}>
+              {inner()}
+            </button>,
+          ];
         })}
       </div>
     </section>
