@@ -281,6 +281,32 @@ describe("attack", () => {
     expect(reward(ns, "p1")).toBe(1);
     expect(reward(ns, "p2")).toBe(-1);
   });
+
+  // unconditional attacker-only effects: self-heal + draw (resolved before turn ends)
+  const fxAtk = (effect: string): EngineCtx => ({
+    catalog: null,
+    resolve: (c) =>
+      c.name === "Pikachu"
+        ? ({ name: "Pikachu", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Fx", cost: ["Lightning"], damage: 30, effect }] } as CatalogCard)
+        : ({ name: c.name, category: "Pokemon" } as CatalogCard),
+    autoKey: (c) => c.name,
+  });
+
+  it("a self-heal attack reduces the attacker's OWN damage (floored at 0), still ending the turn", () => {
+    const s = attackState(200); // defender survives
+    const hurt = { ...s, p1: { ...s.p1, active: { ...s.p1.active!, damage: 50 } } };
+    const ns = applyAction(hurt, { type: "attack", index: 0 }, fxAtk("將這隻寶可夢恢復「30」HP。"));
+    expect(ns.p1.active?.damage).toBe(20); // 50 − 30
+    expect(ns.current).toBe("p2");
+  });
+
+  it("a draw attack puts cards from the attacker's deck into their hand", () => {
+    const s = attackState(200);
+    const withDeck = { ...s, p1: { ...s.p1, deck: [card("d1", "basic"), card("d2", "basic"), card("d3", "basic")], hand: [] }, p2: { ...s.p2, deck: [card("od", "basic")] } };
+    const ns = applyAction(withDeck, { type: "attack", index: 0 }, fxAtk("從自己的牌庫抽出2張卡。"));
+    expect(ns.p1.hand.length).toBe(2);
+    expect(ns.p1.deck.length).toBe(1);
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

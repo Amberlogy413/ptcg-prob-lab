@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -135,6 +135,17 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             st().toggleStatus(opp, oppActive.uid, cond);
             push("battle.log.inflict", undefined, { cond });
           }
+        }
+        // Unconditional attacker-only effects (never cause a KO): self-heal / draw.
+        const heal = selfHealAmount(best.effect);
+        if (heal > 0) {
+          st().setDamage(player, active.uid, Math.max(0, active.damage - heal));
+          push("battle.atk.selfHeal", undefined, { n: heal });
+        }
+        const draw = attackDrawCount(best.effect);
+        if (draw > 0) {
+          st().draw(player, draw);
+          push("battle.atk.selfDraw", undefined, { n: draw });
         }
       }
     }

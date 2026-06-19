@@ -129,6 +129,26 @@ export function inflictedStatus(effect: string | undefined): SpecialCondition | 
   return null;
 }
 
+/** HP the attack UNCONDITIONALLY heals on the ATTACKER itself
+ *  ("將這隻寶可夢恢復「N」HP") — 0 if absent or gated on a 若 (condition) / 擲 (coin
+ *  flip). High-precision like inflictedStatus: only the bare self-heal phrasing, so a
+ *  conditional/variable heal is never applied (and never claimed as exact). Healing
+ *  only ever REDUCES the attacker's own damage, so it can never cause a KO. */
+export function selfHealAmount(effect: string | undefined): number {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  const m = effect.match(/將這隻寶可夢恢復「(\d+)」HP/);
+  return m ? Number(m[1]) : 0;
+}
+
+/** Cards the attack UNCONDITIONALLY draws for the ATTACKER's player
+ *  ("從自己的牌庫抽出N張卡") — 0 if absent or gated on a 若 / 擲. An empty deck simply
+ *  draws fewer (handled by the draw op); drawing never causes a KO. */
+export function attackDrawCount(effect: string | undefined): number {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  const m = effect.match(/從自己的牌庫抽出(\d+)張卡/);
+  return m ? Number(m[1]) : 0;
+}
+
 /** Prize cards taken when this Pokémon is Knocked Out (rule-box → 2, VMAX → 3). */
 export function prizeValue(card: CatalogCard | null): number {
   if (card === null) return 1;

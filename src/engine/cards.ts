@@ -239,7 +239,7 @@ export const COVERAGE = {
   abilities: [] as string[],
   /** Known simplifications carried for this phase (documented, never silent). */
   simplifications: [
-    "attacks resolve damage + weakness/resistance, AND an UNCONDITIONAL Special Condition on the defender (將對手的戰鬥寶可夢【X】, no 若/擲) is applied; coin-flip/conditional statuses and other printed attack EFFECTS (draw, discard, heal, self-damage) are not",
+    "attacks resolve damage + weakness/resistance, an UNCONDITIONAL Special Condition on the defender (將對手的戰鬥寶可夢【X】, no 若/擲), AND two unconditional attacker-only effects — self-heal (將這隻寶可夢恢復「N」HP) and draw (從自己的牌庫抽出N張卡); coin-flip/conditional effects and recoil self-damage (這隻寶可夢也受到N點傷害, deferred — can self-KO) / energy-discard are still not modeled",
     "variable / conditional attack damage ('50+', '60×') is APPROXIMATED by the printed base — the real multiplier/bonus is not in the data, so this value is never claimed as exact (see battleAttack.isVariableDamage)",
     "Special Conditions: poison/burn checkup damage is applied, and an Asleep/Paralyzed Active is correctly barred from attacking AND retreating (Confusion still allows both); the asleep/paralyzed/confused RECOVERY coin flips are left to the caller",
     "mulligan IS performed (a no-Basic opening reshuffles + re-deals), but the opponent's extra-card-per-mulligan is NOT modeled",

@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -487,6 +487,13 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
           ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
         }
       }
+      // Unconditional attacker-only effects (resolve regardless of the defender's
+      // fate, never cause a KO): self-heal reduces the attacker's own damage; draw
+      // adds cards to the attacker's hand. Both apply before the turn ends.
+      const heal = selfHealAmount(atk.effect);
+      if (heal > 0) ns = withBoard(ns, me, mapUnit(ns[me], board.active.uid, (u) => ({ ...u, damage: Math.max(0, u.damage - heal) })));
+      const draw = attackDrawCount(atk.effect);
+      if (draw > 0) ns = drawN(ns, me, draw);
       // Attacking ends the turn (unless it just won the game).
       if (isTerminal(ns)) return ns;
       return endTurnTransition(ns);

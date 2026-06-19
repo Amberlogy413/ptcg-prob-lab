@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -662,6 +662,10 @@ export function BattleView() {
     const prizes = ko ? prizeValue(oppCard) : 0;
     // An unconditional attack-inflicted Special Condition on a SURVIVING defender.
     const cond = ko ? null : inflictedStatus(atk.effect);
+    // Unconditional attacker-only effects (never cause a KO): self-heal reduces the
+    // attacker's own damage; draw adds cards to your hand. Resolved before the turn ends.
+    const heal = selfHealAmount(atk.effect);
+    const draw = attackDrawCount(atk.effect);
     // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
     // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
     const changed = act(() => {
@@ -673,6 +677,8 @@ export function BattleView() {
       } else if (cond !== null && !oppActive.status.includes(cond)) {
         s.toggleStatus(oppId, oppActive.uid, cond);
       }
+      if (heal > 0) s.setDamage(me, active.uid, Math.max(0, active.damage - heal));
+      if (draw > 0) s.draw(me, draw);
       s.endTurn(); // attacking ends your turn (faithful)
     });
     // HONEST: a "+"/"×" attack's printed base is only an approximation — the real
@@ -684,6 +690,8 @@ export function BattleView() {
     let result = t("battle.atk.result", { atk: atk.name, dmg: approx ? `≈${damage}` : damage, tags });
     if (ko) result += " " + t("battle.atk.ko", { n: prizes });
     if (cond !== null) result += " " + t("battle.atk.inflict", { cond: t(`battle.cond.${cond}`) });
+    if (heal > 0) result += " " + t("battle.atk.selfHeal", { n: heal });
+    if (draw > 0) result += " " + t("battle.atk.selfDraw", { n: draw });
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);

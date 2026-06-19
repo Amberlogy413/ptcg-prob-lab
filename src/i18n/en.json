@@ -911,6 +911,8 @@
   "battle.atk.inflict": " (defender now {cond})",
   "battle.atk.result": "{atk}: {dmg} damage to the opponent{tags}.",
   "battle.atk.ko": "Knock Out! Take {n} Prize card(s) (opponent promotes a Benched Pokémon).",
+  "battle.atk.selfHeal": "(healed {n} damage)",
+  "battle.atk.selfDraw": "(drew {n})",
   "battle.win.banner": "🏆 {name} wins!",
   "battle.win.byPrizes": "Took all 6 Prize cards — the win condition is met.",
   "battle.win.byWipe": "{loser} has no Pokémon left in play.",

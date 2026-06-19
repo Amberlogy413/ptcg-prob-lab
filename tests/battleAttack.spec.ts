@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -113,6 +113,31 @@ describe("inflictedStatus — high-precision, unconditional only", () => {
   it("returns null for a plain damage attack", () => {
     expect(inflictedStatus("造成30點傷害。")).toBeNull();
     expect(inflictedStatus(undefined)).toBeNull();
+  });
+});
+
+describe("selfHealAmount — unconditional attacker self-heal only", () => {
+  it("reads 將這隻寶可夢恢復「N」HP", () => {
+    expect(selfHealAmount("造成30點傷害。將這隻寶可夢恢復「30」HP。")).toBe(30);
+    expect(selfHealAmount("將這隻寶可夢恢復「90」HP。")).toBe(90);
+  });
+  it("does NOT fire on a coin-flip / conditional heal, or a plain attack", () => {
+    expect(selfHealAmount("擲1次硬幣若為正面，將這隻寶可夢恢復「30」HP。")).toBe(0);
+    expect(selfHealAmount("若這隻寶可夢【中毒】，將這隻寶可夢恢復「30」HP。")).toBe(0);
+    expect(selfHealAmount("造成30點傷害。")).toBe(0);
+    expect(selfHealAmount(undefined)).toBe(0);
+  });
+});
+
+describe("attackDrawCount — unconditional attacker draw only", () => {
+  it("reads 從自己的牌庫抽出N張卡", () => {
+    expect(attackDrawCount("從自己的牌庫抽出1張卡。")).toBe(1);
+    expect(attackDrawCount("造成20點傷害。從自己的牌庫抽出2張卡。")).toBe(2);
+  });
+  it("does NOT fire on a coin-flip / conditional draw, or a plain attack", () => {
+    expect(attackDrawCount("擲1次硬幣若為正面，從自己的牌庫抽出2張卡。")).toBe(0);
+    expect(attackDrawCount("造成30點傷害。")).toBe(0);
+    expect(attackDrawCount(undefined)).toBe(0);
   });
 });
 

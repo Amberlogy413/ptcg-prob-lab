@@ -911,6 +911,8 @@
   "battle.atk.inflict": "(令對手{cond})",
   "battle.atk.result": "{atk}:對對手造成 {dmg} 點傷害{tags}。",
   "battle.atk.ko": "擊倒!攞 {n} 張獎賞卡(對手要由備戰區補一隻上戰鬥場)。",
+  "battle.atk.selfHeal": "(回復自己 {n} 點傷害)",
+  "battle.atk.selfDraw": "(抽 {n} 張卡)",
   "battle.win.banner": "🏆 {name} 勝出!",
   "battle.win.byPrizes": "攞晒 6 張獎賞卡,達成勝利條件。",
   "battle.win.byWipe": "{loser} 場上已無寶可夢可戰。",
