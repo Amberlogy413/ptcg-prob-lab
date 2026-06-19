@@ -64,6 +64,9 @@ export type Action =
   /** Energy Retrieval (item): take up to 2 basic Energy from YOUR discard into
    *  your hand; `foundIids` is the 1–2 chosen Energy cards. */
   | { type: "energyRetrieve"; iid: string; foundIids: string[] }
+  /** Rare Candy (item): jump-evolve `basicUid` (a Basic in play) directly into
+   *  the Stage 2 hand card `stage2HandIid`, skipping Stage 1. */
+  | { type: "rareCandy"; iid: string; basicUid: string; stage2HandIid: string }
   | { type: "retreat"; benchUnitId: string }
   | { type: "attack"; index: number }
   | { type: "promote"; benchUnitId: string }

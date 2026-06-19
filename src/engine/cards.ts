@@ -110,6 +110,22 @@ export function isEnergyRetrieveEffect(effect: string | undefined): boolean {
   return normEffect(effect) === ENERGY_RETRIEVE_EFFECT;
 }
 
+/** Rare Candy family (神奇糖果): jump-evolve a Basic directly into a Stage 2 from
+ *  hand, skipping Stage 1. The catalog carries TWO equally-valid wordings of the
+ *  same effect (「最初回合與這個回合剛使出」 vs 「最初回合或剛使出」) — both verified
+ *  2026-06-19, 15 prints, all trainerType Item; we accept either exact text. The
+ *  legality of a specific jump (this Stage 2 evolves from this Basic) is checked
+ *  separately by canRareCandyJump using real PokéAPI evolution-chain data. */
+const RARE_CANDY_EFFECTS: ReadonlySet<string> = new Set([
+  "從自己的手牌選擇1張【2階進化】寶可夢卡，放置於自己的場上的可進化成那隻寶可夢的【基礎】寶可夢身上，跳過【1階進化】完成進化。（無法對自己的最初回合與這個回合剛使出的寶可夢使用。）",
+  "從自己的手牌選擇1張【2階進化】寶可夢卡，放置於自己的場上的可進化成那隻寶可夢的【基礎】寶可夢身上，跳過【1階進化】完成進化。（無法對自己的最初回合或剛使出的寶可夢使用。）",
+]);
+
+/** Is this card a canonical Rare Candy? Exact (normalised) match against either wording. */
+export function isRareCandyEffect(effect: string | undefined): boolean {
+  return RARE_CANDY_EFFECTS.has(normEffect(effect));
+}
+
 /** The distinct, meaningful Energy Retrieval picks from a discard pile, as arrays
  *  of 1–2 card iids. Same-element basic Energy is interchangeable, so picks are
  *  deduped by element: one representative per element (×1), one per element with
@@ -211,13 +227,13 @@ export const COVERAGE = {
     "能量回收 / Energy Retrieval (take up to 2 basic Energy from your discard → hand)",
     "能量輸送 / Energy Search (deck → choose a basic Energy → hand, shuffle)",
     "進化薰香 / Evolution Incense (deck → choose an Evolution Pokémon → hand, shuffle)",
+    "神奇糖果 / Rare Candy (jump-evolve a Basic in play → a Stage 2 from hand; legality via real PokéAPI evolution-chain data, see src/data/evolution.ts)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense"],
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense", "神奇糖果 / Rare Candy"],
   /** Known NOT modeled despite high usage, with the honest reason. */
   unmodeledKnown: [
     "超級球 / Ultra Ball (catalog effect text looks wrong — flagged for a data fix)",
-    "神奇糖果 / Rare Candy (Stage-2 jump-evolve) — BLOCKED by data, not modeled: a faithful 'this Stage 2 can evolve from this Basic' check needs the full Basic→Stage 1→Stage 2 line, but the catalog encodes evolveFrom on only ~16% of Stage 2 cards (and not on the std-legal lines), so the chain cannot be verified without GUESSING it. We refuse to offer a jump we can't prove legal. Unblock = enrich the catalog with real evolution-chain data (see docs/DECISIONS.md 2026-06-19); normal step-by-step evolution stays available in the sandbox.",
   ],
   /** Pokémon Abilities: none modeled yet (most are triggered/optional choices). */
   abilities: [] as string[],

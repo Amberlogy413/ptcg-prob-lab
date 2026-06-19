@@ -21,7 +21,8 @@ import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep, toEngineState } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, energyRetrieveCombos, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
+import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
+import { canRareCandyJump } from "../data/evolution.ts";
 import {
   loadDecks,
   localizeArchetype,
@@ -261,12 +262,13 @@ export function BattleView() {
   // Japanese print (夜のタンカ / リーリエの決心). Used for the targeted/search pickers.
   const ectx = useMemo(() => makeCtx(catalog), [catalog]);
   const effectKind = useCallback(
-    (card: BattleCard): "gust" | "switch" | "energyMove" | "energyRetrieve" | null => {
+    (card: BattleCard): "gust" | "switch" | "energyMove" | "energyRetrieve" | "rareCandy" | null => {
       const eff = ectx.resolve(card)?.effect;
       if (isGustEffect(eff)) return "gust";
       if (isSwitchEffect(eff)) return "switch";
       if (isEnergySwitchEffect(eff)) return "energyMove";
       if (isEnergyRetrieveEffect(eff)) return "energyRetrieve";
+      if (isRareCandyEffect(eff)) return "rareCandy";
       return null;
     },
     [ectx],
@@ -345,6 +347,11 @@ export function BattleView() {
         .filter((c): c is BattleCard => c !== undefined)
         .map((c) => resolve(c).name)
         .join("、");
+    } else if (action.type === "rareCandy") {
+      const u = meUnits.find((x) => x.uid === action.basicUid);
+      const s2 = meBoard.hand.find((x) => x.iid === action.s2Iid);
+      esFrom = u !== undefined ? resolve(u.card).name : "";
+      esTo = s2 !== undefined ? resolve(s2).name : "";
     }
     const changed = act(() => {
       const s = store.getState();
@@ -423,6 +430,10 @@ export function BattleView() {
           // Energy Retrieval — resolved by the engine (single rules source).
           if (!engineStep({ type: "energyRetrieve", iid: card.iid, foundIids: action.foundIids }, catalog)) setMsg(t("battle.gate.energyRetrieve"));
           break;
+        case "rareCandy":
+          // Rare Candy — resolved by the engine (legality via real evolution chain).
+          if (!engineStep({ type: "rareCandy", iid: card.iid, basicUid: action.basicUid, stage2HandIid: action.s2Iid }, catalog)) setMsg(t("battle.gate.rareCandy"));
+          break;
         case "discard":
           s.discardFromHand(me, card.iid);
           break;
@@ -447,6 +458,8 @@ export function BattleView() {
         note(t("battle.log.energySwitch", { who, card: cn, energy: esEnergy, from: esFrom, to: esTo }));
       } else if (action.type === "energyRetrieve") {
         note(t("battle.log.energyRetrieve", { who, card: cn, target: targetName }));
+      } else if (action.type === "rareCandy") {
+        note(t("battle.log.rareCandy", { who, card: cn, from: esFrom, to: esTo }));
       } else {
         const key = {
           toActive: "battle.log.active",
@@ -595,6 +608,23 @@ export function BattleView() {
   const oppId: PlayerId = me === "p1" ? "p2" : "p1";
   const oppBoard: PlayerBoard = oppId === "p1" ? dP1 : dP2;
   const meUnits = unitList(meBoard);
+
+  // Rare Candy (神奇糖果): the legal (Basic in play, Stage 2 in hand) jump pairs,
+  // validated against the REAL evolution chain (canRareCandyJump). Mirrors the
+  // engine's gates: barred on your own first turn and on a Basic just played this turn.
+  function rareCandyPairs(candy: BattleCard): { basicUid: string; basicName: string; s2Iid: string; s2Name: string }[] {
+    if (!isRareCandyEffect(ectx.resolve(candy)?.effect)) return [];
+    if (me === firstPlayer ? dTurn === 1 : dTurn === 2) return [];
+    const stage2s = meBoard.hand.filter((h) => h.kind === "evolution");
+    const out: { basicUid: string; basicName: string; s2Iid: string; s2Name: string }[] = [];
+    for (const u of meUnits) {
+      if (u.playedTurn >= dTurn) continue;
+      const bCat = catalogOf(u.card);
+      if (bCat?.stage !== "Basic") continue;
+      for (const s2 of stage2s) if (canRareCandyJump(bCat, catalogOf(s2))) out.push({ basicUid: u.uid, basicName: resolve(u.card).name, s2Iid: s2.iid, s2Name: resolve(s2).name });
+    }
+    return out;
+  }
 
   // --- Attack (P2): the Active Pokémon's real attacks vs the opponent's Active.
   const meActiveCard = meBoard.active !== null ? catalogOf(meBoard.active.card) : null;
@@ -895,6 +925,7 @@ export function BattleView() {
         oppHasActive={oppBoard.active !== null}
         effectKind={effectKind}
         searchSpec={searchSpec}
+        rareCandyPairs={rareCandyPairs}
         resolveName={(c) => resolve(c).name}
         flags={{ supporterUsed: turnSupporterUsed, energyUsed: turnEnergyAttached, stadiumUsed: turnStadiumPlayed, firstTurnNoSupporter: dTurn === 1 && me === firstPlayer }}
         resolve={resolve}
@@ -937,8 +968,12 @@ type PlayAction =
   | { type: "search"; foundIid: string } // Nest/Master Ball, Night Stretcher → pick from a pile
   | { type: "energySwitch"; fromUid: string; energyIid: string; toUid: string } // Energy Switch → move a basic Energy between your Pokémon
   | { type: "energyRetrieve"; foundIids: string[] } // Energy Retrieval → take up to 2 basic Energy from discard
+  | { type: "rareCandy"; basicUid: string; s2Iid: string } // Rare Candy → jump-evolve a Basic into a Stage 2
   | { type: "discard" }
   | { type: "toPile"; pile: Pile };
+
+/** A legal Rare Candy jump: a Basic in play (basicUid) → a Stage 2 in hand (s2Iid). */
+type RareCandyPair = { basicUid: string; basicName: string; s2Iid: string; s2Name: string };
 
 type UnitActionKind = "retreat" | "promote" | "ko" | "scoop";
 
@@ -1411,14 +1446,15 @@ function AttackPanel({
 // The current player's hand — type-correct play actions.
 
 function HandRow({
-  board, units, oppBench, oppHasActive, effectKind, searchSpec, resolveName, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
+  board, units, oppBench, oppHasActive, effectKind, searchSpec, rareCandyPairs, resolveName, flags, resolve, sel, setSel, onPlay, autoKey, onVisual, t,
 }: {
   board: PlayerBoard;
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | "rareCandy" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
+  rareCandyPairs: (c: BattleCard) => RareCandyPair[];
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
   resolve: Resolve;
@@ -1453,7 +1489,7 @@ function HandRow({
                   {name}
                 </button>
                 {selected && (
-                  <HandActions card={c} board={board} units={units} oppBench={oppBench} oppHasActive={oppHasActive} effectKind={effectKind} searchSpec={searchSpec} resolveName={resolveName} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
+                  <HandActions card={c} board={board} units={units} oppBench={oppBench} oppHasActive={oppHasActive} effectKind={effectKind} searchSpec={searchSpec} rareCandyPairs={rareCandyPairs} resolveName={resolveName} flags={flags} resolve={resolve} onPlay={onPlay} autoKey={autoKey} onVisual={onVisual} t={t} />
                 )}
               </span>
             );
@@ -1466,15 +1502,16 @@ function HandRow({
 
 /** The type-correct action toolbar for a selected hand card. */
 function HandActions({
-  card, board, units, oppBench, oppHasActive, effectKind, searchSpec, resolveName, flags, resolve, onPlay, autoKey, onVisual, t,
+  card, board, units, oppBench, oppHasActive, effectKind, searchSpec, rareCandyPairs, resolveName, flags, resolve, onPlay, autoKey, onVisual, t,
 }: {
   card: BattleCard;
   board: PlayerBoard;
   units: InPlay[];
   oppBench: InPlay[];
   oppHasActive: boolean;
-  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | null;
+  effectKind: (c: BattleCard) => "gust" | "switch" | "energyMove" | "energyRetrieve" | "rareCandy" | null;
   searchSpec: (c: BattleCard) => SearchSpec | null;
+  rareCandyPairs: (c: BattleCard) => RareCandyPair[];
   resolveName: (c: BattleCard) => string;
   flags: HandFlags;
   resolve: Resolve;
@@ -1637,6 +1674,32 @@ function HandActions({
                     </button>
                   );
                 })}
+              </span>
+            );
+          })()}
+        </>
+      )}
+      {card.kind === "item" && fx === "rareCandy" && (
+        <>
+          {/* Rare Candy — jump-evolve a Basic in play into a Stage 2 from hand
+              (engine; legality verified against the real evolution chain). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.rareCandy")}→</span>
+          {(() => {
+            const pairs = rareCandyPairs(card);
+            if (pairs.length === 0) return <span className="text-[11px] text-ink2">{t("battle.act.rareCandyNone")}</span>;
+            return (
+              <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+                {pairs.map((p) => (
+                  <button
+                    key={p.basicUid + p.s2Iid}
+                    type="button"
+                    onClick={() => onPlay(card, { type: "rareCandy", basicUid: p.basicUid, s2Iid: p.s2Iid })}
+                    className={btn}
+                    title={`${p.basicName} → ${p.s2Name}`}
+                  >
+                    {p.basicName}→{p.s2Name}
+                  </button>
+                ))}
               </span>
             );
           })()}

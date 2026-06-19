@@ -611,6 +611,49 @@ describe("Energy Retrieval (能量回收)", () => {
   });
 });
 
+// --- Rare Candy (jump-evolve a Basic directly into a Stage 2) ----------------
+
+describe("Rare Candy (神奇糖果)", () => {
+  const RC = "從自己的手牌選擇1張【2階進化】寶可夢卡，放置於自己的場上的可進化成那隻寶可夢的【基礎】寶可夢身上，跳過【1階進化】完成進化。（無法對自己的最初回合或剛使出的寶可夢使用。）";
+  // resolve by name to catalog facts (stage / dexId for the chain check, RC effect for the Item)
+  const ctxOf = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Pokemon", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+  const PKMN: Record<string, Partial<CatalogCard>> = { 小火龍: { stage: "Basic", dexId: [4] }, 噴火龍: { stage: "Stage2", dexId: [6] }, 皮卡丘: { stage: "Basic", dexId: [25] } };
+  const RC_CARD: Record<string, Partial<CatalogCard>> = { RC: { category: "Trainer", trainerType: "Item", effect: RC } };
+  const unit = (uid: string, name: string, playedTurn: number) => ({ uid, card: card(uid, "basic", { name }), under: [] as BattleCard[], energy: [] as BattleCard[], tools: [] as BattleCard[], damage: 0, playedTurn, status: [] });
+  const hand = () => [card("RC", "item", { name: "RC" }), card("s2", "evolution", { name: "噴火龍" })];
+
+  it("jump-evolves a Basic into a real-line Stage 2: Stage 1 skipped, old card under, Stage 2 leaves hand, Item discarded", () => {
+    const ctx = ctxOf({ ...RC_CARD, ...PKMN });
+    const s = baseState({ turn: 3, p1: { ...pb(), active: unit("base", "小火龍", 1), hand: hand() } }); // turn 3 = firstPlayer's 2nd turn
+    expect(find(legalActions(s, ctx), "rareCandy").length).toBe(1);
+    const ns = applyAction(s, { type: "rareCandy", iid: "RC", basicUid: "base", stage2HandIid: "s2" }, ctx);
+    expect(ns.p1.active!.card.name).toBe("噴火龍"); // became the Stage 2
+    expect(ns.p1.active!.under.map((c) => c.name)).toEqual(["小火龍"]); // Basic under it, Stage 1 skipped
+    expect(ns.p1.active!.playedTurn).toBe(3);
+    expect(ns.p1.hand.some((c) => c.iid === "s2")).toBe(false);
+    expect(ns.p1.discard.some((c) => c.iid === "RC")).toBe(true);
+  });
+
+  it("does NOT offer a Stage 2 from a different evolution line", () => {
+    const ctx = ctxOf({ ...RC_CARD, ...PKMN });
+    const s = baseState({ turn: 3, p1: { ...pb(), active: unit("base", "皮卡丘", 1), hand: hand() } });
+    expect(find(legalActions(s, ctx), "rareCandy").length).toBe(0);
+    expect(applyAction(s, { type: "rareCandy", iid: "RC", basicUid: "base", stage2HandIid: "s2" }, ctx)).toBe(s);
+  });
+
+  it("is barred on your own first turn AND on a Basic just played this turn", () => {
+    const ctx = ctxOf({ ...RC_CARD, ...PKMN });
+    const ownFirst = baseState({ turn: 1, p1: { ...pb(), active: unit("base", "小火龍", 1), hand: hand() } }); // firstPlayer turn 1
+    expect(find(legalActions(ownFirst, ctx), "rareCandy").length).toBe(0);
+    const sick = baseState({ turn: 3, p1: { ...pb(), active: unit("base", "小火龍", 3), hand: hand() } }); // played THIS turn
+    expect(find(legalActions(sick, ctx), "rareCandy").length).toBe(0);
+  });
+});
+
 // --- end of turn ------------------------------------------------------------
 
 describe("endTurn", () => {

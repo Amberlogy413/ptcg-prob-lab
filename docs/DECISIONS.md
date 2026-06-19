@@ -799,3 +799,25 @@
   **能量輸送 / Energy Search**(牌庫→基本能量→手牌,重洗)、**進化薰香 / Evolution Incense**
   (牌庫→進化寶可夢→手牌,重洗);合資格判定只用 `kind`(必然存在),不靠稀疏欄位。
 - **質量**:tsc 乾淨 · 黃金 27/507 · vitest 全綠(新增引擎測試)· 數學零改動。
+
+## 2026-06-19(後續)— 神奇糖果解鎖並忠實建模(進化鏈資料補上)
+
+- **轉折**:同日稍後發現 `scripts/dex_names.json` 其實已含每個種族嘅 PokéAPI `from`
+  (= evolves_from_species 嘅國家圖鑑編號,全 1025 種族、可靠),即係**進化鏈資料一直都有**,
+  只係未用嚟做卡效驗證。於是即刻解鎖神奇糖果。
+- **做法(全部真實數據)**:`scripts/build_evolution.mjs` 由 dex_names.json 生成
+  `src/data/evolutionData.ts`(`FROM`: dexId→前進化 dexId;`SPECIES`: zh/ja/小寫en 種名→dexId,
+  0 個歧義碰撞)。`src/data/evolution.ts` 嘅 `canRareCandyJump(basic, stage2)`:用印刷階級
+  gating(基礎→2 階)+ `from(from(2階種族)) === 基礎種族`。種族解析優先用卡自身 dexId,冇就用
+  種名 exact 對應(剝走 owner「的」/超級/ex 等)。**只認 exact,絕不 fuzzy** —— 對應唔到就唔出。
+- **真實 catalog 審計(出貨前驗證關)**:std 85 隻 2 階**全部(100%)解到種族**;每隻 2 階最多得
+  **1 隻**合法基礎(冇過量提供);已知對/錯線全部正確(小火龍→噴火龍 ✓、皮卡丘→噴火龍 ✗);
+  抽樣合法跳階全部真實(呱呱泡蛙→甲賀忍蛙ex、鬼斯→耿鬼ex…)。連 catalog 冇 dexId 嘅 std 線
+  (整條噴火龍線)都靠種名解到——正正解決咗之前「dexId 太疏」嘅阻塞。
+- **建模**:新 Action `rareCandy{ iid, basicUid, stage2HandIid }`;禁用於自己最初回合 +「剛使出」嘅
+  寶可夢;UI 出「基礎→2 階」配對掣經 engineStep 結算(實機驗證:小火龍 直接進化成 噴火龍、
+  小火龍入底、糖果入棄牌、戰報正確)。
+- **baby 安全**:PokéAPI 國家圖鑑線最深 3 種族,baby 線(皮丘→皮卡丘→雷丘)頂端喺 TCG 係 1 階,
+  唔會係 2 階,所以階級 gating 下 `from(from())` 永遠落喺正確嘅 TCG 基礎。
+- **質量**:tsc 乾淨 · 黃金 27/507 · 445 vitest(+13:evolution.spec 10、引擎 rareCandy 3)·
+  0 console error · 數學零改動。

@@ -36,7 +36,8 @@ import {
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, energyRetrieveCombos, searchSpecOf } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf } from "./cards.ts";
+import { canRareCandyJump } from "../data/evolution.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
 /** Hiragana + katakana — a card's effect text containing kana means it's the
@@ -114,6 +115,12 @@ const canActiveRetreat = canActiveAttack;
 /** Is it the going-first player's turn 1? (no Supporter, no attack, no evolve.) */
 function firstTurnRestricted(s: GameState): boolean {
   return s.turn === 1 && s.current === s.firstPlayer;
+}
+
+/** Is it the CURRENT player's own first turn? (firstPlayer → turn 1; the other →
+ *  turn 2.) Rare Candy is barred on your own first turn (its printed text). */
+function isOwnFirstTurn(s: GameState): boolean {
+  return s.current === s.firstPlayer ? s.turn === 1 : s.turn === 2;
 }
 
 /** Can this hand evolution legally land on this unit right now? */
@@ -194,6 +201,19 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
         // Energy Retrieval: take up to 2 basic Energy from your discard. Each
         // distinct, meaningful 1–2 card pick is one legal action (deduped by element).
         for (const ids of energyRetrieveCombos(me.discard)) acts.push({ type: "energyRetrieve", iid: c.iid, foundIids: ids });
+      } else if (isRareCandyEffect(effect)) {
+        // Rare Candy: jump-evolve a Basic in play → a Stage 2 in hand. Barred on
+        // your own first turn and on a Pokémon just played this turn; the specific
+        // (Basic, Stage 2) pair must be a REAL evolution line (canRareCandyJump).
+        if (!isOwnFirstTurn(s)) {
+          const stage2s = me.hand.filter((h) => h.kind === "evolution");
+          for (const u of inPlay) {
+            if (u.playedTurn >= s.turn) continue; // "剛使出" — can't use the turn it came down
+            const basicCat = ctx.resolve(u.card);
+            if (basicCat?.stage !== "Basic") continue;
+            for (const s2 of stage2s) if (canRareCandyJump(basicCat, ctx.resolve(s2))) acts.push({ type: "rareCandy", iid: c.iid, basicUid: u.uid, stage2HandIid: s2.iid });
+          }
+        }
       } else {
         const spec = searchSpecOf(effect);
         // Search: the choice is WHICH eligible card in the from-pile (deck/discard).
@@ -379,6 +399,22 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const b = ns[me];
       const pile = b.discard.filter((c) => !ids.includes(c.iid));
       ns = withBoard(ns, me, { ...b, discard: pile, hand: [...b.hand, ...foundCards] });
+      return ns;
+    }
+    case "rareCandy": {
+      // Rare Candy: jump-evolve a Basic in play directly into a Stage 2 from hand.
+      const card = handCard(board, a.iid);
+      if (card === undefined || card.kind !== "item" || !isRareCandyEffect(ctx.resolve(card)?.effect) || isOwnFirstTurn(s)) return s;
+      const stage2 = handCard(board, a.stage2HandIid);
+      if (stage2 === undefined || stage2.kind !== "evolution") return s;
+      const target = units(board).find((u) => u.uid === a.basicUid);
+      if (target === undefined || target.playedTurn >= s.turn) return s; // not the turn it came down
+      if (!canRareCandyJump(ctx.resolve(target.card), ctx.resolve(stage2))) return s; // a real evolution line only
+      // The Basic becomes the Stage 2 (old card goes under, Stage 1 skipped),
+      // conditions clear, playedTurn resets; the Stage 2 leaves hand, Item → discard.
+      const evolved = (u: InPlay): InPlay => ({ ...u, card: stage2, under: [...u.under, u.card], playedTurn: s.turn, status: [] });
+      let ns = withBoard(s, me, { ...mapUnit(board, a.basicUid, evolved), hand: withoutHand(board, a.stage2HandIid) });
+      ns = discardFromHand(ns, me, a.iid);
       return ns;
     }
     case "search": {
