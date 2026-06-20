@@ -1,7 +1,7 @@
 {
   "note": "Verified EN→zh-tw FACT translations for Trainer/Energy staples (illustrator overlap is unreliable for non-Pokémon). Each zh name is existence-checked against the catalog by fetch_meta.mjs; any not found is dropped. These are factual card-name translations — the popularity numbers themselves come only from real tournament data. Only UNAMBIGUOUS staples are listed; ambiguous names (e.g. Professor's Research has multiple zh variants) are deliberately omitted rather than guessed.",
   "map": {
-    "Ultra Ball": "超級球",
+    "Ultra Ball": "高級球",
     "Nest Ball": "巢穴球",
     "Rare Candy": "神奇糖果",
     "Switch": "寶可夢交替",
@@ -15,7 +15,7 @@
     "Super Rod": "厲害釣竿",
     "Boss's Orders": "老大的指令（坂木）",
     "Pokégear 3.0": "寶可夢手錶 3.0",
-    "Great Ball": "高級球",
+    "Great Ball": "超級球",
     "Level Ball": "等級球",
     "Ordinary Rod": "普通釣竿",
     "Air Balloon": "氣球",

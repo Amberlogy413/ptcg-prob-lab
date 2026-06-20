@@ -42,7 +42,7 @@ const catalog: Catalog = {
   sets: { SV6: { name: "", serie: null, date: "2024-05-24", official: null }, SVE: { name: "", serie: null, date: null, official: null } },
   cards,
   dexEnZh: { dragapult: "多龍巴魯托", dreepy: "多龍梅西亞" },
-  trainerEnZh: { "fire energy": "基本火能量", "ultra ball": "超級球" },
+  trainerEnZh: { "fire energy": "基本火能量", "ultra ball": "高級球" },
 };
 
 describe("localizeDeckRow", () => {
@@ -54,7 +54,7 @@ describe("localizeDeckRow", () => {
 
   it("localizes Trainer/Energy staples from the verified table", () => {
     expect(localizeDeckRow(catalog, { name: "Fire Energy" }, "zh").name).toBe("基本火能量");
-    expect(localizeDeckRow(catalog, { name: "Ultra Ball" }, "zh").name).toBe("超級球");
+    expect(localizeDeckRow(catalog, { name: "Ultra Ball" }, "zh").name).toBe("高級球");
   });
 
   it("leaves an unverified English name unchanged (no guessing)", () => {
