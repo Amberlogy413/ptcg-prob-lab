@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -190,6 +190,19 @@ describe("discardEnergyCount / energyDiscardCombos — attacker Energy discard",
     const one = energy("基本火能量");
     expect(energyDiscardCombos([one], 2)).toEqual([[one.iid]]);
     expect(energyDiscardCombos([], 1)).toEqual([]);
+  });
+});
+
+describe("benchDamageAmount — unconditional opponent bench damage only", () => {
+  it("reads 對手的1隻備戰寶可夢(也)受到N點傷害。[在備戰區不計算…]", () => {
+    expect(benchDamageAmount("對手的1隻備戰寶可夢也受到30點傷害。[在備戰區不計算弱點・抵抗力。]")).toBe(30);
+    expect(benchDamageAmount("對手的1隻備戰寶可夢受到50點傷害。[在備戰區不計算弱點・抵抗力。]")).toBe(50);
+  });
+  it("does NOT fire on a coin-flip / conditional bench effect, or a plain attack", () => {
+    expect(benchDamageAmount("若希望，選擇3個這隻寶可夢身上附加的能量，放回牌庫並重洗。這個情況下，對手的1隻備戰寶可夢也受到120點傷害。[在備戰區不計算弱點・抵抗力。]")).toBe(0);
+    expect(benchDamageAmount("擲1次硬幣若為正面，對手的1隻備戰寶可夢也受到30點傷害。[在備戰區不計算弱點・抵抗力。]")).toBe(0);
+    expect(benchDamageAmount("造成30點傷害。")).toBe(0);
+    expect(benchDamageAmount(undefined)).toBe(0);
   });
 });
 

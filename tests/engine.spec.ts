@@ -366,6 +366,28 @@ describe("attack", () => {
     expect(ns.p1.active?.energy.map((e) => e.iid)).toEqual(["ew"]); // 火 discarded, 水 kept
     expect(ns.p1.discard.some((c) => c.iid === "ef")).toBe(true);
   });
+
+  it("a bench-damage attack enumerates per opponent Bench target; a lethal hit KOs it and the attacker takes the Prize", () => {
+    const bd: EngineCtx = {
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Pikachu"
+          ? ({ name: "Pikachu", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Snipe", cost: ["Colorless"], damage: 20, effect: "對手的1隻備戰寶可夢也受到30點傷害。[在備戰區不計算弱點・抵抗力。]" }] } as CatalogCard)
+          : ({ name: c.name, category: "Pokemon" } as CatalogCard),
+      autoKey: (c) => c.name,
+    };
+    const benchA = { uid: "ba", card: card("ba", "basic", { hp: 60, name: "ba" }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const benchB = { uid: "bb", card: card("bb", "basic", { hp: 30, name: "bb" }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const st = { ...attackState(200), p2: { ...attackState(200).p2, bench: [benchA, benchB], deck: [card("od", "basic")] } };
+    const acts = find(legalActions(st, bd), "attack");
+    expect(acts.length).toBe(2); // one action per opponent Bench target
+    const before = st.p1.prizes.length;
+    const ns = applyAction(st, acts.find((a) => a.benchTargetUid === "bb")!, bd); // 30 → 30HP = KO
+    expect(ns.p2.bench.some((u) => u.uid === "bb")).toBe(false);
+    expect(ns.p1.prizes.length).toBe(before - 1); // attacker took the Prize
+    const ns2 = applyAction(st, acts.find((a) => a.benchTargetUid === "ba")!, bd); // 30 → 60HP survives
+    expect(ns2.p2.bench.find((u) => u.uid === "ba")?.damage).toBe(30);
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

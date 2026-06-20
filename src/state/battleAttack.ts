@@ -200,6 +200,17 @@ export function energyDiscardCombos(energy: BattleCard[], n: number): string[][]
   return combos;
 }
 
+/** Flat damage the attack UNCONDITIONALLY deals to ONE chosen OPPONENT Bench
+ *  Pokémon ("對手的1隻備戰寶可夢(也)?受到N點傷害。[在備戰區不計算弱點・抵抗力。]") — 0 if
+ *  absent or gated on a 若 / 擲. The bracket marks it as bench damage with NO
+ *  weakness/resistance. WHICH Bench Pokémon is a player choice → modeled as part of
+ *  the attack action; the hit can KO it (the ATTACKER then takes the Prize). */
+export function benchDamageAmount(effect: string | undefined): number {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  const m = effect.match(/對手的1隻備戰寶可夢也?受到(\d+)點傷害。\[在備戰區不計算/);
+  return m ? Number(m[1]) : 0;
+}
+
 /** Does the attack UNCONDITIONALLY lock the ATTACKER out of attacking on its
  *  next turn ("在下個自己的回合，這隻寶可夢無法使用招式")? 0/false on 若 / 擲 (so a
  *  coin-flip / optional lock is never applied) — high-precision like inflictedStatus.

@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -237,12 +237,15 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
     const attacks = ac?.attacks ?? [];
     attacks.forEach((a, i) => {
       if (!canPayCost(me.active!.energy, a.cost)) return;
-      // An attack that discards the attacker's own Energy: WHICH Energy is the
-      // choice, so each distinct discard combo is its own legal action.
+      // Choice-as-action: WHICH Energy to discard (選擇N個…丟棄) and WHICH opponent
+      // Bench Pokémon to bench-damage (對手的1隻備戰…受到N) are each player choices,
+      // so legalActions enumerates the cross-product (in practice only one applies).
       const dN = discardEnergyCount(a.effect);
-      const combos = dN > 0 ? energyDiscardCombos(me.active!.energy, dN) : [];
-      if (combos.length === 0) acts.push({ type: "attack", index: i });
-      else for (const iids of combos) acts.push({ type: "attack", index: i, discardEnergyIids: iids });
+      const dCombos = dN > 0 ? energyDiscardCombos(me.active!.energy, dN) : [];
+      const benchTargets = benchDamageAmount(a.effect) > 0 ? opp.bench.map((u) => u.uid) : [];
+      const bases: Extract<Action, { type: "attack" }>[] = dCombos.length > 0 ? dCombos.map((iids) => ({ type: "attack", index: i, discardEnergyIids: iids })) : [{ type: "attack", index: i }];
+      if (benchTargets.length > 0) for (const b of bases) for (const uid of benchTargets) acts.push({ ...b, benchTargetUid: uid });
+      else for (const b of bases) acts.push(b);
     });
   }
 
@@ -491,6 +494,20 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
         const cond = inflictedStatus(atk.effect);
         if (cond !== null) {
           ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
+        }
+      }
+      // Bench damage (choice): flat N to a chosen opponent Bench Pokémon (no
+      // weakness/resistance). A lethal hit KOs it and the ATTACKER takes the Prize.
+      if (a.benchTargetUid !== undefined) {
+        const bN = benchDamageAmount(atk.effect);
+        const tgt = bN > 0 ? ns[oppId].bench.find((u) => u.uid === a.benchTargetUid) : undefined;
+        if (tgt !== undefined) {
+          const newD = tgt.damage + bN;
+          ns = addDamage(ns, oppId, tgt.uid, bN);
+          if (tgt.card.hp !== undefined && newD >= tgt.card.hp) {
+            ns = knockOut(ns, oppId, tgt.uid);
+            ns = takePrize(ns, me, prizeValue(ctx.resolve(tgt.card)));
+          }
         }
       }
       // The attack may already have won (last Prize taken / opponent wiped) — stop

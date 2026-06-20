@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -177,6 +177,19 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             const names = combos[0].map((id) => active.energy.find((e) => e.iid === id)).filter((e): e is BattleCard => e !== undefined).map((e) => ctx.nameOf(e)).join("+");
             st().discardEnergy(player, active.uid, combos[0]);
             push("battle.atk.discardEnergy", undefined, { e: names });
+          }
+        }
+        // Bench damage: the bot hits the opponent's first Benched Pokémon (heuristic).
+        const bN = benchDamageAmount(best.effect);
+        const benchTgt = bN > 0 ? st()[opp].bench[0] : undefined;
+        if (benchTgt !== undefined) {
+          const newD = benchTgt.damage + bN;
+          st().setDamage(opp, benchTgt.uid, newD);
+          push("battle.atk.benchHit", undefined, { p: ctx.nameOf(benchTgt.card), n: bN });
+          if (benchTgt.card.hp !== undefined && newD >= benchTgt.card.hp) {
+            st().knockOut(opp, benchTgt.uid);
+            st().takePrize(player, prizeValue(catOf(benchTgt.card)));
+            push("battle.atk.benchKo", undefined, { n: prizeValue(catOf(benchTgt.card)) });
           }
         }
       }

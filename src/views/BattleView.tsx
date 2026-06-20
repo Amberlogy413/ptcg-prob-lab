@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -629,27 +629,38 @@ export function BattleView() {
   // --- Attack (P2): the Active Pokémon's real attacks vs the opponent's Active.
   const meActiveCard = meBoard.active !== null ? catalogOf(meBoard.active.card) : null;
   const attackList = (meActiveCard?.attacks ?? []).map((a, i) => {
-    // An attack that discards the attacker's own Energy: each distinct discard
-    // choice becomes its own button (WHICH Energy is a real choice, never auto-picked).
-    const dN = discardEnergyCount(a.effect);
+    // Choice-as-action: WHICH Energy to discard (選擇N個…丟棄) and WHICH opponent
+    // Bench Pokémon to bench-damage (對手的1隻備戰…受到N) are player choices, so each
+    // distinct combination becomes its own button (never auto-picked).
     const energy = meBoard.active?.energy ?? [];
-    const discardCombos =
+    const dN = discardEnergyCount(a.effect);
+    const dCombos =
       dN > 0
         ? energyDiscardCombos(energy, dN).map((iids) => ({
             iids,
-            label: iids.map((id) => resolve(energy.find((e) => e.iid === id) ?? ({ name: "" } as BattleCard)).name).join("+"),
+            label: t("battle.atk.discardTag", { e: iids.map((id) => resolve(energy.find((e) => e.iid === id) ?? ({ name: "" } as BattleCard)).name).join("+") }),
           }))
-        : undefined;
+        : [];
+    const bN = benchDamageAmount(a.effect);
+    const bTargets = bN > 0 ? oppBoard.bench.map((u) => ({ uid: u.uid, label: t("battle.atk.benchTag", { p: resolve(u.card).name }) })) : [];
+    // cross-product (in practice only one dimension applies); undefined = a plain attack
+    let variants: { discardIids?: string[]; benchTargetUid?: string; label: string }[] | undefined;
+    if (dCombos.length > 0 || bTargets.length > 0) {
+      const ds = dCombos.length > 0 ? dCombos : [{ iids: undefined as string[] | undefined, label: "" }];
+      const bs = bTargets.length > 0 ? bTargets : [{ uid: undefined as string | undefined, label: "" }];
+      variants = [];
+      for (const d of ds) for (const b of bs) variants.push({ discardIids: d.iids, benchTargetUid: b.uid, label: [d.label, b.label].filter(Boolean).join(" ") });
+    }
     return {
       idx: i,
       name: a.name,
       cost: a.cost ?? [],
       damage: a.damage,
       canPay: meBoard.active !== null && canPayCost(meBoard.active.energy, a.cost),
-      discardCombos,
+      variants,
     };
   });
-  function doAttack(idx: number, discardIids?: string[]) {
+  function doAttack(idx: number, discardIids?: string[], benchTargetUid?: string) {
     setMsg(null);
     const active = meBoard.active;
     const oppActive = oppBoard.active;
@@ -694,6 +705,12 @@ export function BattleView() {
       .filter((e): e is BattleCard => e !== undefined)
       .map((e) => resolve(e).name)
       .join("+");
+    // Bench damage (choice): flat N to a chosen opponent Bench Pokémon; a lethal hit KOs it.
+    const benchN = benchDamageAmount(atk.effect);
+    const benchTgt = benchTargetUid !== undefined ? oppBoard.bench.find((u) => u.uid === benchTargetUid) : undefined;
+    const benchNewDmg = benchTgt ? benchTgt.damage + benchN : 0;
+    const benchKo = benchTgt !== undefined && benchTgt.card.hp !== undefined && benchNewDmg >= benchTgt.card.hp;
+    const benchPrizes = benchKo ? prizeValue(catalogOf(benchTgt!.card)) : 0;
     // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
     // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
     const changed = act(() => {
@@ -704,6 +721,13 @@ export function BattleView() {
         s.takePrize(me, prizes);
       } else if (cond !== null && !oppActive.status.includes(cond)) {
         s.toggleStatus(oppId, oppActive.uid, cond);
+      }
+      if (benchTgt !== undefined && benchN > 0) {
+        s.setDamage(oppId, benchTgt.uid, benchNewDmg);
+        if (benchKo) {
+          s.knockOut(oppId, benchTgt.uid);
+          s.takePrize(me, benchPrizes); // attacker takes the Prize for the KO'd Bench Pokémon
+        }
       }
       if (heal > 0) s.setDamage(me, active.uid, Math.max(0, active.damage - heal));
       if (draw > 0) s.draw(me, draw);
@@ -733,6 +757,10 @@ export function BattleView() {
     if (selfKo) result += " " + t("battle.atk.selfKo");
     if (locks && !selfKo) result += " " + t("battle.atk.selfLock");
     if (discardNames !== "" && !selfKo) result += " " + t("battle.atk.discardEnergy", { e: discardNames });
+    if (benchTgt !== undefined && benchN > 0) {
+      result += " " + t("battle.atk.benchHit", { p: resolve(benchTgt.card).name, n: benchN });
+      if (benchKo) result += " " + t("battle.atk.benchKo", { n: benchPrizes });
+    }
     if (changed) note(`${names[me]}: ${result}`);
     setSel(null);
     setMsg(result);
@@ -1429,9 +1457,9 @@ interface AttackOpt {
   cost: string[];
   damage: number | string | undefined;
   canPay: boolean;
-  /** One entry per distinct "which Energy to discard" choice (attacks that discard
-   *  the attacker's own Energy). Undefined / empty = no discard choice. */
-  discardCombos?: { iids: string[]; label: string }[];
+  /** One entry per distinct choice combination (which Energy to discard / which
+   *  opponent Bench Pokémon to hit). Undefined = a plain attack with no choice. */
+  variants?: { discardIids?: string[]; benchTargetUid?: string; label: string }[];
 }
 
 function AttackPanel({
@@ -1442,7 +1470,7 @@ function AttackPanel({
   attacks: AttackOpt[];
   abilities: string[];
   canAttack: boolean;
-  onAttack: (idx: number, discardIids?: string[]) => void;
+  onAttack: (idx: number, discardIids?: string[], benchTargetUid?: string) => void;
   t: Tr;
 }) {
   return (
@@ -1466,7 +1494,7 @@ function AttackPanel({
           const btnClass =
             "flex items-center gap-1 rounded-ctl border px-2 py-1 text-xs " +
             (ready ? "border-blue text-blue hover:bg-blue/10" : "hairline text-ink2 opacity-60");
-          const inner = (discardLabel?: string) => (
+          const inner = (extraLabel?: string) => (
             <>
               {a.cost.length > 0 && (
                 <span className="flex items-center gap-0.5">
@@ -1479,14 +1507,14 @@ function AttackPanel({
               )}
               <span className="font-medium">{a.name}</span>
               {a.damage !== undefined && a.damage !== "" && <span className="font-mono">{a.damage}</span>}
-              {discardLabel !== undefined && <span className="text-[10px] text-ink2">{t("battle.atk.discardTag", { e: discardLabel })}</span>}
+              {extraLabel !== undefined && extraLabel !== "" && <span className="text-[10px] text-ink2">{extraLabel}</span>}
               {!a.canPay && <span className="text-[10px] text-warn">{t("battle.atk.short")}</span>}
             </>
           );
-          if (a.discardCombos && a.discardCombos.length > 0) {
-            return a.discardCombos.map((c, ci) => (
-              <button key={`${a.idx}-${ci}`} type="button" disabled={!ready} onClick={() => onAttack(a.idx, c.iids)} className={btnClass}>
-                {inner(c.label)}
+          if (a.variants && a.variants.length > 0) {
+            return a.variants.map((v, vi) => (
+              <button key={`${a.idx}-${vi}`} type="button" disabled={!ready} onClick={() => onAttack(a.idx, v.discardIids, v.benchTargetUid)} className={btnClass}>
+                {inner(v.label)}
               </button>
             ));
           }

@@ -69,8 +69,9 @@ export type Action =
   | { type: "rareCandy"; iid: string; basicUid: string; stage2HandIid: string }
   | { type: "retreat"; benchUnitId: string }
   /** Attack with the Active's attack `index`. `discardEnergyIids` is the chosen
-   *  attached Energy to discard when the attack's effect demands it (選擇N個…丟棄). */
-  | { type: "attack"; index: number; discardEnergyIids?: string[] }
+   *  attached Energy to discard (選擇N個…丟棄); `benchTargetUid` is the chosen
+   *  opponent Bench Pokémon to take the attack's bench damage (對手的1隻備戰…受到N). */
+  | { type: "attack"; index: number; discardEnergyIids?: string[]; benchTargetUid?: string }
   | { type: "promote"; benchUnitId: string }
   | { type: "endTurn" };
 
