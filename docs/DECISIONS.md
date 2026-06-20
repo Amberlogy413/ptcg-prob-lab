@@ -865,3 +865,25 @@
 - **質量**:tsc 乾淨 · 黃金 27/507 · **484 vitest**(+8:6 球測試 + 2 覆核修正回歸)· 0 console error ·
   數學零改動 · 實機核實真 catalog 偵測(先機球 cost1/高級球 cost2/等級球 免費/超級球正確不偵測)+
   經 store/bridge 完整付代價搜尋 + 偽造 cost-0 no-op + fetch 去重。
+
+## 2026-06-20 — 位置揭示(topN)+ 超級球/寶可齒輪/能量籤 + 覆核揭發「最新印刷換字」真 bug
+
+- **新機制 `SearchSpec.topN`**:合資格集合只限牌庫**上方 N 張**(`slice(0, topN)`),揀 1 張→手牌,
+  之後牌庫重洗。引擎 legalActions/applyAction + UI 兩邊一致 slice;深於 N 嘅卡永不被提供/揀到。
+- **建模**:**超級球**(= EN Great Ball,上 7 揀 1 寶可夢,~84% 用率,旗艦)、**寶可齒輪3.0 /
+  寶可裝置3.0**(上 7 揀 1 支援者)、**能量籤**(上 7 揀任何能量)。多選/丟棄/重排/睇對手牌庫嘅
+  topN 變體係不同機制,另列不建模。
+- **對抗式覆核(10 agent)揭發一個真 bug(中,我自己嘅實機核實漏咗)**:**超級球有兩個 zh 字句** ——
+  句號版「。選擇其中」(14 印)同逗號版「，從其中選擇」(2 印),我只建模咗句號版。**更嚴重**:
+  name-only 牌組行(5 個對戰範本全部係咁)經 sortPrints 會解到**最新印刷**,而最新嗰兩個正正係**逗號版**
+  (SV1a-065 = nameIndex 贏家)→ searchSpecOf null → 旗艦超級球喺**出貨範本上靜靜失效**。我嘅實機核實
+  用咗 array 第一個(句號)印刷,所以走漏咗;單元測試又用合成 fxCtx,冚唔到真解析路徑。
+- **修正**:超級球補返逗號版字句(同 先機球/高級球/Pokégear 一樣 dual-wording,抽 `SUPER_BALL_SPEC`/
+  `GEAR_SPEC` 共用)。新測試 `tests/searchCatalogResolve.spec.ts`:**載入真 catalog、normalizeCatalog、
+  逐個已建模搜尋道具用 name-only 解析(= 最新印刷)→ 斷言 searchSpecOf 偵測到** —— 正正行真路徑,
+  將來任何「最新印刷換字」都會喺 CI 爆,唔會去到 production。
+- **教訓(寫低)**:用確切效果文字偵測時,**必須冚齊一張卡嘅所有 zh 字句,尤其最新印刷**,因為
+  name-only 牌組行解到最新印刷。實機核實要行**真解析路徑**(name→sortPrints→最新),唔好 pin
+  array 第一個或某個 catalogId 去測(會走漏)。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **501 vitest**(+14:3 topN + 12 真 catalog 解析回歸)· 0 console
+  error · 數學零改動 · 實機核實真路徑(超級球 name-only → 最新印 SV1a-065 逗號版 → 偵測到 topN 7)。

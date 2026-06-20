@@ -1808,11 +1808,13 @@ function HandActions({
       )}
       {card.kind === "item" && fx !== "switch" && search !== null && (search.discardCost ?? 0) === 0 && (
         <>
-          {/* Cost-free search Item — choose which eligible card to pull from the pile (engine). */}
+          {/* Cost-free search Item — choose which eligible card to pull from the pile (engine).
+              A topN reveal (超級球 / Pokégear) only offers the top N cards of the pile. */}
           <span className="text-[11px] text-ink2">{t(search.from === "deck" ? "battle.act.searchDeck" : "battle.act.searchDiscard")}→</span>
           {(() => {
             const seen = new Set<string>();
-            const picks = board[search.from].filter(search.eligible).filter((c) => {
+            const fromPile = search.topN !== undefined ? board[search.from].slice(0, search.topN) : board[search.from];
+            const picks = fromPile.filter(search.eligible).filter((c) => {
               const n = resolveName(c);
               if (seen.has(n)) return false; // dedupe by name — any instance is equivalent
               seen.add(n);
@@ -1864,7 +1866,8 @@ function DiscardCostSearch({
   const [picked, setPicked] = useState<string[]>([]);
   const payable = board.hand.filter((c) => c.iid !== card.iid); // can't pay with the Item itself
   const seen = new Set<string>();
-  const fetches = board[search.from].filter(search.eligible).filter((c) => {
+  const fromPile = search.topN !== undefined ? board[search.from].slice(0, search.topN) : board[search.from];
+  const fetches = fromPile.filter(search.eligible).filter((c) => {
     const n = resolveName(c);
     if (seen.has(n)) return false; // dedupe by name — any instance is equivalent
     seen.add(n);

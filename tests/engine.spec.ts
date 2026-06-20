@@ -799,6 +799,93 @@ describe("ball searches (Level / Quick / Great Ball)", () => {
   });
 });
 
+// --- positional "look at the top N" reveal searches -------------------------
+
+describe("top-N reveal searches (超級球 / Pokégear / 能量籤)", () => {
+  const SB = "查看自己的牌庫上方7張卡。選擇其中1張寶可夢卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗。";
+  // 超級球's SECOND catalog wording (，從其中選擇 — 2 of its 16 prints; the rest use SB's 。選擇其中).
+  const SB2 = "查看自己的牌庫上方7張卡，從其中選擇1張寶可夢卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗。";
+  const GEAR = "查看自己的牌庫上方7張卡。選擇其中1張支援者卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗。";
+  const GEAR2 = "查看自己的牌庫上方7張卡，從其中選擇1張支援者卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗。";
+  const LOTTO = "查看自己的牌庫上方7張卡。選擇其中1張能量卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+
+  it("超級球: looks at ONLY the top 7 — a Pokémon deeper than 7 is never offered nor fetchable, then reshuffles", () => {
+    const ctx = fxCtx({ SB: { effect: SB } });
+    const deck = [
+      card("pkTop", "basic"),
+      card("f1", "item"), card("f2", "item"), card("f3", "item"), card("f4", "item"), card("f5", "item"),
+      card("pkTop2", "evolution"), // index 6 = still inside the top 7
+      card("pkDeep", "basic"), // index 7 = below the top 7
+      card("f6", "item"),
+    ];
+    const s = baseState({ p1: { ...pb(), hand: [card("SB", "item", { name: "SB" })], deck } });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // pkTop + pkTop2 (both in the top 7); pkDeep excluded
+    const ns = applyAction(s, { type: "search", iid: "SB", foundIid: "pkTop2" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("pkTop2");
+    expect(ns.p1.deck.some((c) => c.iid === "pkTop2")).toBe(false);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1); // rest back + reshuffle
+    // a forged pick of the deeper Pokémon is a strict no-op
+    expect(applyAction(s, { type: "search", iid: "SB", foundIid: "pkDeep" }, ctx)).toBe(s);
+  });
+
+  it("超級球: BOTH catalog wordings (。選擇其中 / ，從其中選擇) resolve to the SAME spec and drive the same top-7 reveal", () => {
+    // The 2-print ，從其中選擇 wording must detect identically to the 14-print 。選擇其中 one
+    // (same dual-wording quirk already handled for 寶可齒輪3.0 / 寶可裝置3.0). Shared SUPER_BALL_SPEC.
+    const a = searchSpecOf(SB);
+    const b = searchSpecOf(SB2);
+    expect(a).not.toBeNull();
+    expect(b).toBe(a); // identical object reference — neither wording falls through undetected
+    // and the comma wording exercises the full top-7 reveal end-to-end
+    const ctx = fxCtx({ SB: { effect: SB2 } });
+    const deck = [
+      card("pkTop", "basic"),
+      card("f1", "item"), card("f2", "item"), card("f3", "item"), card("f4", "item"), card("f5", "item"),
+      card("pkTop2", "evolution"), // index 6 = still inside the top 7
+      card("pkDeep", "basic"), // index 7 = below the top 7
+    ];
+    const s = baseState({ p1: { ...pb(), hand: [card("SB", "item", { name: "SB" })], deck } });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // pkTop + pkTop2 (top 7); pkDeep excluded
+    const ns = applyAction(s, { type: "search", iid: "SB", foundIid: "pkTop2" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("pkTop2");
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1); // rest back + reshuffle
+  });
+
+  it("Pokégear 3.0 (both wordings) offers only a Supporter from the top 7", () => {
+    for (const eff of [GEAR, GEAR2]) {
+      const ctx = fxCtx({ G: { effect: eff } });
+      const deck = [
+        card("sup1", "supporter"), card("p", "basic"), card("e", "energy-basic"),
+        card("i1", "item"), card("i2", "item"), card("i3", "item"), card("i4", "item"),
+        card("supDeep", "supporter"), // index 7 = below the top 7
+      ];
+      const s = baseState({ p1: { ...pb(), hand: [card("G", "item", { name: "G" })], deck } });
+      const acts = find(legalActions(s, ctx), "search");
+      expect(acts.length).toBe(1); // only sup1 (in top 7); supDeep below, p/e/items not Supporters
+      const ns = applyAction(s, { type: "search", iid: "G", foundIid: "sup1" }, ctx);
+      expect(ns.p1.hand.map((c) => c.iid)).toContain("sup1");
+    }
+  });
+
+  it("能量籤: top 7 → any Energy (basic or special) is eligible", () => {
+    const ctx = fxCtx({ L: { effect: LOTTO } });
+    const deck = [
+      card("enA", "energy-basic", { name: "基本火能量" }), card("enB", "energy-special", { name: "雙倍渦輪能量" }),
+      card("p", "basic"), card("i1", "item"), card("i2", "item"), card("i3", "item"), card("i4", "item"),
+      card("enDeep", "energy-basic", { name: "基本水能量" }), // below the top 7
+    ];
+    const s = baseState({ p1: { ...pb(), hand: [card("L", "item", { name: "L" })], deck } });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // enA + enB (top 7); enDeep excluded
+  });
+});
+
 // --- Energy Switch (move a basic Energy between your own Pokémon) ------------
 
 describe("Energy Switch (能量轉移)", () => {

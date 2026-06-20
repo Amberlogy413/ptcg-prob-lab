@@ -228,11 +228,14 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
           // over interchangeable same-named copies (a deliberate keep-the-mask-small
           // choice, mirrored by the dedup on the fetch side below).
           const payments = handPayCombos(me.hand, c.iid, cost);
+          // A positional "look at the top N" reveal restricts the candidate set to the
+          // top N cards of the pile (超級球 / Pokégear …); otherwise the whole pile.
+          const pool = spec.topN !== undefined ? me[spec.from].slice(0, spec.topN) : me[spec.from];
           // Dedupe the fetch side by NAME too: same-named copies in the pile yield an
           // identical board, so one representative each keeps the mask minimal and
           // equal to the UI's offered set.
           const seenFound = new Set<string>();
-          for (const found of me[spec.from]) {
+          for (const found of pool) {
             if (!spec.eligible(found) || seenFound.has(found.name)) continue;
             seenFound.add(found.name);
             for (const pay of payments) acts.push(cost > 0 ? { type: "search", iid: c.iid, foundIid: found.iid, discardIids: pay } : { type: "search", iid: c.iid, foundIid: found.iid });
@@ -464,7 +467,10 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       if (card === undefined || card.kind !== "item") return s;
       const spec = searchSpecOf(ctx.resolve(card)?.effect);
       if (spec === null) return s;
-      const found = board[spec.from].find((c) => c.iid === a.foundIid);
+      // A topN reveal can only fetch from the top N cards (a forged pick of a deeper
+      // card is a no-op); a whole-pile search sees the full pile.
+      const pool = spec.topN !== undefined ? board[spec.from].slice(0, spec.topN) : board[spec.from];
+      const found = pool.find((c) => c.iid === a.foundIid);
       if (found === undefined || !spec.eligible(found)) return s;
       if (spec.to === "bench" && board.bench.length >= MAX_BENCH) return s;
       // Pay the discard COST first (先機球 1 / 高級球 2): the chosen hand cards must be
