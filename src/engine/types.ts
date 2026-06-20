@@ -55,11 +55,12 @@ export type Action =
   | { type: "playGust"; iid: string; targetUid: string }
   /** Switch (item): swap YOUR Active with one of your own bench Pokémon. */
   | { type: "playSwitch"; iid: string; benchUid: string }
-  /** Search item (Nest/Master Ball, Night Stretcher, Level/Quick/Great Ball): pull a
-   *  chosen card from a pile (deck/discard) to its destination; `foundIid` is the
-   *  chosen card. `discardIids` is the chosen hand cards paid as a discard COST
-   *  (先機球 1 / 高級球 2; absent for cost-free searches). */
-  | { type: "search"; iid: string; foundIid: string; discardIids?: string[] }
+  /** Search item (Nest/Master Ball, Night Stretcher, Level/Quick/Great/Super Ball,
+   *  Pokégear, 救援行李箱 …): pull chosen card(s) from a pile (deck/discard) to a
+   *  destination. Single-pick searches carry `foundIid`; a multi-pick recovery
+   *  (pickUpTo, e.g. 救援行李箱 ≤2) carries `foundIids`. `discardIids` is the chosen
+   *  hand cards paid as a discard COST (先機球 1 / 高級球 2; absent otherwise). */
+  | { type: "search"; iid: string; foundIid?: string; foundIids?: string[]; discardIids?: string[] }
   /** Energy Switch (item): move one BASIC Energy already attached to one of YOUR
    *  Pokémon onto another of YOUR Pokémon; `energyIid` is the moved Energy. */
   | { type: "energySwitch"; iid: string; fromUid: string; energyIid: string; toUid: string }

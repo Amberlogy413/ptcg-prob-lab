@@ -21,7 +21,7 @@ import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
 import { engineStep, toEngineState } from "../state/battleBridge.ts";
-import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
+import { isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, recoverCombos, searchSpecOf, makeCtx, observe, encodeObservation, type SearchSpec, type Observation, type SideView } from "../engine/index.ts";
 import { canRareCandyJump } from "../data/evolution.ts";
 import {
   loadDecks,
@@ -332,8 +332,14 @@ export function BattleView() {
       const u = meBoard.bench.find((x) => x.uid === action.benchUid);
       targetName = u !== undefined ? resolve(u.card).name : "";
     } else if (action.type === "search") {
-      const c = [...meBoard.deck, ...meBoard.discard].find((x) => x.iid === action.foundIid);
-      targetName = c !== undefined ? resolve(c).name : "";
+      // Multi-pick recovery (救援行李箱) carries foundIids; single-pick carries foundIid.
+      // Resolve whichever is present so the log faithfully names what was fetched.
+      const ids = action.foundIids ?? (action.foundIid !== undefined ? [action.foundIid] : []);
+      targetName = ids
+        .map((id) => [...meBoard.deck, ...meBoard.discard].find((x) => x.iid === id))
+        .filter((c): c is BattleCard => c !== undefined)
+        .map((c) => resolve(c).name)
+        .join("、");
     } else if (action.type === "energySwitch") {
       const from = meUnits.find((x) => x.uid === action.fromUid);
       const to = meUnits.find((x) => x.uid === action.toUid);
@@ -418,9 +424,14 @@ export function BattleView() {
           if (!engineStep({ type: "playSwitch", iid: card.iid, benchUid: action.benchUid }, catalog)) setMsg(t("battle.field.noActive"));
           break;
         case "search":
-          // Nest/Master/Level/Quick/Great Ball, Night Stretcher — resolved by the engine
-          // (the discard cost for 先機球/高級球 rides on discardIids).
-          if (!engineStep({ type: "search", iid: card.iid, foundIid: action.foundIid, ...(action.discardIids !== undefined ? { discardIids: action.discardIids } : {}) }, catalog)) setMsg(t("battle.field.benchFull"));
+          // Searches/recoveries — resolved by the engine. Single-pick carries foundIid;
+          // a multi-pick recovery (救援行李箱) carries foundIids; 先機球/高級球 add discardIids.
+          if (!engineStep({
+            type: "search", iid: card.iid,
+            ...(action.foundIid !== undefined ? { foundIid: action.foundIid } : {}),
+            ...(action.foundIids !== undefined ? { foundIids: action.foundIids } : {}),
+            ...(action.discardIids !== undefined ? { discardIids: action.discardIids } : {}),
+          }, catalog)) setMsg(t("battle.field.benchFull"));
           break;
         case "energySwitch":
           // Energy Switch — resolved by the engine (single rules source).
@@ -1056,7 +1067,7 @@ type PlayAction =
   | { type: "item" }
   | { type: "gust"; targetUid: string } // Boss's Orders → opponent bench Pokémon
   | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
-  | { type: "search"; foundIid: string; discardIids?: string[] } // Nest/Master/Level/Quick/Great Ball, Night Stretcher → pick from a pile (+ optional discard cost)
+  | { type: "search"; foundIid?: string; foundIids?: string[]; discardIids?: string[] } // search/recover from a pile (single foundIid; or multi foundIids for 救援行李箱; + optional discard cost)
   | { type: "energySwitch"; fromUid: string; energyIid: string; toUid: string } // Energy Switch → move a basic Energy between your Pokémon
   | { type: "energyRetrieve"; foundIids: string[] } // Energy Retrieval → take up to 2 basic Energy from discard
   | { type: "rareCandy"; basicUid: string; s2Iid: string } // Rare Candy → jump-evolve a Basic into a Stage 2
@@ -1806,7 +1817,30 @@ function HandActions({
           })()}
         </>
       )}
-      {card.kind === "item" && fx !== "switch" && search !== null && (search.discardCost ?? 0) === 0 && (
+      {card.kind === "item" && fx !== "switch" && search !== null && search.pickUpTo !== undefined && (
+        <>
+          {/* Multi-pick recovery (救援行李箱) — take up to N eligible cards from the pile (engine). */}
+          <span className="text-[11px] text-ink2">{t("battle.act.recover")}→</span>
+          {(() => {
+            const fromPile = search.topN !== undefined ? board[search.from].slice(0, search.topN) : board[search.from];
+            const combos = recoverCombos(fromPile.filter(search.eligible), search.pickUpTo);
+            if (combos.length === 0) return <span className="text-[11px] text-ink2">{t("battle.act.searchNone")}</span>;
+            return (
+              <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+                {combos.map((ids) => {
+                  const label = ids.map((id) => fromPile.find((c) => c.iid === id)).filter((c): c is BattleCard => c !== undefined).map((c) => resolveName(c)).join(" + ");
+                  return (
+                    <button key={ids.join("+")} type="button" onClick={() => onPlay(card, { type: "search", foundIids: ids })} className={btn} title={label}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </span>
+            );
+          })()}
+        </>
+      )}
+      {card.kind === "item" && fx !== "switch" && search !== null && search.pickUpTo === undefined && (search.discardCost ?? 0) === 0 && (
         <>
           {/* Cost-free search Item — choose which eligible card to pull from the pile (engine).
               A topN reveal (超級球 / Pokégear) only offers the top N cards of the pile. */}
@@ -1833,7 +1867,7 @@ function HandActions({
           })()}
         </>
       )}
-      {card.kind === "item" && fx !== "switch" && search !== null && (search.discardCost ?? 0) > 0 && (
+      {card.kind === "item" && fx !== "switch" && search !== null && search.pickUpTo === undefined && (search.discardCost ?? 0) > 0 && (
         <DiscardCostSearch card={card} board={board} search={search} resolveName={resolveName} onPlay={onPlay} btn={btn} sub={sub} t={t} />
       )}
       {card.kind === "item" && fx === null && search === null && (

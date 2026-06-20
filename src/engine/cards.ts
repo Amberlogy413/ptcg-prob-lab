@@ -180,6 +180,11 @@ export interface SearchSpec {
    *  card still goes to its destination and the deck reshuffles afterwards (so the
    *  exact-odds HUD stays uniform). undefined = search the whole pile (the default). */
   topN?: number;
+  /** A MULTI-pick recovery (救援行李箱 …): take 1..pickUpTo eligible cards from `from`
+   *  to `to` at once. The action carries `foundIids` (deduped by name via
+   *  recoverCombos); undefined = a normal single-pick search. Only `to: "hand"` is
+   *  modeled for multi-pick so far. */
+  pickUpTo?: number;
 }
 
 const isBasicPokemon = (c: BattleCard): boolean => c.kind === "basic";
@@ -253,7 +258,37 @@ const SEARCH_BY_EFFECT: Array<{ effect: string; spec: SearchSpec }> = [
   { effect: "查看自己的牌庫上方7張卡，從其中選擇1張支援者卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗", spec: GEAR_SPEC },
   // 能量籤 (Energy Lotto): top 7 → choose any Energy → hand.
   { effect: "查看自己的牌庫上方7張卡。選擇其中1張能量卡，在給對手看過後加入手牌。將剩餘卡放回牌庫並重洗", spec: { from: "deck", to: "hand", eligible: isEnergyCard, shuffleAfter: true, topN: 7 } },
+  // 救援行李箱 (Rescue Carrier): discard → up to 2 Pokémon with HP ≤ 90 → hand (no shuffle). (Verified 2026-06-20: 1 wording, no collision.)
+  { effect: "從自己的棄牌區選擇最多2張HP為「90」以下的寶可夢卡，在給對手看過後加入手牌", spec: { from: "discard", to: "hand", eligible: isPokemonHpAtMost(90), shuffleAfter: false, pickUpTo: 2 } },
 ];
+
+/** Distinct multi-card picks (1..max cards) from `pile`, as iid arrays, deduped by
+ *  card NAME — same-name copies are interchangeable, but taking 2 of a name is a
+ *  distinct pick from taking 1 (and needs ≥2 copies present). Used by "take up to N
+ *  from your discard" recoveries (救援行李箱); shared by the engine action space AND
+ *  the UI so both offer exactly the same picks. Empty when `pile` is empty. */
+export function recoverCombos(pile: BattleCard[], max: number): string[][] {
+  const byName = new Map<string, string[]>(); // name → iids, in pile order
+  for (const c of pile) {
+    const arr = byName.get(c.name);
+    if (arr) arr.push(c.iid);
+    else byName.set(c.name, [c.iid]);
+  }
+  const names = [...byName.keys()];
+  const combos: string[][] = [];
+  // Every non-empty multiset of size 1..max over the names (first `cnt` iids of a name = "cnt copies").
+  const rec = (start: number, chosen: string[]): void => {
+    if (chosen.length >= 1) combos.push(chosen);
+    if (chosen.length >= max) return;
+    for (let i = start; i < names.length; i++) {
+      const ids = byName.get(names[i]!)!;
+      const room = Math.min(ids.length, max - chosen.length);
+      for (let cnt = 1; cnt <= room; cnt++) rec(i + 1, [...chosen, ...ids.slice(0, cnt)]);
+    }
+  };
+  rec(0, []);
+  return combos;
+}
 
 /** The search spec for this card's effect text, or null if it isn't a modeled search. */
 export function searchSpecOf(effect: string | undefined): SearchSpec | null {
@@ -321,10 +356,11 @@ export const COVERAGE = {
     "超級球 (= EN Great Ball, ~84% usage): look at the TOP 7 cards → choose a Pokémon → hand, reshuffle (positional topN reveal; the catalog's nameEn 'Ultra Ball' is a mis-gloss, flagged for a data fix)",
     "寶可齒輪3.0 / 寶可裝置3.0 (Pokégear 3.0): top 7 → choose a Supporter → hand, reshuffle",
     "能量籤 (Energy Lotto): top 7 → choose any Energy → hand, reshuffle",
+    "救援行李箱 (Rescue Carrier): discard → choose up to 2 Pokémon with HP ≤ 90 → hand (multi-pick, deduped by name)",
     "神奇糖果 / Rare Candy (jump-evolve a Basic in play → a Stage 2 from hand; legality via real PokéAPI evolution-chain data, see src/data/evolution.ts)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense", "等級球 / Level Ball", "先機球 / Quick Ball", "高級球 (= EN Ultra Ball, discard 2 → any Pokémon)", "超級球 (= EN Great Ball, top-7 reveal → a Pokémon)", "寶可齒輪3.0 / 寶可裝置3.0 (top-7 reveal → a Supporter)", "能量籤 (top-7 reveal → an Energy)", "神奇糖果 / Rare Candy"],
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense", "等級球 / Level Ball", "先機球 / Quick Ball", "高級球 (= EN Ultra Ball, discard 2 → any Pokémon)", "超級球 (= EN Great Ball, top-7 reveal → a Pokémon)", "寶可齒輪3.0 / 寶可裝置3.0 (top-7 reveal → a Supporter)", "能量籤 (top-7 reveal → an Energy)", "救援行李箱 (Rescue Carrier: discard → up to 2 Pokémon HP≤90)", "神奇糖果 / Rare Candy"],
   /** Known NOT modeled, with the honest reason. */
   unmodeledKnown: [
     "Multi-pick / discard-from-top / reorder / opponent-deck top-N effects (瑪瓜 / 阿克羅瑪的實驗 / 杜若 / 蕾荷 / 推理組合 …) — these go beyond the single-pick topN reveal modeled here (choose ANY number, or discard, or rearrange, or target the opponent's deck); deferred as distinct mechanics",

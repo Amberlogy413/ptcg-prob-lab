@@ -33,7 +33,7 @@ const detectByName = (name: string) => searchSpecOf(ctx.resolve(nameRow(name))?.
 describe("real-catalog resolution — every modeled search Item is detected by NAME", () => {
   // Each of these resolves a name-only row to the catalog's newest matching print, so
   // a re-worded newest print (the 超級球 trap) would make this null and fail CI.
-  const NAMES = ["巢穴球", "大師球", "夜間擔架", "能量輸送", "進化薰香", "等級球", "先機球", "高級球", "超級球", "寶可齒輪3.0", "寶可裝置3.0", "能量籤"];
+  const NAMES = ["巢穴球", "大師球", "夜間擔架", "能量輸送", "進化薰香", "等級球", "先機球", "高級球", "超級球", "寶可齒輪3.0", "寶可裝置3.0", "能量籤", "救援行李箱"];
   for (const name of NAMES) {
     it(`${name} is present and detected as a search Item via name-only resolution`, () => {
       expect(ctx.resolve(nameRow(name))).not.toBeNull(); // the card exists in the catalog

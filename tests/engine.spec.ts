@@ -19,6 +19,7 @@ import {
   makeCtx,
   searchSpecOf,
   energyRetrieveCombos,
+  recoverCombos,
   type GameState,
   type EngineCtx,
   type BattleCard,
@@ -883,6 +884,63 @@ describe("top-N reveal searches (超級球 / Pokégear / 能量籤)", () => {
     const s = baseState({ p1: { ...pb(), hand: [card("L", "item", { name: "L" })], deck } });
     const acts = find(legalActions(s, ctx), "search");
     expect(acts.length).toBe(2); // enA + enB (top 7); enDeep excluded
+  });
+});
+
+// --- multi-pick recovery from discard (救援行李箱) ---------------------------
+
+describe("recoverCombos + 救援行李箱 (take up to 2 HP≤90 Pokémon from discard)", () => {
+  const RESCUE = "從自己的棄牌區選擇最多2張HP為「90」以下的寶可夢卡，在給對手看過後加入手牌。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+
+  it("recoverCombos enumerates distinct 1..max picks deduped by name (incl. ×2 of a name)", () => {
+    // two copies of "A" + one "B", max 2 → [A], [A×2], [B], [A+B]
+    const pile = [card("a1", "basic", { name: "A" }), card("a2", "basic", { name: "A" }), card("b1", "basic", { name: "B" })];
+    const combos = recoverCombos(pile, 2).map((ids) => ids.slice().sort().join("+")).sort();
+    expect(combos).toEqual(["a1", "a1+a2", "a1+b1", "b1"]);
+    expect(recoverCombos([], 2)).toEqual([]); // empty pile → no picks
+  });
+
+  it("offers distinct 1–2 picks of only HP≤90 Pokémon and moves them to hand WITHOUT reshuffling", () => {
+    const ctx = fxCtx({ R: { effect: RESCUE } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("R", "item", { name: "R" })],
+        discard: [
+          card("pA", "basic", { hp: 60, name: "A" }),
+          card("pB", "basic", { hp: 70, name: "B" }),
+          card("pBig", "basic", { hp: 200, name: "Big" }), // HP > 90 → ineligible
+          card("pNoHp", "basic", { name: "NoHp" }), // unknown HP → ineligible
+          card("en", "energy-basic", { name: "基本火能量" }), // not a Pokémon
+        ],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(3); // [A], [B], [A+B]
+    const ns = applyAction(s, { type: "search", iid: "R", foundIids: ["pA", "pB"] }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid).sort()).toEqual(["pA", "pB"]);
+    expect(ns.p1.discard.some((c) => c.iid === "pA" || c.iid === "pB")).toBe(false); // left the discard
+    expect(ns.p1.discard.map((c) => c.iid)).toContain("R"); // played Item → discard
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce); // discard recovery never reshuffles
+  });
+
+  it("rejects an invalid recovery (over-90 / not in discard / >2 / duplicate / empty)", () => {
+    const ctx = fxCtx({ R: { effect: RESCUE } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("R", "item", { name: "R" })], discard: [card("pA", "basic", { hp: 60, name: "A" }), card("pB", "basic", { hp: 70, name: "B" }), card("pC", "basic", { hp: 80, name: "C" }), card("pBig", "basic", { hp: 200, name: "Big" })] },
+    });
+    expect(applyAction(s, { type: "search", iid: "R", foundIids: ["pBig"] }, ctx)).toBe(s); // HP>90 ineligible
+    expect(applyAction(s, { type: "search", iid: "R", foundIids: ["ghost"] }, ctx)).toBe(s); // not in discard
+    expect(applyAction(s, { type: "search", iid: "R", foundIids: ["pA", "pB", "pC"] }, ctx)).toBe(s); // >2
+    expect(applyAction(s, { type: "search", iid: "R", foundIids: ["pA", "pA"] }, ctx)).toBe(s); // duplicate
+    expect(applyAction(s, { type: "search", iid: "R", foundIids: [] }, ctx)).toBe(s); // empty
+    const ns = applyAction(s, { type: "search", iid: "R", foundIids: ["pA"] }, ctx); // a single valid pick works
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("pA");
   });
 });
 

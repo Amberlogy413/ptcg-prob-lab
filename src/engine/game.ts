@@ -36,7 +36,7 @@ import {
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf, handPayCombos } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf, handPayCombos, recoverCombos } from "./cards.ts";
 import { canRareCandyJump } from "../data/evolution.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
@@ -220,7 +220,12 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
         // AND — for a discard-cost ball (先機球 1 / 高級球 2) — WHICH hand cards pay the
         // cost. The cross-product is enumerated; handPayCombos returns [[]] for a
         // cost-free search and [] when the hand can't cover the cost (then unplayable).
-        if (spec !== null && !(spec.to === "bench" && me.bench.length >= MAX_BENCH)) {
+        if (spec !== null && spec.pickUpTo !== undefined) {
+          // Multi-pick recovery (救援行李箱 …): every distinct 1..pickUpTo pick of eligible
+          // cards (deduped by name) is one legal action. Offered only when something is eligible.
+          const pool = spec.topN !== undefined ? me[spec.from].slice(0, spec.topN) : me[spec.from];
+          for (const ids of recoverCombos(pool.filter(spec.eligible), spec.pickUpTo)) acts.push({ type: "search", iid: c.iid, foundIids: ids });
+        } else if (spec !== null && !(spec.to === "bench" && me.bench.length >= MAX_BENCH)) {
           const cost = spec.discardCost ?? 0;
           // The payment is enumerated by NAME-representative (handPayCombos): one
           // representative per distinct hand-card name. applyAction accepts ANY
@@ -467,6 +472,22 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       if (card === undefined || card.kind !== "item") return s;
       const spec = searchSpecOf(ctx.resolve(card)?.effect);
       if (spec === null) return s;
+      // Multi-pick recovery (救援行李箱 …): take 1..pickUpTo eligible cards from the pile
+      // → hand. The chosen iids must be distinct, in the (topN-limited) pile, and eligible.
+      if (spec.pickUpTo !== undefined) {
+        const ids = a.foundIids ?? [];
+        if (ids.length < 1 || ids.length > spec.pickUpTo || new Set(ids).size !== ids.length) return s;
+        const mPool = spec.topN !== undefined ? board[spec.from].slice(0, spec.topN) : board[spec.from];
+        const picks = ids.map((id) => mPool.find((c) => c.iid === id));
+        if (picks.some((c) => c === undefined || !spec.eligible(c))) return s;
+        const found = picks as BattleCard[];
+        let ns = discardFromHand(s, me, a.iid); // the played Item → discard
+        const b = ns[me];
+        const pile = b[spec.from].filter((c) => !ids.includes(c.iid));
+        ns = withBoard(ns, me, { ...b, [spec.from]: pile, hand: [...b.hand, ...found] } as PlayerBoard);
+        if (spec.shuffleAfter) ns = shuffleDeck(ns, me);
+        return ns;
+      }
       // A topN reveal can only fetch from the top N cards (a forged pick of a deeper
       // card is a no-op); a whole-pile search sees the full pile.
       const pool = spec.topN !== undefined ? board[spec.from].slice(0, spec.topN) : board[spec.from];

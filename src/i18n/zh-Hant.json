@@ -883,6 +883,7 @@
   "battle.act.searchDeck": "從牌庫揀",
   "battle.act.searchDiscard": "從棄牌揀",
   "battle.act.searchNone": "冇合資格嘅卡",
+  "battle.act.recover": "從棄牌救回",
   "battle.act.searchCost": "棄 {n} 張做代價(已選 {k})→",
   "battle.act.searchCostShort": "手牌唔夠 {n} 張俾代價",
   "battle.act.discard": "棄牌",

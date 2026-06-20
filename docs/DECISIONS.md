@@ -887,3 +887,21 @@
   array 第一個或某個 catalogId 去測(會走漏)。
 - **質量**:tsc 乾淨 · 黃金 27/507 · **501 vitest**(+14:3 topN + 12 真 catalog 解析回歸)· 0 console
   error · 數學零改動 · 實機核實真路徑(超級球 name-only → 最新印 SV1a-065 逗號版 → 偵測到 topN 7)。
+
+## 2026-06-20 — 多選救回(pickUpTo)+ 救援行李箱
+
+- **新機制 `SearchSpec.pickUpTo`**:一次過由 `from` 揀 1..N 張合資格卡 → `to`(目前只做 to:hand)。
+  `recoverCombos(pile, max)` 列舉所有**按卡名去重**嘅 1..N 張組合(同名 ×2 要有 ≥2 張)。search Action
+  嘅 `foundIid` 改成 optional、新增 `foundIids?`;applyAction pickUpTo 分支驗證(1..N、distinct、喺
+  (topN 限制嘅)pile、合資格)→ 搬入手牌,僅 shuffleAfter 先重洗。
+- **建模**:**救援行李箱**(棄牌→揀 ≤2 張 HP「90」以下寶可夢→手牌,不洗)。3 印同一字句、無 kana、
+  無撞文字(出貨前 node 核實 —— 沿用上次「冚齊所有字句」嘅教訓)。混合屬性/類別、放回牌庫嗰啲救回卡
+  (克拉拉/水蓮/釣竿系)係更闊機制,未建模。
+- **對抗式覆核(9 agent)→ 1 個真問題(低,即修)**:救援行李箱救回後,**戰報目標名顯示空白** ——
+  log-label 嗰段只讀 `action.foundIid`(多選帶嘅係 `foundIids`)→ `{who} 用 救援行李箱 搜出 ⟨空⟩`。
+  引擎 state 完全正確、守恆無問題、數學零影響,純係 log 漏報「救咗邊幾隻」。但**忠實交代發生咗咩**
+  係本產品底線,所以即修:log-label 改成兩者都認(有 foundIids 就 map 棄牌區拼名,否則單張),
+  完全照搬隔離 energyRetrieve 嗰段已驗證 pattern。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **506 vitest**(+5:recoverCombos + 救援行李箱 3 + 真 catalog 解析 1)·
+  0 console error · 數學零改動 · 實機核實真路徑(救援行李箱 by name → pickUpTo 2、HP≤90 gate;完整救回 2 隻、
+  HP200 留喺棄牌、不洗、偽造 over-90 = no-op)。

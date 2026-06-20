@@ -883,6 +883,7 @@
   "battle.act.searchDeck": "From deck",
   "battle.act.searchDiscard": "From discard",
   "battle.act.searchNone": "No eligible card",
+  "battle.act.recover": "Recover from discard",
   "battle.act.searchCost": "Discard {n} as cost ({k} picked)→",
   "battle.act.searchCostShort": "Hand too small to pay {n}",
   "battle.act.discard": "Discard",
