@@ -80,6 +80,11 @@ export interface InPlay {
    *  whose effect locks the attacker next turn, e.g. 在下個自己的回合…無法使用招式).
    *  Auto-expires: it only ever blocks the exact turn it names. */
   noAttackTurn?: number;
+  /** Turn on which this Pokémon was Paralyzed by an attack. Paralysis recovers
+   *  AUTOMATICALLY — no coin flip (only Sleep/Confused need one): it clears in the
+   *  Checkup at the END of its owner's next turn, i.e. once `paralyzedTurn` is an
+   *  earlier turn than the one now ending. Set alongside the "paralyzed" status. */
+  paralyzedTurn?: number;
 }
 
 export type SpecialCondition = "poison" | "burn" | "asleep" | "confused" | "paralyzed";
@@ -209,6 +214,8 @@ interface BattleState {
   setDamage: (player: PlayerId, unitId: string, damage: number) => void;
   /** Mark a unit unable to attack on a given turn number (attacker self-lock). */
   markNoAttack: (player: PlayerId, unitId: string, turn: number) => void;
+  /** Record the turn a unit was Paralyzed by an attack (drives auto-recovery). */
+  markParalyzed: (player: PlayerId, unitId: string, turn: number) => void;
   /** Discard specific attached Energy (by iid) from a unit to the discard pile. */
   discardEnergy: (player: PlayerId, unitId: string, iids: string[]) => void;
   /** Toggle a Special Condition on a unit (poison/burn/asleep/confused/paralyzed). */
@@ -579,6 +586,10 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
     set((s) => ({ [player]: mapUnit(s[player], unitId, (u) => ({ ...u, noAttackTurn: turn })) }) as Partial<BattleState>);
   },
 
+  markParalyzed: (player, unitId, turn) => {
+    set((s) => ({ [player]: mapUnit(s[player], unitId, (u) => ({ ...u, paralyzedTurn: turn })) }) as Partial<BattleState>);
+  },
+
   discardEnergy: (player, unitId, iids) => {
     set((s) => {
       const ids = new Set(iids);
@@ -689,12 +700,24 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
   endTurn: () => {
     set((s) => {
       // Pokémon Checkup between turns: each Active takes its deterministic
-      // Special-Condition damage — Poisoned +10, Burned +20. (Sleep/Confused/
-      // Paralyzed recovery needs a coin flip → left to the player, honest.)
+      // Special-Condition damage — Poisoned +10, Burned +20. (Sleep/Confused
+      // recovery needs a COIN FLIP → left to the player to toggle, honest; this
+      // permissive sandbox does not auto-resolve those.)
       const checkup = (b: PlayerBoard): PlayerBoard => {
         if (b.active === null) return b;
         const extra = (b.active.status.includes("poison") ? 10 : 0) + (b.active.status.includes("burn") ? 20 : 0);
         return extra === 0 ? b : { ...b, active: { ...b.active, damage: b.active.damage + extra } };
+      };
+      // Paralysis recovers AUTOMATICALLY (no coin flip): a Pokémon Paralyzed by an
+      // attack stays Paralyzed through its owner's next turn, then clears in the
+      // Checkup at the END of that turn. So recover only the player whose turn is
+      // ending (s.current), and only paralysis applied on an EARLIER turn — one
+      // inflicted this very turn must survive into its owner's upcoming turn.
+      const recoverParalysis = (b: PlayerBoard): PlayerBoard => {
+        const a = b.active;
+        if (a === null || !a.status.includes("paralyzed")) return b;
+        if (a.paralyzedTurn === undefined || a.paralyzedTurn >= s.turn) return b;
+        return { ...b, active: { ...a, status: a.status.filter((c) => c !== "paralyzed") } };
       };
       const next: PlayerId = s.current === "p1" ? "p2" : "p1";
       // Start-of-turn draw for the incoming player (PTCG Live auto-draws; a real
@@ -704,6 +727,9 @@ export const useBattleStore = create<BattleState>()((set, get) => ({
         b.deck.length > 0 ? { ...b, hand: [...b.hand, b.deck[0]!], deck: b.deck.slice(1) } : b;
       let p1n = checkup(s.p1);
       let p2n = checkup(s.p2);
+      // Auto-recover Paralysis on the Active of the player whose turn just ended.
+      if (s.current === "p1") p1n = recoverParalysis(p1n);
+      else p2n = recoverParalysis(p2n);
       if (next === "p1") p1n = drawTop(p1n);
       else p2n = drawTop(p2n);
       return {

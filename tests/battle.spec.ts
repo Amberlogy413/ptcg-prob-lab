@@ -240,6 +240,37 @@ describe("special conditions + between-turns checkup (P3)", () => {
     useBattleStore.getState().evolve("p1", "drakloak", id);
     expect(useBattleStore.getState().p1.active!.status).toEqual([]);
   });
+
+  it("auto-clears Paralysis on the Active of the player whose turn ends (no coin flip)", () => {
+    useBattleStore.setState({
+      started: true,
+      turn: 3,
+      current: "p1",
+      firstPlayer: "p2",
+      // p1 was Paralyzed on turn 2; ending p1's own turn (3) clears it in the Checkup.
+      p1: { ...emptyBoard(), active: { ...unit(bc("pika", "basic", { hp: 120 })), status: ["paralyzed" as const], paralyzedTurn: 2 } },
+      p2: { ...emptyBoard(), active: unit(bc("foe", "basic", { hp: 120 })) },
+    });
+    useBattleStore.getState().endTurn();
+    const { p1, current } = useBattleStore.getState();
+    expect(current).toBe("p2");
+    expect(p1.active!.status).not.toContain("paralyzed");
+  });
+
+  it("keeps Paralysis inflicted THIS turn (recovery is only after the owner's own turn)", () => {
+    useBattleStore.setState({
+      started: true,
+      turn: 3,
+      current: "p1",
+      firstPlayer: "p2",
+      // p1 just Paralyzed p2's Active this turn (paralyzedTurn 3) → it must persist
+      // into p2's upcoming turn, not vanish in p1's own turn-end Checkup.
+      p1: { ...emptyBoard(), active: unit(bc("pika", "basic", { hp: 120 })) },
+      p2: { ...emptyBoard(), active: { ...unit(bc("foe", "basic", { hp: 120 })), status: ["paralyzed" as const], paralyzedTurn: 3 } },
+    });
+    useBattleStore.getState().endTurn();
+    expect(useBattleStore.getState().p2.active!.status).toContain("paralyzed");
+  });
 });
 
 describe("per-turn limits (review fix)", () => {

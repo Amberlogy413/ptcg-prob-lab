@@ -821,3 +821,21 @@
   唔會係 2 階,所以階級 gating 下 `from(from())` 永遠落喺正確嘅 TCG 基礎。
 - **質量**:tsc 乾淨 · 黃金 27/507 · 445 vitest(+13:evolution.spec 10、引擎 rareCandy 3)·
   0 console error · 數學零改動。
+
+## 2026-06-20 — 麻痺自動恢復(對抗式覆核 Bug 4)
+
+- **問題(對抗式覆核確認)**:受攻擊麻痺後,引擎**永不解除**麻痺 —— `endTurnTransition`
+  嘅 Checkup 只結算毒/燒傷害,從無清麻痺,令防守方在嚴格引擎裡**永久**唔能夠攻擊/撤退。
+  (沙盤本身對狀態採寬鬆態度、唔強制封鎖,故只係狀態 chip 永不消失,非「卡死」;但戰報失實。)
+- **真實規則**:麻痺**自動恢復、無需擲幣**(只有睡眠/混亂恢復先要擲幣)。受招麻痺會經過其
+  擁有者**下一個自己的回合**,然後喺該回合結束嘅 Checkup 解除。
+- **做法**:InPlay 新增 `paralyzedTurn?`(類比 `noAttackTurn`)。引擎 `attack` 上麻痺時
+  同時 stamp `paralyzedTurn = s.turn`;`endTurnTransition` 嘅 Checkup 只對**回合結束嗰位
+  玩家(s.current)**嘅 Active 解麻痺,且僅當 `paralyzedTurn < s.turn`(本回合先上嘅麻痺要
+  留到擁有者自己回合)。沙盤 `endTurn` 鏡像同一邏輯;bot 與 UI 上麻痺時呼叫新 store op
+  `markParalyzed` 種下標記,令沙盤側 chip 亦會喺一個輪迴後忠實清除。
+- **同時修正**:battleStore `endTurn` 一段**失實註解**(舊文把麻痺同睡眠/混亂一齊講成「需擲幣
+  恢復」)—— 改為如實:麻痺自動恢復、無擲幣;只有睡眠/混亂恢復擲幣留俾玩家手動。睡眠/混亂仍
+  屬已揭示嘅擲幣缺口。
+- **質量**:tsc 乾淨 · 黃金 27/507 · 476 vitest(+4:引擎麻痺恢復 2、沙盤 Checkup 2)·
+  0 console error · 數學零改動 · 實機核對沙盤 endTurn 麻痺(過一回合自動清、本回合上嘅保留)。

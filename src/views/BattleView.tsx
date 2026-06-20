@@ -726,6 +726,7 @@ export function BattleView() {
         s.takePrize(me, prizes);
       } else if (cond !== null && !oppActive.status.includes(cond)) {
         s.toggleStatus(oppId, oppActive.uid, cond);
+        if (cond === "paralyzed") s.markParalyzed(oppId, oppActive.uid, turn); // auto-recovers after the defender's next turn
       }
       if (defLock) s.markNoAttack(oppId, oppActive.uid, turn + 1); // opponent's next turn
       if (benchTgt !== undefined && benchN > 0) {

@@ -261,11 +261,25 @@ function endTurnTransition(s: GameState): GameState {
     const extra = (b.active.status.includes("poison") ? 10 : 0) + (b.active.status.includes("burn") ? 20 : 0);
     return extra === 0 ? b : { ...b, active: { ...b.active, damage: b.active.damage + extra } };
   };
+  // Paralysis recovers automatically (no coin flip): a Pokémon Paralyzed during
+  // the opponent's turn stays Paralyzed through its OWNER's next turn, then clears
+  // in the Checkup at the end of that turn. Recover only the player whose turn is
+  // ending (s.current), and only paralysis applied on an EARLIER turn — a defender
+  // paralyzed THIS turn must keep it through its own upcoming turn. (A stale
+  // paralyzedTurn left after recovery is inert: the guard requires the status too.)
+  const recoverParalysis = (b: PlayerBoard): PlayerBoard => {
+    const a = b.active;
+    if (a === null || !a.status.includes("paralyzed")) return b;
+    if (a.paralyzedTurn === undefined || a.paralyzedTurn >= s.turn) return b;
+    return { ...b, active: { ...a, status: a.status.filter((c) => c !== "paralyzed") } };
+  };
   const next = other(s.current);
   const drawTop = (b: PlayerBoard): PlayerBoard =>
     b.deck.length > 0 ? { ...b, hand: [...b.hand, b.deck[0]!], deck: b.deck.slice(1) } : b;
   let p1n = checkup(s.p1);
   let p2n = checkup(s.p2);
+  if (s.current === "p1") p1n = recoverParalysis(p1n);
+  else p2n = recoverParalysis(p2n);
   // The incoming player makes their mandatory start-of-turn draw; an empty deck
   // at that moment is a LOSS (real rule). The engine ENFORCES it via deckedOut.
   const incoming = next === "p1" ? p1n : p2n;
@@ -491,9 +505,17 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       } else {
         // Surviving defender: apply an unconditional attack-inflicted Special
         // Condition (poison/burn/etc.); the upcoming checkup ticks poison/burn.
+        // Paralysis also stamps `paralyzedTurn` so it auto-recovers after the
+        // defender's next turn (endTurnTransition) rather than locking forever.
         const cond = inflictedStatus(atk.effect);
         if (cond !== null) {
-          ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
+          ns = withBoard(
+            ns,
+            oppId,
+            mapUnit(ns[oppId], defenderUid, (u) =>
+              u.status.includes(cond) ? u : { ...u, status: [...u.status, cond], ...(cond === "paralyzed" ? { paralyzedTurn: s.turn } : {}) },
+            ),
+          );
         }
         // Defender-lock: the (surviving) defender can't attack on the opponent's next
         // turn (s.turn + 1), if the effect's type qualifier matches this defender.

@@ -136,9 +136,12 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
           push("battle.log.koTake", undefined, { n: prizes });
         } else {
           // Surviving defender: apply an unconditional attack-inflicted condition.
+          // Paralysis also stamps the turn so it auto-recovers after the defender's
+          // next turn (store Checkup) rather than persisting forever.
           const cond = inflictedStatus(best.effect);
           if (cond !== null && !oppActive.status.includes(cond)) {
             st().toggleStatus(opp, oppActive.uid, cond);
+            if (cond === "paralyzed") st().markParalyzed(opp, oppActive.uid, s.turn);
             push("battle.log.inflict", undefined, { cond });
           }
           // Defender-lock: the surviving defender can't attack on the opponent's next turn.

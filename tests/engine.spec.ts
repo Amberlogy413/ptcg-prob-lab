@@ -270,6 +270,65 @@ describe("attack", () => {
     expect(ns.p2.active?.status ?? []).not.toContain("poison");
   });
 
+  it("attack-inflicted Paralysis auto-recovers after the defender's next turn (not before, not forever)", () => {
+    const ctxP: EngineCtx = {
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Stunner"
+          ? ({ name: "Stunner", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Stun", cost: ["Lightning"], damage: 30, effect: "將對手的戰鬥寶可夢【麻痺】。" }] } as CatalogCard)
+          : ({ name: "Defender", category: "Pokemon", types: ["Colorless"], attacks: [{ name: "Tackle", cost: ["Colorless"], damage: 10 }] } as CatalogCard),
+      autoKey: (c) => c.name,
+    };
+    const deck5 = (p: string) => new Array(5).fill(0).map((_, i) => card(`${p}d${i}`, "basic"));
+    const attacker = { uid: "atk", card: card("Stunner", "basic", { hp: 70, name: "Stunner" }), under: [], energy: [card("le", "energy-basic", { name: "Lightning Energy" })], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const defender = { uid: "def", card: card("Defender", "basic", { hp: 200, name: "Defender" }), under: [], energy: [card("ge", "energy-basic", { name: "Grass Energy" })], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const s = baseState({
+      turn: 2,
+      current: "p1",
+      p1: { ...pb(), active: attacker, deck: deck5("a") },
+      p2: { ...pb(), active: defender, deck: deck5("b") },
+    });
+    // p1 attacks → the 200-HP Defender SURVIVES and is Paralyzed, stamped this turn.
+    const t2 = applyAction(s, { type: "attack", index: 0 }, ctxP);
+    expect(t2.p2.active?.status).toContain("paralyzed");
+    expect(t2.p2.active?.paralyzedTurn).toBe(2);
+    expect(t2.current).toBe("p2");
+    // p2's turn: the Paralyzed Active can neither attack nor retreat — even though
+    // it CAN pay for Tackle, so paralysis (not Energy) is what blocks it.
+    expect(find(legalActions(t2, ctxP), "attack").length).toBe(0);
+    // p2 ends its turn → the Checkup auto-clears Paralysis (no coin flip, faithful).
+    const t3 = applyAction(t2, { type: "endTurn" }, ctxP);
+    expect(t3.current).toBe("p1");
+    expect(t3.p2.active?.status ?? []).not.toContain("paralyzed");
+    // and on p2's NEXT turn the attack is legal again (it really recovered).
+    const t4 = applyAction(t3, { type: "endTurn" }, ctxP); // p1 ends turn 4 → p2's turn 5
+    expect(t4.current).toBe("p2");
+    expect(find(legalActions(t4, ctxP), "attack").length).toBeGreaterThan(0);
+  });
+
+  it("a defender Paralyzed THIS turn keeps it through the attacker's own turn-end Checkup", () => {
+    const ctxP: EngineCtx = {
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Stunner"
+          ? ({ name: "Stunner", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Stun", cost: ["Lightning"], damage: 30, effect: "將對手的戰鬥寶可夢【麻痺】。" }] } as CatalogCard)
+          : ({ name: c.name, category: "Pokemon" } as CatalogCard),
+      autoKey: (c) => c.name,
+    };
+    const attacker = { uid: "atk", card: card("Stunner", "basic", { hp: 70, name: "Stunner" }), under: [], energy: [card("le", "energy-basic", { name: "Lightning Energy" })], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const defender = { uid: "def", card: card("Snorlax", "basic", { hp: 200, name: "Snorlax" }), under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [] };
+    const s = baseState({
+      turn: 2,
+      current: "p1",
+      p1: { ...pb(), active: attacker, deck: new Array(3).fill(0).map((_, i) => card(`d${i}`, "basic")) },
+      p2: { ...pb(), active: defender, deck: new Array(3).fill(0).map((_, i) => card(`e${i}`, "basic")) },
+    });
+    // The attack ends p1's turn (its checkup runs immediately) — the just-applied
+    // paralysis must NOT clear in that same checkup (recovery is the OWNER's turn).
+    const t2 = applyAction(s, { type: "attack", index: 0 }, ctxP);
+    expect(t2.p2.active?.status).toContain("paralyzed");
+  });
+
   it("taking the last Prize wins the game (no turn pass)", () => {
     const s = baseState({
       p1: { ...pb(), active: { uid: "atk", card: card("Pikachu", "basic", { hp: 70, name: "Pikachu" }), under: [], energy: [card("le", "energy-basic", { name: "Lightning Energy" })], tools: [], damage: 0, playedTurn: 1, status: [] }, prizes: [card("last", "basic")] },
