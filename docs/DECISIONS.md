@@ -839,3 +839,29 @@
   屬已揭示嘅擲幣缺口。
 - **質量**:tsc 乾淨 · 黃金 27/507 · 476 vitest(+4:引擎麻痺恢復 2、沙盤 Checkup 2)·
   0 console error · 數學零改動 · 實機核對沙盤 endTurn 麻痺(過一回合自動清、本回合上嘅保留)。
+
+## 2026-06-20 — 搜尋球家族(等級球/先機球/高級球)+ 新「棄手牌做代價」機制
+
+- **掃描定方向**:用 Workflow 並行掃真 catalog(6 卡效家族 + 最高用率完整性檢查)。誠實發現:
+  catalog `usage` 欄好疏(得 8 隻訓練家有用率,6 隻已建模),per-family scout 冇漏低用率卡。
+- **揀咗**:三隻搜尋球 —— **等級球**(免代價、牌庫搵 HP≤90 寶可夢)、**先機球**(棄 1 搵基礎)、
+  **高級球**(棄 2 搵任何寶可夢)。引入新**棄手牌做代價**機制:`SearchSpec.discardCost`,代價=抉擇
+  (`handPayCombos` 按卡名去重列舉,絕不自動付),引擎一個 action 原子驗證代價→棄→搜尋。HP≤90
+  靠 BattleCard.hp,HP 未知者**不合資格**(絕不假設)。UI 新 `DiscardCostSearch` 兩步揀牌器。
+- **對抗式覆核(14 agent,3 維度 × 反駁驗證)→ 4 個確認 bug,全部即修**:
+  1. **(中)**免代價搜尋收到偽造 `discardIids` 會無驗證咁棄手牌 —— 違反「非法 action 必須 no-op」。
+     修:`payIds` gate 喺 `cost>0`;cost-0 帶 discardIids 一律 no-op。
+  2. **(低)**引擎 fetch 側未按卡名去重(付費側同 UI 都有去重)→ action mask 脹大 ~4×、同 UI 唔對齊。
+     修:legalActions fetch 側按 `found.name` 去重(惠及所有搜尋,同引擎「去重縮小空間」慣例一致)。
+  3. **(低)**legalActions 付費列舉係**按名代表**、非窮舉;applyAction 接受任何等價付費 → UI 可玩
+     出唔喺 legalActions 嘅付費。修:喺 legalActions 註解講清楚(代表而非窮舉,RL 消費者勿假設窮舉)。
+  4. **(中,誠實關鍵)**我之前叫**超級球**效果「corrupt」係**錯判**。真相:catalog nameEn 對
+     高級球/超級球**對調**咗 —— 高級球 nameJa ハイパーボール = 英文 **Ultra Ball**(棄 2 搵任何寶可夢,
+     效果真實正確);超級球 = スーパーボール = 英文 **Great Ball**,「看上方 7 張」係佢**真實正確**效果。
+     更正:cards.ts 註解/COVERAGE 唔再叫超級球 corrupt;高級球唔再標 EN「Great Ball」。超級球暫不建模
+     嘅真因 = 「看上方 N 張」係**位置揭示**機制(合資格=上 7 張),同全牌庫搜尋框架唔同(框架缺口,
+     非數據錯)。nameEn 對調係 display-only catalog bug,已開背景 task 喺名稱 pipeline 修。
+  - **教訓**:唔好憑英文名假設(超/ultra)就斷定真數據係錯;查 nameJa/效果先。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **484 vitest**(+8:6 球測試 + 2 覆核修正回歸)· 0 console error ·
+  數學零改動 · 實機核實真 catalog 偵測(先機球 cost1/高級球 cost2/等級球 免費/超級球正確不偵測)+
+  經 store/bridge 完整付代價搜尋 + 偽造 cost-0 no-op + fetch 去重。

@@ -170,11 +170,20 @@ export interface SearchSpec {
   eligible: (card: BattleCard) => boolean;
   /** Deck searches reshuffle (keeps the exact-odds HUD uniform). */
   shuffleAfter: boolean;
+  /** Cards that MUST be discarded from hand as a cost to play this search Item
+   *  (先機球 / Quick Ball discards 1, 高級球 / Great Ball discards 2). 0/undefined =
+   *  no cost. WHICH cards to pitch is a real player choice → enumerated as part of
+   *  the action (handPayCombos), never auto-paid (real-data-only mandate). */
+  discardCost?: number;
 }
 
 const isBasicPokemon = (c: BattleCard): boolean => c.kind === "basic";
 const isPokemon = (c: BattleCard): boolean => c.section === "pokemon";
 const isEvolution = (c: BattleCard): boolean => c.kind === "evolution"; // any non-Basic Pokémon (Stage 1/2)
+/** A Pokémon whose printed HP is ≤ `max` (等級球 / Level Ball gates on HP ≤ 90). HP
+ *  rides on the BattleCard (set from the catalog); a card with NO known HP is NOT
+ *  eligible — we never assume an unverified HP (honest). */
+const isPokemonHpAtMost = (max: number) => (c: BattleCard): boolean => isPokemon(c) && c.hp !== undefined && c.hp <= max;
 /** A "basic Energy" — identified by its NAME (the standard type Energies), NOT by
  *  `kind` or catalog `energyType`, both of which are unreliable (verified
  *  2026-06-19): a catalog-absent special Energy from a newest set falls through to
@@ -185,10 +194,26 @@ const isEvolution = (c: BattleCard): boolean => c.kind === "evolution"; // any n
 const isBasicEnergy = (c: BattleCard): boolean => energyProvides(c) !== null;
 
 /** Modeled single-pick search Items, keyed by exact (normalised) catalog effect.
- *  Verified 2026-06-18 in public/catalog/cards-zh-Hant.json. NOTE: 超級球 / Ultra
- *  Ball is deliberately NOT modeled — its catalog effect text is anomalous
- *  (reads "look at the top 7", which is not Ultra Ball's rule), so we do not
- *  faithfully reproduce data we believe is wrong (flagged for a data fix). */
+ *  Verified 2026-06-18 in public/catalog/cards-zh-Hant.json.
+ *
+ *  NOTE on the "ball" English names (corrected 2026-06-20): the catalog's nameEn
+ *  glosses for 高級球 and 超級球 are SWAPPED vs. the real cards. 高級球 carries
+ *  nameJa ハイパーボール = the card English-named ULTRA BALL (discard 2 → search any
+ *  Pokémon) — so its discard-2 effect is genuine; the catalog's nameEn "Great Ball"
+ *  is a mis-gloss. 超級球 = スーパーボール = English GREAT BALL (look at the top 7 →
+ *  choose a Pokémon); that "top 7" effect is its REAL effect, NOT corrupt — our
+ *  earlier "corrupt" label was wrong. We model 高級球 (its effect IS a plain
+ *  discard-cost full-deck search). We do NOT yet model 超級球 because a positional
+ *  "look at the top N" REVEAL is a different mechanic than a full-pile search
+ *  (the eligible set is the top 7, not the whole deck) — an honest framework gap,
+ *  not a data error. Both nameEn mis-glosses are flagged for a catalog fix. */
+// Shared specs for the cards that carry TWO equally-valid wordings (a catalog
+// quirk: a single ASCII space after the first 。). Defined once, referenced by
+// both variant strings, so the spec object stays identical.
+const QUICK_BALL_SPEC: SearchSpec = { from: "deck", to: "hand", eligible: isBasicPokemon, shuffleAfter: true, discardCost: 1 };
+// 高級球 — discard 2 → search any Pokémon (the card English-named Ultra Ball; see NOTE above).
+const HIGH_BALL_SPEC: SearchSpec = { from: "deck", to: "hand", eligible: isPokemon, shuffleAfter: true, discardCost: 2 };
+
 const SEARCH_BY_EFFECT: Array<{ effect: string; spec: SearchSpec }> = [
   // 巢穴球 (Nest Ball): deck → a Basic Pokémon → Bench, shuffle.
   { effect: "從自己的牌庫選擇1張【基礎】寶可夢卡，放置於備戰區。並且重洗牌庫", spec: { from: "deck", to: "bench", eligible: isBasicPokemon, shuffleAfter: true } },
@@ -200,12 +225,55 @@ const SEARCH_BY_EFFECT: Array<{ effect: string; spec: SearchSpec }> = [
   { effect: "從自己的牌庫選擇1張基本能量卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isBasicEnergy, shuffleAfter: true } },
   // 進化薰香 (Evolution Incense): deck → an Evolution Pokémon (Stage 1/2) → hand, shuffle. (Verified 2026-06-19.)
   { effect: "從自己的牌庫選擇1張進化寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isEvolution, shuffleAfter: true } },
+  // 等級球 (Level Ball): deck → a Pokémon with HP ≤ 90 → hand, shuffle (no cost). (Verified 2026-06-20.)
+  { effect: "從自己的牌庫選擇1張HP為「90」以下的寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: { from: "deck", to: "hand", eligible: isPokemonHpAtMost(90), shuffleAfter: true } },
+  // 先機球 (Quick Ball): discard 1 from hand → deck → a Basic Pokémon → hand, shuffle. (Verified 2026-06-20; both wordings.)
+  { effect: "這張卡必須將自己的1張手牌丟棄才可使用。 從自己的牌庫選擇1張【基礎】寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: QUICK_BALL_SPEC },
+  { effect: "這張卡必須將自己的1張手牌丟棄才可使用。從自己的牌庫選擇1張【基礎】寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: QUICK_BALL_SPEC },
+  // 高級球 (nameJa ハイパーボール = English Ultra Ball): discard 2 from hand → deck → any Pokémon → hand, shuffle. (Verified 2026-06-20; both wordings.)
+  { effect: "這張卡必須將自己的2張手牌丟棄才可使用。 從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: HIGH_BALL_SPEC },
+  { effect: "這張卡必須將自己的2張手牌丟棄才可使用。從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫", spec: HIGH_BALL_SPEC },
 ];
 
 /** The search spec for this card's effect text, or null if it isn't a modeled search. */
 export function searchSpecOf(effect: string | undefined): SearchSpec | null {
   const n = normEffect(effect);
   return SEARCH_BY_EFFECT.find((e) => e.effect === n)?.spec ?? null;
+}
+
+/** The distinct ways to pay an N-card hand-discard COST (先機球 / 高級球), as arrays
+ *  of `n` iids drawn from `hand` EXCLUDING the played Item (`excludeIid`). Deduped by
+ *  card NAME (pitching one copy of a 4-of is the same choice as pitching another), so
+ *  the action space stays small. Empty when the hand can't cover the cost — the card
+ *  is then unplayable (honest: the cost is mandatory). Shared by the engine's action
+ *  space AND the UI picker so both offer exactly the same payments. */
+export function handPayCombos(hand: BattleCard[], excludeIid: string, n: number): string[][] {
+  if (n <= 0) return [[]];
+  const payable = hand.filter((c) => c.iid !== excludeIid);
+  if (payable.length < n) return [];
+  // Group by name; keep ids in hand order. A payment is a multiset over names.
+  const byName = new Map<string, string[]>();
+  for (const c of payable) {
+    const arr = byName.get(c.name);
+    if (arr) arr.push(c.iid);
+    else byName.set(c.name, [c.iid]);
+  }
+  const names = [...byName.keys()];
+  const combos: string[][] = [];
+  // Choose `remaining` cards as a multiset over names: for each name take 0..min(avail,remaining).
+  const rec = (start: number, chosen: string[], remaining: number): void => {
+    if (remaining === 0) {
+      combos.push(chosen);
+      return;
+    }
+    for (let i = start; i < names.length; i++) {
+      const ids = byName.get(names[i]!)!;
+      const max = Math.min(ids.length, remaining);
+      for (let cnt = 1; cnt <= max; cnt++) rec(i + 1, [...chosen, ...ids.slice(0, cnt)], remaining - cnt);
+    }
+  };
+  rec(0, [], n);
+  return combos;
 }
 
 /**
@@ -227,13 +295,16 @@ export const COVERAGE = {
     "能量回收 / Energy Retrieval (take up to 2 basic Energy from your discard → hand)",
     "能量輸送 / Energy Search (deck → choose a basic Energy → hand, shuffle)",
     "進化薰香 / Evolution Incense (deck → choose an Evolution Pokémon → hand, shuffle)",
+    "等級球 / Level Ball (deck → choose a Pokémon with HP ≤ 90 → hand, shuffle)",
+    "先機球 / Quick Ball (discard 1 from hand → deck → choose a Basic Pokémon → hand, shuffle)",
+    "高級球 (discard 2 from hand → deck → choose any Pokémon → hand, shuffle; nameJa ハイパーボール = the card English-named Ultra Ball — the catalog's nameEn 'Great Ball' is a mis-gloss, flagged for a data fix)",
     "神奇糖果 / Rare Candy (jump-evolve a Basic in play → a Stage 2 from hand; legality via real PokéAPI evolution-chain data, see src/data/evolution.ts)",
   ],
   /** Item active effects modeled (the choice is part of the action space). */
-  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense", "神奇糖果 / Rare Candy"],
-  /** Known NOT modeled despite high usage, with the honest reason. */
+  items: ["寶可夢交替 / Switch", "巢穴球 / Nest Ball", "大師球 / Master Ball", "夜間擔架 / Night Stretcher", "能量轉移 / Energy Switch", "能量回收 / Energy Retrieval", "能量輸送 / Energy Search", "進化薰香 / Evolution Incense", "等級球 / Level Ball", "先機球 / Quick Ball", "高級球 (= EN Ultra Ball, discard 2 → any Pokémon)", "神奇糖果 / Rare Candy"],
+  /** Known NOT modeled, with the honest reason. */
   unmodeledKnown: [
-    "超級球 / Ultra Ball (catalog effect text looks wrong — flagged for a data fix)",
+    "超級球 (= スーパーボール / English GREAT BALL; the catalog's nameEn 'Ultra Ball' is a mis-gloss): its effect is 'look at the top 7 cards, choose a Pokémon' — its REAL effect, NOT corrupt (an earlier note wrongly called it corrupt). NOT modeled because a positional top-N REVEAL is a different mechanic than a full-pile search (eligible = the top 7, not the whole deck) — a framework gap, not a data error. High real usage (~84%), so a strong next candidate once a top-N reveal is supported. The nameEn mis-gloss is flagged for a catalog fix",
   ],
   /** Pokémon Abilities: none modeled yet (most are triggered/optional choices). */
   abilities: [] as string[],

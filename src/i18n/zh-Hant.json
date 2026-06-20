@@ -883,6 +883,8 @@
   "battle.act.searchDeck": "從牌庫揀",
   "battle.act.searchDiscard": "從棄牌揀",
   "battle.act.searchNone": "冇合資格嘅卡",
+  "battle.act.searchCost": "棄 {n} 張做代價(已選 {k})→",
+  "battle.act.searchCostShort": "手牌唔夠 {n} 張俾代價",
   "battle.act.discard": "棄牌",
   "battle.act.toDeck": "洗入牌庫",
   "battle.act.needTarget": "場上未有寶可夢可指定。",

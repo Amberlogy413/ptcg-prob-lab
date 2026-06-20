@@ -883,6 +883,8 @@
   "battle.act.searchDeck": "From deck",
   "battle.act.searchDiscard": "From discard",
   "battle.act.searchNone": "No eligible card",
+  "battle.act.searchCost": "Discard {n} as cost ({k} picked)→",
+  "battle.act.searchCostShort": "Hand too small to pay {n}",
   "battle.act.discard": "Discard",
   "battle.act.toDeck": "Shuffle into deck",
   "battle.act.needTarget": "No Pokémon in play to target.",

@@ -418,8 +418,9 @@ export function BattleView() {
           if (!engineStep({ type: "playSwitch", iid: card.iid, benchUid: action.benchUid }, catalog)) setMsg(t("battle.field.noActive"));
           break;
         case "search":
-          // Nest/Master Ball, Night Stretcher — resolved by the engine.
-          if (!engineStep({ type: "search", iid: card.iid, foundIid: action.foundIid }, catalog)) setMsg(t("battle.field.benchFull"));
+          // Nest/Master/Level/Quick/Great Ball, Night Stretcher — resolved by the engine
+          // (the discard cost for 先機球/高級球 rides on discardIids).
+          if (!engineStep({ type: "search", iid: card.iid, foundIid: action.foundIid, ...(action.discardIids !== undefined ? { discardIids: action.discardIids } : {}) }, catalog)) setMsg(t("battle.field.benchFull"));
           break;
         case "energySwitch":
           // Energy Switch — resolved by the engine (single rules source).
@@ -1055,7 +1056,7 @@ type PlayAction =
   | { type: "item" }
   | { type: "gust"; targetUid: string } // Boss's Orders → opponent bench Pokémon
   | { type: "switch"; benchUid: string } // Switch → own bench Pokémon
-  | { type: "search"; foundIid: string } // Nest/Master Ball, Night Stretcher → pick from a pile
+  | { type: "search"; foundIid: string; discardIids?: string[] } // Nest/Master/Level/Quick/Great Ball, Night Stretcher → pick from a pile (+ optional discard cost)
   | { type: "energySwitch"; fromUid: string; energyIid: string; toUid: string } // Energy Switch → move a basic Energy between your Pokémon
   | { type: "energyRetrieve"; foundIids: string[] } // Energy Retrieval → take up to 2 basic Energy from discard
   | { type: "rareCandy"; basicUid: string; s2Iid: string } // Rare Candy → jump-evolve a Basic into a Stage 2
@@ -1805,9 +1806,9 @@ function HandActions({
           })()}
         </>
       )}
-      {card.kind === "item" && fx !== "switch" && search !== null && (
+      {card.kind === "item" && fx !== "switch" && search !== null && (search.discardCost ?? 0) === 0 && (
         <>
-          {/* Search Item — choose which eligible card to pull from the pile (engine). */}
+          {/* Cost-free search Item — choose which eligible card to pull from the pile (engine). */}
           <span className="text-[11px] text-ink2">{t(search.from === "deck" ? "battle.act.searchDeck" : "battle.act.searchDiscard")}→</span>
           {(() => {
             const seen = new Set<string>();
@@ -1830,6 +1831,9 @@ function HandActions({
           })()}
         </>
       )}
+      {card.kind === "item" && fx !== "switch" && search !== null && (search.discardCost ?? 0) > 0 && (
+        <DiscardCostSearch card={card} board={board} search={search} resolveName={resolveName} onPlay={onPlay} btn={btn} sub={sub} t={t} />
+      )}
       {card.kind === "item" && fx === null && search === null && (
         <button type="button" onClick={() => onPlay(card, { type: "item" })} className={btn}>{t("battle.act.useItem")}</button>
       )}
@@ -1837,6 +1841,74 @@ function HandActions({
       <button type="button" onClick={() => onPlay(card, { type: "discard" })} className={sub}>{t("battle.act.discard")}</button>
       <button type="button" onClick={() => onPlay(card, { type: "toPile", pile: "deck" })} className={sub}>{t("battle.act.toDeck")}</button>
     </span>
+  );
+}
+
+/** Discard-cost deck search (先機球 / Quick Ball discards 1, 高級球 / Great Ball discards
+ *  2): tick the cost-many hand cards to pitch, then pick which eligible Pokémon to
+ *  fetch. The engine validates the payment, discards it, and searches in ONE atomic
+ *  action — so the cost and the fetch resolve together (faithful, never auto-paid). */
+function DiscardCostSearch({
+  card, board, search, resolveName, onPlay, btn, sub, t,
+}: {
+  card: BattleCard;
+  board: PlayerBoard;
+  search: SearchSpec;
+  resolveName: (c: BattleCard) => string;
+  onPlay: (card: BattleCard, action: PlayAction) => void;
+  btn: string;
+  sub: string;
+  t: Tr;
+}) {
+  const cost = search.discardCost ?? 0;
+  const [picked, setPicked] = useState<string[]>([]);
+  const payable = board.hand.filter((c) => c.iid !== card.iid); // can't pay with the Item itself
+  const seen = new Set<string>();
+  const fetches = board[search.from].filter(search.eligible).filter((c) => {
+    const n = resolveName(c);
+    if (seen.has(n)) return false; // dedupe by name — any instance is equivalent
+    seen.add(n);
+    return true;
+  });
+  if (payable.length < cost) return <span className="text-[11px] text-warn">{t("battle.act.searchCostShort", { n: cost })}</span>;
+  const ready = picked.length === cost;
+  const toggle = (iid: string) =>
+    setPicked((p) => (p.includes(iid) ? p.filter((x) => x !== iid) : p.length < cost ? [...p, iid] : p));
+  return (
+    <>
+      {/* Step 1 — tick exactly `cost` hand cards to discard as the play cost. */}
+      <span className="text-[11px] text-ink2">{t("battle.act.searchCost", { n: cost, k: picked.length })}</span>
+      <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+        {payable.map((c) => {
+          const on = picked.includes(c.iid);
+          return (
+            <button key={c.iid} type="button" onClick={() => toggle(c.iid)} className={on ? btn + " bg-blue/10" : sub} title={resolveName(c)}>
+              {on ? "✓ " : ""}{resolveName(c)}
+            </button>
+          );
+        })}
+      </span>
+      {/* Step 2 — pick which eligible Pokémon to fetch (enabled once the cost is paid). */}
+      <span className="text-[11px] text-ink2">{t(search.from === "deck" ? "battle.act.searchDeck" : "battle.act.searchDiscard")}→</span>
+      {fetches.length === 0 ? (
+        <span className="text-[11px] text-ink2">{t("battle.act.searchNone")}</span>
+      ) : (
+        <span className="flex max-h-24 flex-wrap gap-0.5 overflow-y-auto">
+          {fetches.map((c) => (
+            <button
+              key={c.iid}
+              type="button"
+              disabled={!ready}
+              onClick={() => { onPlay(card, { type: "search", foundIid: c.iid, discardIids: picked }); setPicked([]); }}
+              className={btn + (ready ? "" : " opacity-40")}
+              title={resolveName(c)}
+            >
+              {resolveName(c)}
+            </button>
+          ))}
+        </span>
+      )}
+    </>
   );
 }
 

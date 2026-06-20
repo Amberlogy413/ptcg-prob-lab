@@ -36,7 +36,7 @@ import {
   takePrize,
   setup,
 } from "./ops.ts";
-import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf } from "./cards.ts";
+import { SUPPORTER_EFFECTS, isModeledSupporter, isGustEffect, isSwitchEffect, isEnergySwitchEffect, isEnergyRetrieveEffect, isRareCandyEffect, energyRetrieveCombos, searchSpecOf, handPayCombos } from "./cards.ts";
 import { canRareCandyJump } from "../data/evolution.ts";
 import type { Action, BattleCard, CardSpec, EngineCtx, GameState, InPlay, PlayerBoard, PlayerId } from "./types.ts";
 
@@ -216,9 +216,27 @@ export function legalActions(s: GameState, ctx: EngineCtx): Action[] {
         }
       } else {
         const spec = searchSpecOf(effect);
-        // Search: the choice is WHICH eligible card in the from-pile (deck/discard).
+        // Search: the choice is WHICH eligible card in the from-pile (deck/discard),
+        // AND — for a discard-cost ball (先機球 1 / 高級球 2) — WHICH hand cards pay the
+        // cost. The cross-product is enumerated; handPayCombos returns [[]] for a
+        // cost-free search and [] when the hand can't cover the cost (then unplayable).
         if (spec !== null && !(spec.to === "bench" && me.bench.length >= MAX_BENCH)) {
-          for (const found of me[spec.from]) if (spec.eligible(found)) acts.push({ type: "search", iid: c.iid, foundIid: found.iid });
+          const cost = spec.discardCost ?? 0;
+          // The payment is enumerated by NAME-representative (handPayCombos): one
+          // representative per distinct hand-card name. applyAction accepts ANY
+          // equivalent valid payment, so the mask is representative — not exhaustive —
+          // over interchangeable same-named copies (a deliberate keep-the-mask-small
+          // choice, mirrored by the dedup on the fetch side below).
+          const payments = handPayCombos(me.hand, c.iid, cost);
+          // Dedupe the fetch side by NAME too: same-named copies in the pile yield an
+          // identical board, so one representative each keeps the mask minimal and
+          // equal to the UI's offered set.
+          const seenFound = new Set<string>();
+          for (const found of me[spec.from]) {
+            if (!spec.eligible(found) || seenFound.has(found.name)) continue;
+            seenFound.add(found.name);
+            for (const pay of payments) acts.push(cost > 0 ? { type: "search", iid: c.iid, foundIid: found.iid, discardIids: pay } : { type: "search", iid: c.iid, foundIid: found.iid });
+          }
         }
       }
     }
@@ -449,7 +467,20 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
       const found = board[spec.from].find((c) => c.iid === a.foundIid);
       if (found === undefined || !spec.eligible(found)) return s;
       if (spec.to === "bench" && board.bench.length >= MAX_BENCH) return s;
-      let ns = discardFromHand(s, me, a.iid); // the played Item → discard
+      // Pay the discard COST first (先機球 1 / 高級球 2): the chosen hand cards must be
+      // exactly `cost` distinct cards in hand, none of them the Item being played.
+      const cost = spec.discardCost ?? 0;
+      // A cost-FREE search must carry NO payment — a forged discardIids on e.g. Nest
+      // Ball would otherwise pitch those cards unvalidated. Reject it as a strict no-op.
+      if (cost === 0 && a.discardIids !== undefined && a.discardIids.length > 0) return s;
+      const payIds = cost > 0 ? (a.discardIids ?? []) : [];
+      if (cost > 0) {
+        if (payIds.length !== cost || new Set(payIds).size !== cost) return s;
+        if (payIds.includes(a.iid) || !payIds.every((id) => board.hand.some((c) => c.iid === id))) return s;
+      }
+      let ns: GameState = s;
+      for (const id of payIds) ns = discardFromHand(ns, me, id); // pay the cost (each card → discard)
+      ns = discardFromHand(ns, me, a.iid); // the played Item → discard
       const b = ns[me];
       const pile = b[spec.from].filter((c) => c.iid !== a.foundIid);
       if (spec.to === "hand") {

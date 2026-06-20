@@ -666,6 +666,139 @@ describe("search effects (Nest / Master Ball, Night Stretcher, Energy Search, Ev
   });
 });
 
+// --- the ball family: HP-gated + discard-cost deck searches -----------------
+
+describe("ball searches (Level / Quick / Great Ball)", () => {
+  // Real verified effect text (2026-06-20). Quick/Great each have TWO catalog
+  // wordings differing only by a space after the first 。 — both map to one spec.
+  const LEVEL = "從自己的牌庫選擇1張HP為「90」以下的寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const QUICK = "這張卡必須將自己的1張手牌丟棄才可使用。 從自己的牌庫選擇1張【基礎】寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const QUICK_NOSPACE = "這張卡必須將自己的1張手牌丟棄才可使用。從自己的牌庫選擇1張【基礎】寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const GREAT = "這張卡必須將自己的2張手牌丟棄才可使用。 從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+  const fxCtx = (table: Record<string, Partial<CatalogCard>>): EngineCtx => ({
+    catalog: null,
+    resolve: (c) => (table[c.name] ? ({ name: c.name, category: "Trainer", ...table[c.name] } as CatalogCard) : null),
+    autoKey: (c) => c.name,
+  });
+
+  it("both Quick Ball wordings map to the same discard-1 Basic-search spec", () => {
+    for (const eff of [QUICK, QUICK_NOSPACE]) {
+      const spec = searchSpecOf(eff);
+      expect(spec).not.toBeNull();
+      expect(spec!.discardCost).toBe(1);
+      expect(spec!.from).toBe("deck");
+    }
+  });
+
+  it("Level Ball offers only Pokémon with HP ≤ 90 (no HP = not eligible), no discard cost", () => {
+    const ctx = fxCtx({ Level: { effect: LEVEL } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Level", "item", { name: "Level" })],
+        deck: [card("p60", "basic", { hp: 60 }), card("p200", "basic", { hp: 200 }), card("pNoHp", "basic"), card("e90", "evolution", { hp: 90 }), card("en", "energy-basic")],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // p60 + e90 only (p200 too big, pNoHp unknown, energy not a Pokémon)
+    expect(acts.every((a) => a.discardIids === undefined)).toBe(true); // cost-free
+    const ns = applyAction(s, { type: "search", iid: "Level", foundIid: "p60" }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid)).toContain("p60");
+    expect(ns.p1.deck.some((c) => c.iid === "p60")).toBe(false);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
+    // an over-90 Pokémon can never be pulled (would be a false positive)
+    expect(applyAction(s, { type: "search", iid: "Level", foundIid: "p200" }, ctx)).toBe(s);
+  });
+
+  it("a cost-FREE search rejects a forged discard payment (strict no-op, nothing pitched)", () => {
+    const ctx = fxCtx({ Level: { effect: LEVEL } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("Level", "item", { name: "Level" }), card("victim", "item", { name: "victim" })], deck: [card("p60", "basic", { hp: 60 })] },
+    });
+    // Level Ball has NO discard cost — a forged discardIids must never pitch 'victim'.
+    expect(applyAction(s, { type: "search", iid: "Level", foundIid: "p60", discardIids: ["victim"] }, ctx)).toBe(s);
+    // the legitimate cost-free play still works and 'victim' stays in hand.
+    const ok = applyAction(s, { type: "search", iid: "Level", foundIid: "p60" }, ctx);
+    expect(ok.p1.hand.map((c) => c.iid).sort()).toEqual(["p60", "victim"]);
+  });
+
+  it("the fetch side is deduped by name (same-named copies → one representative action, matching the UI)", () => {
+    const ctx = fxCtx({ Level: { effect: LEVEL } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Level", "item", { name: "Level" })],
+        deck: [card("d1", "basic", { hp: 60, name: "Cleffa" }), card("d2", "basic", { hp: 60, name: "Cleffa" }), card("d3", "basic", { hp: 70, name: "Pichu" })],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(2); // Cleffa (2 copies → one rep) + Pichu, NOT 3 per-instance
+  });
+
+  it("Quick Ball enumerates (Basic to fetch × hand card to pitch) and pays the discard cost atomically", () => {
+    const ctx = fxCtx({ Quick: { effect: QUICK } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Quick", "item", { name: "Quick" }), card("payA", "item", { name: "payA" }), card("payB", "item", { name: "payB" })],
+        deck: [card("b1", "basic"), card("b2", "basic"), card("evoX", "evolution")],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(4); // 2 eligible Basics × 2 distinct one-card payments
+    const ns = applyAction(s, { type: "search", iid: "Quick", foundIid: "b1", discardIids: ["payA"] }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid).sort()).toEqual(["b1", "payB"]); // fetched b1; payA + Quick gone
+    expect(ns.p1.discard.map((c) => c.iid).sort()).toEqual(["Quick", "payA"]); // cost + Item discarded
+    expect(ns.p1.deck.some((c) => c.iid === "b1")).toBe(false);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
+    // card conservation: nothing created or lost
+    const before = s.p1.hand.length + s.p1.deck.length + s.p1.discard.length;
+    const after = ns.p1.hand.length + ns.p1.deck.length + ns.p1.discard.length;
+    expect(after).toBe(before);
+  });
+
+  it("Quick Ball rejects an invalid payment (wrong count / the Item itself / not in hand)", () => {
+    const ctx = fxCtx({ Quick: { effect: QUICK } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("Quick", "item", { name: "Quick" }), card("payA", "item", { name: "payA" })], deck: [card("b1", "basic")] },
+    });
+    expect(applyAction(s, { type: "search", iid: "Quick", foundIid: "b1", discardIids: [] }, ctx)).toBe(s); // no payment
+    expect(applyAction(s, { type: "search", iid: "Quick", foundIid: "b1", discardIids: ["Quick"] }, ctx)).toBe(s); // can't pay with itself
+    expect(applyAction(s, { type: "search", iid: "Quick", foundIid: "b1", discardIids: ["ghost"] }, ctx)).toBe(s); // not in hand
+    expect(applyAction(s, { type: "search", iid: "Quick", foundIid: "b1" }, ctx)).toBe(s); // missing payment entirely
+  });
+
+  it("Quick Ball is unplayable when the hand can't cover the cost (honest: cost is mandatory)", () => {
+    const ctx = fxCtx({ Quick: { effect: QUICK } });
+    const s = baseState({
+      p1: { ...pb(), hand: [card("Quick", "item", { name: "Quick" })], deck: [card("b1", "basic")] }, // no other card to pitch
+    });
+    expect(find(legalActions(s, ctx), "search").length).toBe(0);
+    expect(applyAction(s, { type: "search", iid: "Quick", foundIid: "b1", discardIids: ["b1"] }, ctx)).toBe(s);
+  });
+
+  it("Great Ball discards 2 from hand and fetches any Pokémon", () => {
+    const ctx = fxCtx({ Great: { effect: GREAT } });
+    const s = baseState({
+      p1: {
+        ...pb(),
+        hand: [card("Great", "item", { name: "Great" }), card("c1", "item", { name: "c1" }), card("c2", "item", { name: "c2" }), card("c3", "item", { name: "c3" })],
+        deck: [card("pkA", "basic"), card("pkB", "evolution")],
+      },
+    });
+    const acts = find(legalActions(s, ctx), "search");
+    expect(acts.length).toBe(6); // 2 Pokémon × C(3,2)=3 distinct two-card payments
+    const ns = applyAction(s, { type: "search", iid: "Great", foundIid: "pkB", discardIids: ["c1", "c2"] }, ctx);
+    expect(ns.p1.hand.map((c) => c.iid).sort()).toEqual(["c3", "pkB"]);
+    expect(ns.p1.discard.map((c) => c.iid).sort()).toEqual(["Great", "c1", "c2"]);
+    expect(ns.shuffleNonce).toBe(s.shuffleNonce + 1);
+    // a duplicate-id payment (only 1 distinct card) is rejected
+    expect(applyAction(s, { type: "search", iid: "Great", foundIid: "pkB", discardIids: ["c1", "c1"] }, ctx)).toBe(s);
+    // a 1-card payment (wrong count) is rejected
+    expect(applyAction(s, { type: "search", iid: "Great", foundIid: "pkB", discardIids: ["c1"] }, ctx)).toBe(s);
+  });
+});
+
 // --- Energy Switch (move a basic Energy between your own Pokémon) ------------
 
 describe("Energy Switch (能量轉移)", () => {
