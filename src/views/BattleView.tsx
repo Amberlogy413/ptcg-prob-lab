@@ -714,6 +714,10 @@ export function BattleView() {
     const benchPrizes = benchKo ? prizeValue(catalogOf(benchTgt!.card)) : 0;
     // One atomic gesture (damage → KO+prize / status → endTurn) so a single Undo
     // reverses the whole attack, not just the turn flip (review fix 2026-06-17).
+    // Two terminality guards mirror the engine (game.ts): once the attack already
+    // wins/loses the game, skip the attacker-only effects and the turn flip — never
+    // draw extra cards or auto-draw for the loser on an already-decided board.
+    let attackerEffectsSkipped = false;
     const changed = act(() => {
       const s = store.getState();
       s.setDamage(oppId, oppActive.uid, newDamage);
@@ -731,6 +735,10 @@ export function BattleView() {
           s.takePrize(me, benchPrizes); // attacker takes the Prize for the KO'd Bench Pokémon
         }
       }
+      if (gameResult(store.getState()) !== null) {
+        attackerEffectsSkipped = true; // the attack already won — no attacker-only effects, no turn flip
+        return;
+      }
       if (heal > 0) s.setDamage(me, active.uid, Math.max(0, active.damage - heal));
       if (draw > 0) s.draw(me, draw);
       if (recoil > 0) {
@@ -742,6 +750,7 @@ export function BattleView() {
       }
       if (locks && !selfKo) s.markNoAttack(me, active.uid, turn + 2); // can't attack on your next turn
       if (discardIids !== undefined && discardIids.length > 0 && !selfKo) s.discardEnergy(me, active.uid, discardIids);
+      if (gameResult(store.getState()) !== null) return; // a recoil self-KO ended the game → no turn flip
       s.endTurn(); // attacking ends your turn (faithful)
     });
     // HONEST: a "+"/"×" attack's printed base is only an approximation — the real
@@ -753,13 +762,13 @@ export function BattleView() {
     let result = t("battle.atk.result", { atk: atk.name, dmg: approx ? `≈${damage}` : damage, tags });
     if (ko) result += " " + t("battle.atk.ko", { n: prizes });
     if (cond !== null) result += " " + t("battle.atk.inflict", { cond: t(`battle.cond.${cond}`) });
-    if (heal > 0) result += " " + t("battle.atk.selfHeal", { n: heal });
-    if (draw > 0) result += " " + t("battle.atk.selfDraw", { n: draw });
-    if (recoil > 0) result += " " + t("battle.atk.selfDamage", { n: recoil });
-    if (selfKo) result += " " + t("battle.atk.selfKo");
-    if (locks && !selfKo) result += " " + t("battle.atk.selfLock");
+    if (heal > 0 && !attackerEffectsSkipped) result += " " + t("battle.atk.selfHeal", { n: heal });
+    if (draw > 0 && !attackerEffectsSkipped) result += " " + t("battle.atk.selfDraw", { n: draw });
+    if (recoil > 0 && !attackerEffectsSkipped) result += " " + t("battle.atk.selfDamage", { n: recoil });
+    if (selfKo && !attackerEffectsSkipped) result += " " + t("battle.atk.selfKo");
+    if (locks && !selfKo && !attackerEffectsSkipped) result += " " + t("battle.atk.selfLock");
     if (defLock) result += " " + t("battle.atk.defLock", { p: resolve(oppActive.card).name });
-    if (discardNames !== "" && !selfKo) result += " " + t("battle.atk.discardEnergy", { e: discardNames });
+    if (discardNames !== "" && !selfKo && !attackerEffectsSkipped) result += " " + t("battle.atk.discardEnergy", { e: discardNames });
     if (benchTgt !== undefined && benchN > 0) {
       result += " " + t("battle.atk.benchHit", { p: resolve(benchTgt.card).name, n: benchN });
       if (benchKo) result += " " + t("battle.atk.benchKo", { n: benchPrizes });

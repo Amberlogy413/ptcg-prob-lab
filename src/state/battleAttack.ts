@@ -17,6 +17,15 @@ export function energyProvides(card: BattleCard): string | null {
   return energyType(card.name);
 }
 
+/** An effect is CONDITIONAL — so a helper that models only the UNCONDITIONAL case
+ *  must skip it — when gated on a coin flip (擲), a 若 condition, OR an outcome
+ *  clause 「…的情況下」 (e.g. 有丟棄的情況下 = only if something was discarded). Verified
+ *  2026-06-19: the 情況下 token suppresses exactly one otherwise-matching effect (a
+ *  genuinely conditional Paralyze) and zero unconditional ones. */
+function isConditionalEffect(effect: string): boolean {
+  return effect.includes("若") || effect.includes("擲") || effect.includes("情況下");
+}
+
 /**
  * Can the attached Energy pay this attack cost? Type-aware: each non-Colorless
  * symbol needs a matching-element Energy (or a wildcard); Colorless symbols are
@@ -124,7 +133,7 @@ const STATUS_TEXT: ReadonlyArray<readonly [string, SpecialCondition]> = [
   ["麻痺", "paralyzed"],
 ];
 export function inflictedStatus(effect: string | undefined): SpecialCondition | null {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return null;
+  if (effect === undefined || isConditionalEffect(effect)) return null;
   for (const [zh, cond] of STATUS_TEXT) if (effect.includes(`將對手的戰鬥寶可夢【${zh}】`)) return cond;
   return null;
 }
@@ -135,7 +144,7 @@ export function inflictedStatus(effect: string | undefined): SpecialCondition | 
  *  conditional/variable heal is never applied (and never claimed as exact). Healing
  *  only ever REDUCES the attacker's own damage, so it can never cause a KO. */
 export function selfHealAmount(effect: string | undefined): number {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  if (effect === undefined || isConditionalEffect(effect)) return 0;
   const m = effect.match(/將這隻寶可夢恢復「(\d+)」HP/);
   return m ? Number(m[1]) : 0;
 }
@@ -144,7 +153,7 @@ export function selfHealAmount(effect: string | undefined): number {
  *  ("從自己的牌庫抽出N張卡") — 0 if absent or gated on a 若 / 擲. An empty deck simply
  *  draws fewer (handled by the draw op); drawing never causes a KO. */
 export function attackDrawCount(effect: string | undefined): number {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  if (effect === undefined || isConditionalEffect(effect)) return 0;
   const m = effect.match(/從自己的牌庫抽出(\d+)張卡/);
   return m ? Number(m[1]) : 0;
 }
@@ -154,7 +163,7 @@ export function attackDrawCount(effect: string | undefined): number {
  *  recoil CAN Knock the attacker Out (the opponent then takes the Prize), so the
  *  caller must handle a possible self-KO. */
 export function selfDamageAmount(effect: string | undefined): number {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  if (effect === undefined || isConditionalEffect(effect)) return 0;
   const m = effect.match(/這隻寶可夢也受到(\d+)點傷害/);
   return m ? Number(m[1]) : 0;
 }
@@ -164,7 +173,7 @@ export function selfDamageAmount(effect: string | undefined): number {
  *  若 / 擲. WHICH Energy to discard is a real player choice → modeled as part of the
  *  attack action (see energyDiscardCombos), never auto-picked. */
 export function discardEnergyCount(effect: string | undefined): number {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  if (effect === undefined || isConditionalEffect(effect)) return 0;
   const m = effect.match(/選擇(\d+)個這隻寶可夢身上附加的能量，將其丟棄/);
   return m ? Number(m[1]) : 0;
 }
@@ -206,7 +215,7 @@ export function energyDiscardCombos(energy: BattleCard[], n: number): string[][]
  *  weakness/resistance. WHICH Bench Pokémon is a player choice → modeled as part of
  *  the attack action; the hit can KO it (the ATTACKER then takes the Prize). */
 export function benchDamageAmount(effect: string | undefined): number {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return 0;
+  if (effect === undefined || isConditionalEffect(effect)) return 0;
   const m = effect.match(/對手的1隻備戰寶可夢也?受到(\d+)點傷害。\[在備戰區不計算/);
   return m ? Number(m[1]) : 0;
 }
@@ -216,7 +225,7 @@ export function benchDamageAmount(effect: string | undefined): number {
  *  coin-flip / optional lock is never applied) — high-precision like inflictedStatus.
  *  The DEFENDER-lock wording ("受到這個招式的…無法使用招式") is intentionally NOT matched. */
 export function locksAttackerNextTurn(effect: string | undefined): boolean {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return false;
+  if (effect === undefined || isConditionalEffect(effect)) return false;
   return effect.includes("在下個自己的回合，這隻寶可夢無法使用招式");
 }
 
@@ -226,7 +235,7 @@ export function locksAttackerNextTurn(effect: string | undefined): boolean {
  *  Basic, 進化 only an Evolution, 寶可夢【V】 only a V, otherwise any Pokémon. 0/false on
  *  若 / 擲. Caller applies it only when the defender SURVIVES the attack. */
 export function locksDefenderNextTurn(effect: string | undefined, defender: CatalogCard | null): boolean {
-  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return false;
+  if (effect === undefined || isConditionalEffect(effect)) return false;
   if (defender === null || defender.category !== "Pokemon") return false;
   if (!effect.includes("受到這個招式") || !effect.includes("無法使用招式")) return false;
   const isEvolution = defender.stage !== undefined && defender.stage !== "Basic";

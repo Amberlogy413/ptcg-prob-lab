@@ -15,7 +15,9 @@ function bc(iid: string, kind: BattleCard["kind"], over: Partial<BattleCard> = {
   return { iid, name: iid, isBasic: kind === "basic", section, kind, ...over };
 }
 function emptyBoard(): PlayerBoard {
-  return { deck: [], hand: [], discard: [], prizes: [], lostzone: [], active: null, bench: [], stadium: null };
+  // 6 Prize cards = a real, not-yet-decided game (empty prizes would read as an
+  // instant prize-win, so gameResult would short-circuit the bot's end-of-turn).
+  return { deck: [], hand: [], discard: [], prizes: new Array(6).fill(0).map((_, i) => bc(`pz${i}`, "basic")), lostzone: [], active: null, bench: [], stadium: null };
 }
 const ctx = { who: "Bot", nameOf: (c: BattleCard) => c.name, autoKey: (c: BattleCard) => c.name };
 

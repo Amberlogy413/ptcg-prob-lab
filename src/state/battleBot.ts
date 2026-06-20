@@ -17,6 +17,7 @@ import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type Playe
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
+import { gameResult } from "../engine/index.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
 export interface BotEvent {
@@ -146,45 +147,9 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             push("battle.atk.defLock", undefined, { p: ctx.nameOf(oppActive.card) });
           }
         }
-        // Unconditional attacker-only effects: self-heal / draw (never KO) + recoil
-        // (can self-KO the attacker → the opponent takes the Prize).
-        const heal = selfHealAmount(best.effect);
-        if (heal > 0) {
-          st().setDamage(player, active.uid, Math.max(0, active.damage - heal));
-          push("battle.atk.selfHeal", undefined, { n: heal });
-        }
-        const draw = attackDrawCount(best.effect);
-        if (draw > 0) {
-          st().draw(player, draw);
-          push("battle.atk.selfDraw", undefined, { n: draw });
-        }
-        const recoil = selfDamageAmount(best.effect);
-        if (recoil > 0) {
-          const selfNew = Math.max(0, active.damage - heal) + recoil;
-          st().setDamage(player, active.uid, selfNew);
-          push("battle.atk.selfDamage", undefined, { n: recoil });
-          if (active.card.hp !== undefined && selfNew >= active.card.hp) {
-            st().knockOut(player, active.uid);
-            st().takePrize(opp, prizeValue(ac));
-            push("battle.atk.selfKo");
-          }
-        }
-        // Self-lock: barred from attacking on the bot's next turn (s.turn + 2).
-        if (locksAttackerNextTurn(best.effect) && st()[player].active !== null) {
-          st().markNoAttack(player, active.uid, s.turn + 2);
-          push("battle.atk.selfLock");
-        }
-        // Energy discard: the bot picks the first valid combo (a heuristic choice).
-        const dN = discardEnergyCount(best.effect);
-        if (dN > 0 && st()[player].active !== null) {
-          const combos = energyDiscardCombos(active.energy, dN);
-          if (combos[0] !== undefined && combos[0].length > 0) {
-            const names = combos[0].map((id) => active.energy.find((e) => e.iid === id)).filter((e): e is BattleCard => e !== undefined).map((e) => ctx.nameOf(e)).join("+");
-            st().discardEnergy(player, active.uid, combos[0]);
-            push("battle.atk.discardEnergy", undefined, { e: names });
-          }
-        }
-        // Bench damage: the bot hits the opponent's first Benched Pokémon (heuristic).
+        // Bench damage (choice): hit the opponent's first Benched Pokémon (heuristic);
+        // a lethal hit KOs it and the bot takes the Prize. Resolved WITH the defender,
+        // before the attacker-only effects (mirrors the engine order).
         const bN = benchDamageAmount(best.effect);
         const benchTgt = bN > 0 ? st()[opp].bench[0] : undefined;
         if (benchTgt !== undefined) {
@@ -197,12 +162,56 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
             push("battle.atk.benchKo", undefined, { n: prizeValue(catOf(benchTgt.card)) });
           }
         }
+        // Once the attack already won/lost the game, skip the attacker-only effects
+        // (mirror engine game.ts — no extra draws on an already-decided board).
+        if (gameResult(useBattleStore.getState()) === null) {
+          // Unconditional attacker-only effects: self-heal / draw (never KO) + recoil
+          // (can self-KO the attacker → the opponent takes the Prize).
+          const heal = selfHealAmount(best.effect);
+          if (heal > 0) {
+            st().setDamage(player, active.uid, Math.max(0, active.damage - heal));
+            push("battle.atk.selfHeal", undefined, { n: heal });
+          }
+          const draw = attackDrawCount(best.effect);
+          if (draw > 0) {
+            st().draw(player, draw);
+            push("battle.atk.selfDraw", undefined, { n: draw });
+          }
+          const recoil = selfDamageAmount(best.effect);
+          if (recoil > 0) {
+            const selfNew = Math.max(0, active.damage - heal) + recoil;
+            st().setDamage(player, active.uid, selfNew);
+            push("battle.atk.selfDamage", undefined, { n: recoil });
+            if (active.card.hp !== undefined && selfNew >= active.card.hp) {
+              st().knockOut(player, active.uid);
+              st().takePrize(opp, prizeValue(ac));
+              push("battle.atk.selfKo");
+            }
+          }
+          // Self-lock: barred from attacking on the bot's next turn (s.turn + 2).
+          if (locksAttackerNextTurn(best.effect) && st()[player].active !== null) {
+            st().markNoAttack(player, active.uid, s.turn + 2);
+            push("battle.atk.selfLock");
+          }
+          // Energy discard: the bot picks the first valid combo (a heuristic choice).
+          const dN = discardEnergyCount(best.effect);
+          if (dN > 0 && st()[player].active !== null) {
+            const combos = energyDiscardCombos(active.energy, dN);
+            if (combos[0] !== undefined && combos[0].length > 0) {
+              const names = combos[0].map((id) => active.energy.find((e) => e.iid === id)).filter((e): e is BattleCard => e !== undefined).map((e) => ctx.nameOf(e)).join("+");
+              st().discardEnergy(player, active.uid, combos[0]);
+              push("battle.atk.discardEnergy", undefined, { e: names });
+            }
+          }
+        }
       }
     }
   }
 
-  // End the bot's turn (this auto-draws the incoming player per endTurn).
-  st().endTurn();
-  push("battle.log.endTurn");
+  // End the bot's turn — but not if the attack already won/lost the game (mirror engine).
+  if (gameResult(useBattleStore.getState()) === null) {
+    st().endTurn();
+    push("battle.log.endTurn");
+  }
   return ev;
 }

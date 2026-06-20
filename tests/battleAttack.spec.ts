@@ -107,6 +107,10 @@ describe("inflictedStatus — high-precision, unconditional only", () => {
     expect(inflictedStatus("擲1次硬幣若為正面，則將對手的戰鬥寶可夢【麻痺】。")).toBeNull();
     expect(inflictedStatus("查看對手的手牌，若其中有能量卡，則將對手的戰鬥寶可夢【麻痺】。")).toBeNull();
   });
+  it("does NOT fire on a 「…的情況下」 outcome-conditional status (review fix 2026-06-19)", () => {
+    // N的電電蟲: paralyze only IF a Tool was discarded — no 若/擲, but gated on 有丟棄的情況下.
+    expect(inflictedStatus("在造成傷害前，將對手的戰鬥寶可夢身上附加的「寶可夢道具」卡丟棄。有丟棄的情況下，將對手的戰鬥寶可夢【麻痺】。")).toBeNull();
+  });
   it("does NOT mistake a READ-for-damage (若…【中毒】則增加傷害) for an inflict", () => {
     expect(inflictedStatus("若對手的戰鬥寶可夢【中毒】，則增加90點傷害。")).toBeNull();
   });
