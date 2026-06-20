@@ -905,3 +905,20 @@
 - **質量**:tsc 乾淨 · 黃金 27/507 · **506 vitest**(+5:recoverCombos + 救援行李箱 3 + 真 catalog 解析 1)·
   0 console error · 數學零改動 · 實機核實真路徑(救援行李箱 by name → pickUpTo 2、HP≤90 gate;完整救回 2 隻、
   HP200 留喺棄牌、不洗、偽造 over-90 = no-op)。
+
+## 2026-06-20 — bot 首次識用 modeled item(巢穴球)
+
+- **轉向**:已建模咗 ~16 個道具/搜尋卡效,但 bot 一個都唔識用(淨係打抽牌支援者+攻擊)—— 即係所有
+  建模喺實際 AI 對戰睇唔到,AI 比規則允許嘅更弱。今棍開始補:bot 識用**巢穴球類**。
+- **做法(安全、確立 pattern)**:battleBot 新 step 2b —— 備戰唔夠(< MAX_BOT_BENCH)時,搵手牌一張
+  **免代價 deck→Bench 基礎搜尋**(`searchSpecOf` 判 from=deck/to=bench/discardCost 0/pickUpTo undefined
+  = 巢穴球),揀牌庫**第一張合資格基礎**,經 **`engineStep`** 結算(引擎 applyAction 驗證 → 保證合法,
+  非法就 return false→break)。loop 有 guard counter,catalog=null 時整段 inert(舊 bot 測試照過)。
+  記 `battle.log.botBall`(忠實報明用咗咩 + 搵到咩)。**bot 由直接 store ops + 引擎 engineStep 混合**,
+  但 engineStep 設計正正係將引擎 action 寫返 store,安全。
+- **對抗式覆核(14 agent,2 維度)→ 12 候選、反駁後 0 確認**:loop 一定終止、無 store desync、spec gate
+  啱好只認巢穴球(唔會誤觸先機/高級/超級/Pokégear/救援行李箱/到手搜尋)、揀第一張合資格基礎安全(引擎驗證)、
+  log 忠實、catalog=null inert。乾淨。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **507 vitest**(+1:bot 巢穴球)· 0 console error · 數學零改動 ·
+  實機核實真 catalog(bot 皮卡丘→戰鬥場,再用巢穴球 SVHK-012 由牌庫搵卡比獸落備戰,牌庫少咗、球入棄牌、log 忠實)。
+- **NEXT**:逐步教 bot 用更多 modeled item(到手搜尋揀基礎、進化薰香、能量加速…),沿用同一 engineStep pattern。

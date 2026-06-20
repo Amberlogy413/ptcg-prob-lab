@@ -17,7 +17,8 @@ import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type Playe
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
-import { gameResult } from "../engine/index.ts";
+import { gameResult, makeCtx, searchSpecOf } from "../engine/index.ts";
+import { engineStep } from "./battleBridge.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
 export interface BotEvent {
@@ -77,6 +78,30 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
     const basic = st()[player].hand.find((c) => c.kind === "basic");
     if (basic === undefined || !st().playToBench(player, basic.iid)) break;
     push("battle.log.bench", basic);
+  }
+
+  // 2b) If the bench is still thin, play a Nest Ball-family search (a cost-free
+  //     deck→Bench Basic search) to develop the board — the bot's first use of a
+  //     MODELED search Item. Resolved through the rules ENGINE (engineStep), so the
+  //     move is guaranteed legal and the fetch is a real choice (the bot takes the
+  //     first eligible Basic, deterministic). More item types can follow this pattern.
+  if (catalog !== null && st()[player].active !== null) {
+    const ectx = makeCtx(catalog);
+    let guard = 0;
+    while (st()[player].bench.length < MAX_BOT_BENCH && guard++ < MAX_BOT_BENCH) {
+      const board = st()[player];
+      const item = board.hand.find((c) => {
+        if (c.kind !== "item") return false;
+        const spec = searchSpecOf(ectx.resolve(c)?.effect);
+        return spec !== null && spec.from === "deck" && spec.to === "bench" && (spec.discardCost ?? 0) === 0 && spec.pickUpTo === undefined;
+      });
+      if (item === undefined) break;
+      const spec = searchSpecOf(ectx.resolve(item)?.effect)!;
+      const target = board.deck.find((c) => spec.eligible(c)); // first eligible Basic in the deck
+      if (target === undefined) break;
+      if (!engineStep({ type: "search", iid: item.iid, foundIid: target.iid }, catalog)) break;
+      push("battle.log.botBall", item, { card2: ctx.nameOf(target) });
+    }
   }
 
   // 3) Evolve any in-play unit the hand has a NAME-matching evolution for (safe:

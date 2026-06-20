@@ -806,6 +806,7 @@
   "battle.log.title": "Battle log",
   "battle.log.active": "{who} played {card} to Active",
   "battle.log.bench": "{who} benched {card}",
+  "battle.log.botBall": "{who} used {card} to fetch {card2} to the Bench",
   "battle.log.evolve": "{who} evolved into {card}",
   "battle.log.energy": "{who} attached Energy {card}",
   "battle.log.tool": "{who} attached Tool {card}",

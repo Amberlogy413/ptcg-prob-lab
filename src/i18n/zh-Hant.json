@@ -806,6 +806,7 @@
   "battle.log.title": "對戰紀錄",
   "battle.log.active": "{who} 打出 {card} 上戰鬥場",
   "battle.log.bench": "{who} 放 {card} 上備戰",
+  "battle.log.botBall": "{who} 用 {card} 由牌庫搵 {card2} 落備戰",
   "battle.log.evolve": "{who} 進化出 {card}",
   "battle.log.energy": "{who} 為寶可夢附上能量 {card}",
   "battle.log.tool": "{who} 裝備工具 {card}",

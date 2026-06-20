@@ -221,6 +221,9 @@ const winner = env.winner();
 - ✅ **步驟③–④(骨架)**:`scripts/rl/ppo_selfplay.py` PPO 自我對弈骨架(策略+價值
   網絡、按合法動作集評分取樣)—— 起點,需 GPU 離線訓練,詳見 `scripts/rl/README.md`。
 - ✅ 啟發式對手(`battleBot.ts`)已上線(誠實宣告:規則式,非學習模型)。
+  bot 而家**開始識用已建模嘅道具**:備戰唔夠時會經**引擎 `engineStep`**(保證合法)打**巢穴球
+  類**(免代價、牌庫→基礎→備戰)發展場面 —— bot 首次使用 modeled search Item,確立
+  「bot → searchSpecOf 揀卡 → engineStep」嘅 pattern,日後逐張 item 沿用。
 - ⬜ **步驟①剩餘**:逐張卡效(搜尋/抽牌/狀態/特性…)—— 數月、需團隊(agent 上限取決於此)。
 - ⬜ **步驟⑤–⑦**:評估迭代 + 權重匯出(ONNX/tf.js)+ 瀏覽器推論。
 
