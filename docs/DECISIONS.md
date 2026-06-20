@@ -922,3 +922,18 @@
 - **質量**:tsc 乾淨 · 黃金 27/507 · **507 vitest**(+1:bot 巢穴球)· 0 console error · 數學零改動 ·
   實機核實真 catalog(bot 皮卡丘→戰鬥場,再用巢穴球 SVHK-012 由牌庫搵卡比獸落備戰,牌庫少咗、球入棄牌、log 忠實)。
 - **NEXT**:逐步教 bot 用更多 modeled item(到手搜尋揀基礎、進化薰香、能量加速…),沿用同一 engineStep pattern。
+
+## 2026-06-20 — bot 用埋「到手寶可夢搜尋」發展場面(step 2b 一般化)
+
+- **承上**:把 step 2b 由淨係巢穴球**一般化**做「**任何免代價單抽 deck→寶可夢搜尋,只要攞到一張基礎**」。
+  巢穴球(to:bench)引擎直接落備戰;**大師球/等級球/超級球**(to:hand)搵一張**基礎**入手牌,bot 再
+  `playToBench` 上備戰。超級球 pool = `deck.slice(0,7)`(同引擎一致);bot 揀第一張合資格基礎(已揭示簡化)。
+  **唔會**用棄牌代價球(先機/高級)或多選救回。
+- **正確性護欄**:spec gate(from deck / discardCost 0 / pickUpTo undefined)+ target filter
+  (`kind==="basic" && spec.eligible`)令 bot **只會**喺呢度攞到「可上備戰嘅基礎」,自動跳過能量籤/
+  Pokégear(揀能量/支援者)、進化薰香(揀進化)、夜間擔架(from discard)。to:hand 攞到入手牌後即上
+  備戰,失敗就 break(無無限 loop、無漏卡)。
+- **對抗式覆核(14 agent,2 維度)→ 12 候選、反駁後 0 確認**:loop 終止、fetch→bench 兩步守恆、scope
+  gate 啱、超級球 topN slice 同引擎一致、log 忠實。乾淨。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **508 vitest**(+1:大師球到手搜尋)· 0 console error · 數學零改動 ·
+  實機核實真 catalog(bot 用大師球 SVHK-015 由牌庫搵基礎卡比獸、跳過噴火龍進化、落備戰,log 忠實)。

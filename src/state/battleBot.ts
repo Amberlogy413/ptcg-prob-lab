@@ -17,7 +17,7 @@ import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type Playe
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
-import { gameResult, makeCtx, searchSpecOf } from "../engine/index.ts";
+import { gameResult, makeCtx, searchSpecOf, type SearchSpec } from "../engine/index.ts";
 import { engineStep } from "./battleBridge.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -80,27 +80,36 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
     push("battle.log.bench", basic);
   }
 
-  // 2b) If the bench is still thin, play a Nest Ball-family search (a cost-free
-  //     deck→Bench Basic search) to develop the board — the bot's first use of a
-  //     MODELED search Item. Resolved through the rules ENGINE (engineStep), so the
-  //     move is guaranteed legal and the fetch is a real choice (the bot takes the
-  //     first eligible Basic, deterministic). More item types can follow this pattern.
+  // 2b) If the bench is still thin, develop the board with a cost-free, single-pick
+  //     deck → Pokémon search Item (the bot's MODELED-item use). 巢穴球 / Nest Ball
+  //     benches a Basic directly; a to-hand search (大師球 / 等級球 / 超級球 …) fetches a
+  //     Basic which the bot then benches. All routed through the rules ENGINE
+  //     (engineStep → guaranteed legal); a topN reveal only sees the top N. The bot
+  //     fetches the first eligible BASIC (deterministic — a disclosed simplification;
+  //     it never spends a discard-cost ball or a multi-pick recovery here). The same
+  //     engineStep pattern extends to more item types later.
   if (catalog !== null && st()[player].active !== null) {
     const ectx = makeCtx(catalog);
     let guard = 0;
-    while (st()[player].bench.length < MAX_BOT_BENCH && guard++ < MAX_BOT_BENCH) {
+    while (st()[player].bench.length < MAX_BOT_BENCH && guard++ < 8) {
       const board = st()[player];
-      const item = board.hand.find((c) => {
-        if (c.kind !== "item") return false;
+      let chosen: { item: BattleCard; spec: SearchSpec; target: BattleCard } | undefined;
+      for (const c of board.hand) {
+        if (c.kind !== "item") continue;
         const spec = searchSpecOf(ectx.resolve(c)?.effect);
-        return spec !== null && spec.from === "deck" && spec.to === "bench" && (spec.discardCost ?? 0) === 0 && spec.pickUpTo === undefined;
-      });
-      if (item === undefined) break;
-      const spec = searchSpecOf(ectx.resolve(item)?.effect)!;
-      const target = board.deck.find((c) => spec.eligible(c)); // first eligible Basic in the deck
-      if (target === undefined) break;
-      if (!engineStep({ type: "search", iid: item.iid, foundIid: target.iid }, catalog)) break;
-      push("battle.log.botBall", item, { card2: ctx.nameOf(target) });
+        if (spec === null || spec.from !== "deck" || (spec.discardCost ?? 0) !== 0 || spec.pickUpTo !== undefined) continue;
+        const pool = spec.topN !== undefined ? board.deck.slice(0, spec.topN) : board.deck;
+        const target = pool.find((d) => d.kind === "basic" && spec.eligible(d)); // a benchable Basic
+        if (target !== undefined) {
+          chosen = { item: c, spec, target };
+          break;
+        }
+      }
+      if (chosen === undefined) break;
+      if (!engineStep({ type: "search", iid: chosen.item.iid, foundIid: chosen.target.iid }, catalog)) break;
+      // A to-hand search lands the Basic in hand — bench it now (Nest Ball already benched it).
+      if (chosen.spec.to === "hand" && !st().playToBench(player, chosen.target.iid)) break;
+      push("battle.log.botBall", chosen.item, { card2: ctx.nameOf(chosen.target) });
     }
   }
 

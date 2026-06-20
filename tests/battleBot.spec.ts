@@ -83,6 +83,36 @@ describe("runBotTurn — deterministic heuristic", () => {
     expect(events.some((e) => e.key === "battle.log.botBall")).toBe(true); // and it's reported in the log
   });
 
+  it("plays a to-hand Pokémon search (Master Ball) to fetch a BASIC (not an evolution) and bench it", () => {
+    const MASTER = "從自己的牌庫選擇1張寶可夢卡，在給對手看過後加入手牌。並且重洗牌庫。";
+    const cat = { sets: {}, cards: [{ id: "master", localId: "1", name: "大師球", nameZh: "大師球", category: "Trainer", trainerType: "Item", set: "X", effect: MASTER }] } as unknown as Catalog;
+    normalizeCatalog(cat);
+    useBattleStore.setState({
+      started: true,
+      seed: 1,
+      shuffleNonce: 0,
+      turn: 2,
+      current: "p1",
+      firstPlayer: "p1",
+      turnEnergyAttached: false,
+      turnSupporterUsed: false,
+      turnStadiumPlayed: false,
+      turnRetreated: false,
+      everInPlay: { p1: false, p2: false },
+      // deck has an evolution FIRST — the bot must skip it and fetch the Basic to bench.
+      p1: { ...emptyBoard(), hand: [bc("pika", "basic", { hp: 60 }), bc("mb", "item", { name: "大師球", catalogId: "master" })], deck: [bc("evo", "evolution", { hp: 90, name: "Evo" }), bc("deckMon", "basic", { hp: 70, name: "Snorlax" })] },
+      p2: emptyBoard(),
+      log: [],
+    });
+
+    const events = runBotTurn("p1", cat, ctx);
+    const { p1 } = useBattleStore.getState();
+    expect(p1.bench.some((u) => u.card.iid === "deckMon")).toBe(true); // fetched the Basic and benched it
+    expect(p1.bench.some((u) => u.card.iid === "evo")).toBe(false); // never benched the evolution
+    expect(p1.discard.some((c) => c.iid === "mb")).toBe(true); // Master Ball used → discard
+    expect(events.some((e) => e.key === "battle.log.botBall")).toBe(true);
+  });
+
   it("with no playable Pokémon it simply ends the turn (no fabrication)", () => {
     useBattleStore.setState({
       started: true,
