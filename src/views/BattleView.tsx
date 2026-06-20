@@ -16,7 +16,7 @@ import {
   MAX_BENCH,
 } from "../state/battleStore.ts";
 import { toBattleSpec } from "../state/battlePlay.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
 import { runBotTurn } from "../state/battleBot.ts";
 import { computeDrawOdds } from "../state/battle.ts";
 import { AUTO_EFFECTS } from "../state/battleEffects.ts";
@@ -691,6 +691,7 @@ export function BattleView() {
     const prizes = ko ? prizeValue(oppCard) : 0;
     // An unconditional attack-inflicted Special Condition on a SURVIVING defender.
     const cond = ko ? null : inflictedStatus(atk.effect);
+    const defLock = !ko && locksDefenderNextTurn(atk.effect, oppCard); // defender can't attack next turn
     // Unconditional attacker-only effects: self-heal reduces the attacker's own
     // damage; draw adds cards; recoil damages the attacker and CAN self-KO it (the
     // opponent then takes the Prize). All resolved before the turn ends.
@@ -722,6 +723,7 @@ export function BattleView() {
       } else if (cond !== null && !oppActive.status.includes(cond)) {
         s.toggleStatus(oppId, oppActive.uid, cond);
       }
+      if (defLock) s.markNoAttack(oppId, oppActive.uid, turn + 1); // opponent's next turn
       if (benchTgt !== undefined && benchN > 0) {
         s.setDamage(oppId, benchTgt.uid, benchNewDmg);
         if (benchKo) {
@@ -756,6 +758,7 @@ export function BattleView() {
     if (recoil > 0) result += " " + t("battle.atk.selfDamage", { n: recoil });
     if (selfKo) result += " " + t("battle.atk.selfKo");
     if (locks && !selfKo) result += " " + t("battle.atk.selfLock");
+    if (defLock) result += " " + t("battle.atk.defLock", { p: resolve(oppActive.card).name });
     if (discardNames !== "" && !selfKo) result += " " + t("battle.atk.discardEnergy", { e: discardNames });
     if (benchTgt !== undefined && benchN > 0) {
       result += " " + t("battle.atk.benchHit", { p: resolve(benchTgt.card).name, n: benchN });

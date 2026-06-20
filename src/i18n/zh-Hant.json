@@ -922,6 +922,7 @@
   "battle.atk.benchTag": "·打備戰{p}",
   "battle.atk.benchHit": "(對備戰 {p} 造成 {n} 點傷害)",
   "battle.atk.benchKo": "(擊倒備戰!攞 {n} 張獎賞卡)",
+  "battle.atk.defLock": "(令對手 {p} 下回合無法使用招式)",
   "battle.win.banner": "🏆 {name} 勝出!",
   "battle.win.byPrizes": "攞晒 6 張獎賞卡,達成勝利條件。",
   "battle.win.byWipe": "{loser} 場上已無寶可夢可戰。",

@@ -388,6 +388,23 @@ describe("attack", () => {
     const ns2 = applyAction(st, acts.find((a) => a.benchTargetUid === "ba")!, bd); // 30 → 60HP survives
     expect(ns2.p2.bench.find((u) => u.uid === "ba")?.damage).toBe(30);
   });
+
+  it("a defender-lock attack bars the SURVIVING defender on the opponent's next turn (honours the type qualifier)", () => {
+    const dl = (effect: string): EngineCtx => ({
+      catalog: null,
+      resolve: (c) =>
+        c.name === "Pikachu"
+          ? ({ name: "Pikachu", category: "Pokemon", types: ["Lightning"], attacks: [{ name: "Stun", cost: ["Lightning"], damage: 30, effect }] } as CatalogCard)
+          : ({ name: c.name, category: "Pokemon", stage: "Basic" } as CatalogCard), // the defender is a Basic
+      autoKey: (c) => c.name,
+    });
+    // unqualified → locks the Basic defender on the opponent's next turn (turn 2 → 3)
+    const ns = applyAction(attackState(200), { type: "attack", index: 0 }, dl("在下個對手的回合，受到這個招式的寶可夢無法使用招式。"));
+    expect(ns.p2.active?.noAttackTurn).toBe(3);
+    // 進化-qualified → does NOT lock a Basic defender
+    const ns2 = applyAction(attackState(200), { type: "attack", index: 0 }, dl("在下個對手的回合，受到這個招式的進化寶可夢無法使用招式。"));
+    expect(ns2.p2.active?.noAttackTurn).toBeUndefined();
+  });
 });
 
 // --- supporter (modeled effect) --------------------------------------------

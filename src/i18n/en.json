@@ -922,6 +922,7 @@
   "battle.atk.benchTag": "· hit Bench {p}",
   "battle.atk.benchHit": "(dealt {n} to Benched {p})",
   "battle.atk.benchKo": "(Bench KO! took {n} Prize(s))",
+  "battle.atk.defLock": "(the opponent's {p} can't attack next turn)",
   "battle.win.banner": "🏆 {name} wins!",
   "battle.win.byPrizes": "Took all 6 Prize cards — the win condition is met.",
   "battle.win.byWipe": "{loser} has no Pokémon left in play.",

@@ -15,7 +15,7 @@
 
 import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type PlayerBoard } from "./battleStore.ts";
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
-import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -139,6 +139,11 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
           if (cond !== null && !oppActive.status.includes(cond)) {
             st().toggleStatus(opp, oppActive.uid, cond);
             push("battle.log.inflict", undefined, { cond });
+          }
+          // Defender-lock: the surviving defender can't attack on the opponent's next turn.
+          if (locksDefenderNextTurn(best.effect, oc)) {
+            st().markNoAttack(opp, oppActive.uid, s.turn + 1);
+            push("battle.atk.defLock", undefined, { p: ctx.nameOf(oppActive.card) });
           }
         }
         // Unconditional attacker-only effects: self-heal / draw (never KO) + recoil

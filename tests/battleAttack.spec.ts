@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../src/state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, energyProvides, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../src/state/battleAttack.ts";
 import type { BattleCard } from "../src/state/battleStore.ts";
 import type { CatalogCard } from "../src/data/catalog.ts";
 
@@ -203,6 +203,30 @@ describe("benchDamageAmount — unconditional opponent bench damage only", () =>
     expect(benchDamageAmount("擲1次硬幣若為正面，對手的1隻備戰寶可夢也受到30點傷害。[在備戰區不計算弱點・抵抗力。]")).toBe(0);
     expect(benchDamageAmount("造成30點傷害。")).toBe(0);
     expect(benchDamageAmount(undefined)).toBe(0);
+  });
+});
+
+describe("locksDefenderNextTurn — defender attack-lock with type qualifier", () => {
+  const basic = card({ category: "Pokemon", stage: "Basic" });
+  const evo = card({ category: "Pokemon", stage: "Stage2" });
+  const vmon = card({ category: "Pokemon", stage: "Basic", name: "皮卡丘V", nameZh: "皮卡丘V" });
+  it("unqualified locks any Pokémon", () => {
+    const e = "在下個對手的回合，受到這個招式的寶可夢無法使用招式。";
+    expect(locksDefenderNextTurn(e, basic)).toBe(true);
+    expect(locksDefenderNextTurn(e, evo)).toBe(true);
+  });
+  it("【基礎】 locks only a Basic; 進化 only an Evolution; 寶可夢【V】 only a V", () => {
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的【基礎】寶可夢，無法使用招式。", basic)).toBe(true);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的【基礎】寶可夢，無法使用招式。", evo)).toBe(false);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的進化寶可夢無法使用招式。", evo)).toBe(true);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的進化寶可夢無法使用招式。", basic)).toBe(false);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的「寶可夢【V】」，無法使用招式。", vmon)).toBe(true);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的「寶可夢【V】」，無法使用招式。", basic)).toBe(false);
+  });
+  it("does not fire on 若/擲, a non-Pokémon, or a plain attack", () => {
+    expect(locksDefenderNextTurn("擲1次硬幣若為正面，則在下個對手的回合，受到這個招式的寶可夢無法使用招式。", basic)).toBe(false);
+    expect(locksDefenderNextTurn("在下個對手的回合，受到這個招式的寶可夢無法使用招式。", null)).toBe(false);
+    expect(locksDefenderNextTurn("造成30點傷害。", basic)).toBe(false);
   });
 });
 

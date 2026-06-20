@@ -220,6 +220,22 @@ export function locksAttackerNextTurn(effect: string | undefined): boolean {
   return effect.includes("在下個自己的回合，這隻寶可夢無法使用招式");
 }
 
+/** Does the attack UNCONDITIONALLY lock the DEFENDER (the Pokémon that received it)
+ *  out of attacking on the OPPONENT's next turn ("在下個對手的回合，受到這個招式的…無法
+ *  使用招式")? The qualifier restricts which defenders it applies to — 【基礎】 only a
+ *  Basic, 進化 only an Evolution, 寶可夢【V】 only a V, otherwise any Pokémon. 0/false on
+ *  若 / 擲. Caller applies it only when the defender SURVIVES the attack. */
+export function locksDefenderNextTurn(effect: string | undefined, defender: CatalogCard | null): boolean {
+  if (effect === undefined || effect.includes("若") || effect.includes("擲")) return false;
+  if (defender === null || defender.category !== "Pokemon") return false;
+  if (!effect.includes("受到這個招式") || !effect.includes("無法使用招式")) return false;
+  const isEvolution = defender.stage !== undefined && defender.stage !== "Basic";
+  if (effect.includes("受到這個招式的【基礎】寶可夢")) return defender.stage === "Basic";
+  if (effect.includes("受到這個招式的進化寶可夢")) return isEvolution;
+  if (effect.includes("寶可夢【V】")) return cardTier(defender) === "V";
+  return effect.includes("受到這個招式的寶可夢無法使用招式"); // unqualified → any Pokémon
+}
+
 /** Prize cards taken when this Pokémon is Knocked Out (rule-box → 2, VMAX → 3). */
 export function prizeValue(card: CatalogCard | null): number {
   if (card === null) return 1;

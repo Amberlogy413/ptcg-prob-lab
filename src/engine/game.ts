@@ -13,7 +13,7 @@
  * (vs. the permissive manual sandbox) are documented in docs/11_AI_AGENT.md.
  */
 
-import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
+import { canPayCost, baseDamage, finalDamage, prizeValue, inflictedStatus, energyProvides, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "../state/battleAttack.ts";
 import type { Catalog, CatalogCard } from "../data/catalog.ts";
 import { resolveDeckRow, localizeDeckRow } from "../data/catalog.ts";
 import {
@@ -494,6 +494,11 @@ export function applyAction(s: GameState, a: Action, ctx: EngineCtx): GameState 
         const cond = inflictedStatus(atk.effect);
         if (cond !== null) {
           ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => (u.status.includes(cond) ? u : { ...u, status: [...u.status, cond] })));
+        }
+        // Defender-lock: the (surviving) defender can't attack on the opponent's next
+        // turn (s.turn + 1), if the effect's type qualifier matches this defender.
+        if (locksDefenderNextTurn(atk.effect, oc)) {
+          ns = withBoard(ns, oppId, mapUnit(ns[oppId], defenderUid, (u) => ({ ...u, noAttackTurn: s.turn + 1 })));
         }
       }
       // Bench damage (choice): flat N to a chosen opponent Bench Pokémon (no
