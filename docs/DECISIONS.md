@@ -953,3 +953,19 @@
 - **質量**:tsc 乾淨 · 黃金 27/507 · **510 vitest**(+2:拉打有利 fire / 無利 no-fire)· 0 console error ·
   數學零改動 · 實機核實真 catalog(全 7 個老大的指令印刷都 isGustEffect;真 playGust 經 store 換上揀中嘅備戰)。
 - **NEXT**:bot 進化(配合到手/神奇糖果)、能量加速、退場/能量轉移。
+
+## 2026-06-20 — bot 用神奇糖果跳階(Rare Candy)
+
+- **做法**:battleBot 新 step 2c(排喺按名進化之前,優先跳 2 階)。手上有 `isRareCandyEffect` 道具時,
+  搵場上一隻「resolved stage===Basic、非剛使出」嘅基礎,配手牌一張 `canRareCandyJump(basic, stage2)`
+  成立嘅 2 階卡,經 `engineStep(rareCandy)` 直接跳階。每回合一次(break)。
+- **安全**:引擎 applyAction 重新驗證晒(最初回合 / 剛使出唔得、真實進化線 canRareCandyJump、2 階係
+  evolution)；engineStep false = clean no-op。bot 無自己嘅 own-first-turn 檢查,靠引擎擋(覆核確認
+  乾淨 no-op、唔會誤 log)。catalog=null inert。
+- **對抗式覆核(11 agent,2 維度:合法性+終止 / 啟發式+數據)→ 9 候選、反駁後 0 確認**(引擎 parity、
+  快照迭代 break-後-一次安全、守恆+底卡疊正確、跳階優先於按名進化合理、canRareCandyJump 拒錯線/一跳/
+  1階當基礎)。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **511 vitest**(+1:小火龍→噴火龍 跳階)· 0 console error · 數學零改動 ·
+  實機核實真 catalog(全 16 個神奇糖果印刷 isRareCandyEffect;canRareCandyJump 喺真卡 小火龍 SV2a-004 →
+  噴火龍 M2-013 成立;bot 用真糖果 M1S-082 跳階,底卡疊正確、糖果入棄牌)。
+- bot 而家識:巢穴/大師/等級/超級球 + 老大的指令拉打 + 神奇糖果跳階 + 按名進化 + 抽牌支援者 + 攻擊。

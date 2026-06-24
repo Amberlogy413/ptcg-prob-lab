@@ -17,7 +17,8 @@ import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type Playe
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
-import { gameResult, makeCtx, searchSpecOf, isGustEffect, type SearchSpec } from "../engine/index.ts";
+import { gameResult, makeCtx, searchSpecOf, isGustEffect, isRareCandyEffect, type SearchSpec } from "../engine/index.ts";
+import { canRareCandyJump } from "../data/evolution.ts";
 import { engineStep } from "./battleBridge.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -110,6 +111,29 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
       // A to-hand search lands the Basic in hand — bench it now (Nest Ball already benched it).
       if (chosen.spec.to === "hand" && !st().playToBench(player, chosen.target.iid)) break;
       push("battle.log.botBall", chosen.item, { card2: ctx.nameOf(chosen.target) });
+    }
+  }
+
+  // 2c) Rare Candy (神奇糖果): jump-evolve a Basic in play directly into a Stage 2
+  //     from hand — a stronger attacker, faster. Tried BEFORE the by-name evolution
+  //     (which would only reach Stage 1) so the bot prefers the jump. Engine-routed
+  //     (engineStep → guaranteed legal): the engine bars it on the bot's own first
+  //     turn and on a just-played Basic, and only allows a REAL evolution line
+  //     (canRareCandyJump on verified PokéAPI chain data). One per turn (kept simple).
+  if (catalog !== null) {
+    const ectx = makeCtx(catalog);
+    const candy = st()[player].hand.find((c) => c.kind === "item" && isRareCandyEffect(ectx.resolve(c)?.effect));
+    if (candy !== undefined) {
+      for (const unit of unitsOf(st()[player])) {
+        if (unit.playedTurn >= st().turn) continue; // can't candy a just-played Basic
+        const basicCat = catOf(unit.card);
+        if (basicCat?.stage !== "Basic") continue;
+        const stage2 = st()[player].hand.find((c) => c.kind === "evolution" && canRareCandyJump(basicCat, catOf(c)));
+        if (stage2 !== undefined && engineStep({ type: "rareCandy", iid: candy.iid, basicUid: unit.uid, stage2HandIid: stage2.iid }, catalog)) {
+          push("battle.log.evolve", stage2);
+          break; // one Rare Candy this turn (simple, honest)
+        }
+      }
     }
   }
 

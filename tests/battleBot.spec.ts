@@ -179,6 +179,40 @@ describe("runBotTurn — deterministic heuristic", () => {
     expect(p1.discard.some((c) => c.iid === "boss")).toBe(false); // Boss's Orders not spent pointlessly
   });
 
+  it("uses Rare Candy to jump-evolve a Basic in play into a Stage 2 from hand (a real evolution line)", () => {
+    const CANDY = "從自己的手牌選擇1張【2階進化】寶可夢卡，放置於自己的場上的可進化成那隻寶可夢的【基礎】寶可夢身上，跳過【1階進化】完成進化。（無法對自己的最初回合與這個回合剛使出的寶可夢使用。）";
+    const cat = { sets: {}, cards: [
+      { id: "candy", localId: "1", name: "神奇糖果", nameZh: "神奇糖果", category: "Trainer", trainerType: "Item", set: "X", effect: CANDY },
+      { id: "charm", localId: "2", name: "小火龍", nameZh: "小火龍", category: "Pokemon", stage: "Basic", set: "X", hp: 70 },
+      { id: "char", localId: "3", name: "噴火龍", nameZh: "噴火龍", category: "Pokemon", stage: "Stage2", set: "X", hp: 170, attacks: [] },
+    ] } as unknown as Catalog;
+    normalizeCatalog(cat);
+    const inplay = (iid: string, card: BattleCard, over: Partial<InPlay> = {}): InPlay => ({ uid: iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [], ...over });
+    useBattleStore.setState({
+      started: true,
+      seed: 1,
+      shuffleNonce: 0,
+      turn: 2, // p1 is going-first, so turn 2 is past p1's own first turn (Rare Candy is allowed)
+      current: "p1",
+      firstPlayer: "p1",
+      turnEnergyAttached: false,
+      turnSupporterUsed: false,
+      turnStadiumPlayed: false,
+      turnRetreated: false,
+      everInPlay: { p1: true, p2: true },
+      p1: { ...emptyBoard(), active: inplay("u1", bc("charm", "basic", { name: "小火龍", catalogId: "charm", hp: 70 }), { playedTurn: 1 }), hand: [bc("candy", "item", { name: "神奇糖果", catalogId: "candy" }), bc("evo2", "evolution", { name: "噴火龍", catalogId: "char", hp: 170 })] },
+      p2: emptyBoard(),
+      log: [],
+    });
+
+    const events = runBotTurn("p1", cat, ctx);
+    const { p1 } = useBattleStore.getState();
+    expect(p1.active?.card.iid).toBe("evo2"); // jumped straight to the Stage 2 噴火龍
+    expect(p1.active?.under.some((c) => c.iid === "charm")).toBe(true); // the Basic 小火龍 is under it
+    expect(p1.discard.some((c) => c.iid === "candy")).toBe(true); // Rare Candy used → discard
+    expect(events.some((e) => e.key === "battle.log.evolve")).toBe(true);
+  });
+
   it("with no playable Pokémon it simply ends the turn (no fabrication)", () => {
     useBattleStore.setState({
       started: true,
