@@ -937,3 +937,19 @@
   gate 啱、超級球 topN slice 同引擎一致、log 忠實。乾淨。
 - **質量**:tsc 乾淨 · 黃金 27/507 · **508 vitest**(+1:大師球到手搜尋)· 0 console error · 數學零改動 ·
   實機核實真 catalog(bot 用大師球 SVHK-015 由牌庫搵基礎卡比獸、跳過噴火龍進化、落備戰,log 忠實)。
+
+## 2026-06-20 — bot 用老大的指令拉打(gust snipe,首個針對對手嘅 AI 戰術)
+
+- **做法**:battleBot 新 step 4.5(喺附能量同抽牌支援者之間)。若 bot 將會攻擊(mirror atkBlock:非
+  turn-1 先手、無 noAttackTurn),手上有 gust 支援者(`isGustEffect`),computes 最佳可付攻擊;
+  `koPrizes(u)` = 用最佳攻擊 KO u 可攞幾多獎賞(HP 未知 = 0)。bar = `koPrizes(對手戰鬥場)`;若有備戰
+  `koPrizes > bar`(**嚴格大過**),就經 `engineStep(playGust)` 拉佢上嚟,step 6 隨即 KO 佢。
+- **嚴格有利、冇蝕底**:只喺「拉打今回合多攞獎賞」先出手;**變動傷害(+/×)同 HP 未知一律唔出手**
+  (絕不喺唔確定嘅 KO 上拉打)。用支援者格 → 喺抽牌支援者之前評估(拉打通常比抽牌值)。engineStep
+  非法時 clean no-op。catalog=null inert。
+- **一致性**:gust 嘅 koPrizes 同 step 6 用同一 `baseDamage(best)` + `finalDamage` + `prizeValue`,
+  所以拉上嚟嗰隻 step 6 一定 KO 到(覆核確認無 mismatch)。
+- **對抗式覆核(14 agent,2 維度:啟發式正確性 / 一致性+安全)→ 12 候選、反駁後 0 確認**。
+- **質量**:tsc 乾淨 · 黃金 27/507 · **510 vitest**(+2:拉打有利 fire / 無利 no-fire)· 0 console error ·
+  數學零改動 · 實機核實真 catalog(全 7 個老大的指令印刷都 isGustEffect;真 playGust 經 store 換上揀中嘅備戰)。
+- **NEXT**:bot 進化(配合到手/神奇糖果)、能量加速、退場/能量轉移。

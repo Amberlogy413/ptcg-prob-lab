@@ -17,7 +17,7 @@ import { useBattleStore, type PlayerId, type BattleCard, type InPlay, type Playe
 import { applyAutoEffect, AUTO_EFFECTS } from "./battleEffects.ts";
 import { canPayCost, baseDamage, finalDamage, prizeValue, isVariableDamage, inflictedStatus, selfHealAmount, attackDrawCount, selfDamageAmount, locksAttackerNextTurn, locksDefenderNextTurn, discardEnergyCount, energyDiscardCombos, benchDamageAmount } from "./battleAttack.ts";
 import { resolveDeckRow, type Catalog, type CatalogCard } from "../data/catalog.ts";
-import { gameResult, makeCtx, searchSpecOf, type SearchSpec } from "../engine/index.ts";
+import { gameResult, makeCtx, searchSpecOf, isGustEffect, type SearchSpec } from "../engine/index.ts";
 import { engineStep } from "./battleBridge.ts";
 
 /** One localized log line, as an i18n key + params (the view does the t()). */
@@ -126,6 +126,50 @@ export function runBotTurn(player: PlayerId, catalog: Catalog | null, ctx: BotCt
   if (!st().turnEnergyAttached && st()[player].active !== null) {
     const energy = st()[player].hand.find((c) => c.kind === "energy-basic" || c.kind === "energy-special");
     if (energy !== undefined && st().attachEnergy(player, energy.iid, st()[player].active!.uid)) push("battle.log.energy", energy);
+  }
+
+  // 4.5) Boss's Orders (老大的指令, gust): if the bot WILL attack, and dragging up an
+  //      OPPONENT Benched Pokémon lets it take STRICTLY MORE Prize cards this turn than
+  //      KOing the current Active, gust that target up (engine-routed → guaranteed
+  //      legal). Clearly beneficial — only fires when it nets more prizes, so there is
+  //      no downside. It uses the Supporter slot, so it is evaluated BEFORE the draw
+  //      Supporter. Skipped for variable "+/×" damage (the KO would be only approximate;
+  //      we never gust on an uncertain KO) and when any HP is unknown (never assume).
+  if (catalog !== null && !st().turnSupporterUsed) {
+    const s = st();
+    const me = s[player];
+    const oppB = s[opp];
+    const active = me.active;
+    const atkBlock = (s.turn === 1 && player === s.firstPlayer) || (active !== null && active.noAttackTurn === s.turn);
+    if (active !== null && oppB.active !== null && oppB.bench.length > 0 && !atkBlock) {
+      const ac = catOf(active.card);
+      const best = (ac?.attacks ?? [])
+        .filter((a) => canPayCost(active.energy, a.cost))
+        .sort((x, y) => baseDamage(y.damage) - baseDamage(x.damage))[0];
+      const gust = me.hand.find((c) => c.kind === "supporter" && isGustEffect(catOf(c)?.effect));
+      if (best !== undefined && gust !== undefined && !isVariableDamage(best.damage)) {
+        const base = baseDamage(best.damage);
+        // Prizes the bot would take this turn by KOing `u` with its best attack (0 if it
+        // can't KO it or its HP is unknown). Bench damage = main attack damage only.
+        const koPrizes = (u: InPlay): number => {
+          if (u.card.hp === undefined) return 0;
+          const { damage } = finalDamage(ac, catOf(u.card), base);
+          return u.damage + damage >= u.card.hp ? prizeValue(catOf(u.card)) : 0;
+        };
+        let bestTarget: InPlay | undefined;
+        let bestPrizes = koPrizes(oppB.active); // the bar to beat = KOing the current Active
+        for (const u of oppB.bench) {
+          const p = koPrizes(u);
+          if (p > bestPrizes) {
+            bestPrizes = p;
+            bestTarget = u;
+          }
+        }
+        if (bestTarget !== undefined && engineStep({ type: "playGust", iid: gust.iid, targetUid: bestTarget.uid }, catalog)) {
+          push("battle.log.botGust", gust, { card2: ctx.nameOf(bestTarget.card) });
+        }
+      }
+    }
   }
 
   // 5) Play a known choice-free draw Supporter when the hand is low + allowed.

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { useBattleStore, type BattleCard, type PlayerBoard } from "../src/state/battleStore.ts";
+import { useBattleStore, type BattleCard, type InPlay, type PlayerBoard } from "../src/state/battleStore.ts";
 import { runBotTurn } from "../src/state/battleBot.ts";
 import { normalizeCatalog, type Catalog } from "../src/data/catalog.ts";
 
@@ -111,6 +111,72 @@ describe("runBotTurn — deterministic heuristic", () => {
     expect(p1.bench.some((u) => u.card.iid === "evo")).toBe(false); // never benched the evolution
     expect(p1.discard.some((c) => c.iid === "mb")).toBe(true); // Master Ball used → discard
     expect(events.some((e) => e.key === "battle.log.botBall")).toBe(true);
+  });
+
+  it("gusts up a KO'able Benched Pokémon (Boss's Orders) when it nets more prizes, then KOs it", () => {
+    const GUST = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換。";
+    const cat = { sets: {}, cards: [
+      { id: "boss", localId: "1", name: "老大的指令", nameZh: "老大的指令", category: "Trainer", trainerType: "Supporter", set: "X", effect: GUST },
+      { id: "atk", localId: "2", name: "皮卡丘", nameZh: "皮卡丘", category: "Pokemon", stage: "Basic", set: "X", types: ["Lightning"], hp: 70, attacks: [{ name: "Bolt", cost: ["Colorless"], damage: 90 }] },
+      { id: "wall", localId: "3", name: "高牆", nameZh: "高牆", category: "Pokemon", stage: "Basic", set: "X", hp: 200, attacks: [] },
+      { id: "squishy", localId: "4", name: "軟軟", nameZh: "軟軟", category: "Pokemon", stage: "Basic", set: "X", hp: 60, attacks: [] },
+    ] } as unknown as Catalog;
+    normalizeCatalog(cat);
+    const inplay = (iid: string, card: BattleCard, over: Partial<InPlay> = {}): InPlay => ({ uid: iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [], ...over });
+    useBattleStore.setState({
+      started: true,
+      seed: 1,
+      shuffleNonce: 0,
+      turn: 2,
+      current: "p1",
+      firstPlayer: "p1",
+      turnEnergyAttached: false,
+      turnSupporterUsed: false,
+      turnStadiumPlayed: false,
+      turnRetreated: false,
+      everInPlay: { p1: true, p2: true },
+      p1: { ...emptyBoard(), active: inplay("atk", bc("atk", "basic", { name: "皮卡丘", catalogId: "atk", hp: 70 }), { energy: [bc("le", "energy-basic", { name: "基本雷能量" })] }), hand: [bc("boss", "supporter", { name: "老大的指令", catalogId: "boss" })] },
+      // opp Active (高牆 200HP) can't be KO'd by 90; the Benched 軟軟 (60HP) can.
+      p2: { ...emptyBoard(), active: inplay("wall", bc("wall", "basic", { name: "高牆", catalogId: "wall", hp: 200 })), bench: [inplay("squishy", bc("squishy", "basic", { name: "軟軟", catalogId: "squishy", hp: 60 }))] },
+      log: [],
+    });
+
+    const events = runBotTurn("p1", cat, ctx);
+    const { p1, p2 } = useBattleStore.getState();
+    expect(events.some((e) => e.key === "battle.log.botGust")).toBe(true); // gusted the Bench Pokémon up
+    expect(p2.bench.some((u) => u.card.iid === "wall")).toBe(true); // the old Active was demoted to Bench
+    expect(p2.active).toBeNull(); // the gusted-up 軟軟 was KO'd (opp promotes on its own turn)
+    expect(p2.discard.some((c) => c.iid === "squishy")).toBe(true);
+    expect(p1.prizes.length).toBe(5); // took 1 Prize for the KO
+    expect(p1.discard.some((c) => c.iid === "boss")).toBe(true); // Boss's Orders used → discard
+  });
+
+  it("does NOT gust when KOing the current Active is worth at least as much (no pointless gust)", () => {
+    const GUST = "選擇1隻對手的備戰寶可夢，與戰鬥寶可夢互換。";
+    const cat = { sets: {}, cards: [
+      { id: "boss", localId: "1", name: "老大的指令", nameZh: "老大的指令", category: "Trainer", trainerType: "Supporter", set: "X", effect: GUST },
+      { id: "atk", localId: "2", name: "皮卡丘", nameZh: "皮卡丘", category: "Pokemon", stage: "Basic", set: "X", types: ["Lightning"], hp: 70, attacks: [{ name: "Bolt", cost: ["Colorless"], damage: 90 }] },
+      { id: "front", localId: "3", name: "前鋒", nameZh: "前鋒", category: "Pokemon", stage: "Basic", set: "X", hp: 60, attacks: [] },
+      { id: "back", localId: "4", name: "後排", nameZh: "後排", category: "Pokemon", stage: "Basic", set: "X", hp: 60, attacks: [] },
+    ] } as unknown as Catalog;
+    normalizeCatalog(cat);
+    const inplay = (iid: string, card: BattleCard, over: Partial<InPlay> = {}): InPlay => ({ uid: iid, card, under: [], energy: [], tools: [], damage: 0, playedTurn: 1, status: [], ...over });
+    useBattleStore.setState({
+      started: true, seed: 1, shuffleNonce: 0, turn: 2, current: "p1", firstPlayer: "p1",
+      turnEnergyAttached: false, turnSupporterUsed: false, turnStadiumPlayed: false, turnRetreated: false,
+      everInPlay: { p1: true, p2: true },
+      p1: { ...emptyBoard(), active: inplay("atk", bc("atk", "basic", { name: "皮卡丘", catalogId: "atk", hp: 70 }), { energy: [bc("le", "energy-basic", { name: "基本雷能量" })] }), hand: [bc("boss", "supporter", { name: "老大的指令", catalogId: "boss" })] },
+      // both the Active and the Bench are 1-prize 60HP KOs — gusting gains nothing.
+      p2: { ...emptyBoard(), active: inplay("front", bc("front", "basic", { name: "前鋒", catalogId: "front", hp: 60 })), bench: [inplay("back", bc("back", "basic", { name: "後排", catalogId: "back", hp: 60 }))] },
+      log: [],
+    });
+
+    const events = runBotTurn("p1", cat, ctx);
+    const { p1, p2 } = useBattleStore.getState();
+    expect(events.some((e) => e.key === "battle.log.botGust")).toBe(false); // no gust — KOing the Active is just as good
+    expect(p2.active).toBeNull(); // it KO'd the current Active (前鋒) directly
+    expect(p2.bench.some((u) => u.card.iid === "back")).toBe(true); // the Bench Pokémon was never dragged up
+    expect(p1.discard.some((c) => c.iid === "boss")).toBe(false); // Boss's Orders not spent pointlessly
   });
 
   it("with no playable Pokémon it simply ends the turn (no fabrication)", () => {
